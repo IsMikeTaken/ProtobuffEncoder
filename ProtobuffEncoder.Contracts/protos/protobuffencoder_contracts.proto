@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package ProtobuffEncoder.Contracts;
+
+enum NotificationLevel {
+  Info = 0;
+  Warning = 1;
+  Error = 2;
+}
+
+message NotificationMessage {
+  string Source = 1;
+  string Text = 2;
+  NotificationLevel Level = 3;
+  int64 TimestampUtc = 4;
+  repeated string Tags = 5;
+}
+
+message AckResponse {
+  bool Accepted = 1;
+  string MessageId = 2;
+}
+
+message WeatherRequest {
+  string City = 1;
+  int32 Days = 2;
+  bool IncludeHourly = 3;
+}
+
+message DayForecast {
+  string Date = 1;
+  double TemperatureMin = 2;
+  double TemperatureMax = 3;
+  string Condition = 4;
+  int32 HumidityPercent = 5;
+  optional double WindSpeed = 6;
+}
+
+message WeatherResponse {
+  string City = 1;
+  repeated DayForecast Forecasts = 2;
+  int64 GeneratedAtUtc = 3;
+}

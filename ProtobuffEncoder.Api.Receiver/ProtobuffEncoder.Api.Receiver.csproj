@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\ProtobuffEncoder.AspNetCore\ProtobuffEncoder.AspNetCore.csproj" />
+    <!-- NO reference to ProtobuffEncoder.Contracts — decoding is schema-driven -->
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <!-- Copy .proto schemas from the Contracts project as the source of truth -->
+  <ItemGroup>
+    <Content Include="..\ProtobuffEncoder.Contracts\protos\**\*.proto"
+             Link="protos\%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>
