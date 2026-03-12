@@ -29,22 +29,21 @@ app.MapGet("/api/send-weather", async (
         IncludeHourly = includeHourly ?? false
     };
 
-    var response = await client.PostProtobufAsync<WeatherRequest, WeatherResponse>(
-        "/api/weather", request);
+    var response = await client.PostProtobufAsync<WeatherRequest, WeatherResponse>("/api/weather", request);
 
     // Return as JSON for easy inspection
     return Results.Ok(new
     {
         response.City,
         response.GeneratedAtUtc,
-        Forecasts = response.Forecasts.Select(f => new
+        Forecasts = response.Forecasts.Select(forecast => new
         {
-            f.Date,
-            f.TemperatureMin,
-            f.TemperatureMax,
-            f.Condition,
-            f.HumidityPercent,
-            f.WindSpeed
+            forecast.Date,
+            forecast.TemperatureMin,
+            forecast.TemperatureMax,
+            forecast.Condition,
+            forecast.HumidityPercent,
+            forecast.WindSpeed
         })
     });
 });
@@ -90,5 +89,3 @@ app.MapPost("/api/send-notification", async (
 app.MapGet("/health", () => Results.Ok("Sender is running"));
 
 app.Run();
-
-record NotificationInput(string? Source, string? Text, string? Level, List<string>? Tags);

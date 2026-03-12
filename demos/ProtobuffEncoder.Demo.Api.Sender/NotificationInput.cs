@@ -1,0 +1,1 @@
+record NotificationInput(string? Source, string? Text, string? Level, List<string>? Tags);

@@ -2,13 +2,6 @@ using ProtobuffEncoder.Attributes;
 
 namespace ProtobuffEncoder.Console;
 
-public enum ContactType
-{
-    Unknown = 0,
-    Personal = 1,
-    Work = 2
-}
-
 [ProtoContract]
 public class Person
 {
@@ -37,21 +30,4 @@ public class Person
 
     // Collection of nested messages
     public List<PhoneNumber> PhoneNumbers { get; set; } = [];
-}
-
-[ProtoContract]
-public class Address
-{
-    public string Street { get; set; } = "";
-    public string City { get; set; } = "";
-
-    [ProtoField(FieldNumber = 10)]
-    public int ZipCode { get; set; }
-}
-
-[ProtoContract]
-public class PhoneNumber
-{
-    public string Number { get; set; } = "";
-    public ContactType Type { get; set; }
 }
