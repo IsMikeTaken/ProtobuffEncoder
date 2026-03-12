@@ -3,7 +3,9 @@
     <Project Path="src/ProtobuffEncoder/ProtobuffEncoder.csproj" />
     <Project Path="src/ProtobuffEncoder.AspNetCore/ProtobuffEncoder.AspNetCore.csproj" />
     <Project Path="src/ProtobuffEncoder.Contracts/ProtobuffEncoder.Contracts.csproj" />
+    <Project Path="src/ProtobuffEncoder.WebSockets/ProtobuffEncoder.WebSockets.csproj" />
   </Folder>
+  <Folder Name="/tests/" />
 
   <Folder Name="/tools/">
     <Project Path="tools/ProtobuffEncoder.Tool/ProtobuffEncoder.Tool.csproj" />
@@ -15,6 +17,7 @@
     <Project Path="demos/ProtobuffEncoder.Demo.Bidirectional.Server/ProtobuffEncoder.Demo.Bidirectional.Server.csproj" />
     <Project Path="demos/ProtobuffEncoder.Demo.Bidirectional.Client/ProtobuffEncoder.Demo.Bidirectional.Client.csproj" />
   </Folder>
+  <Folder Name="/demos/" />
 
   <Folder Name="/demos/console/">
     <Project Path="demos/ProtobuffEncoder.Demo.Console/ProtobuffEncoder.Demo.Console.csproj" />

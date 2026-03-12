@@ -1,6 +1,5 @@
 using ProtobuffEncoder.Contracts;
-using ProtobuffEncoder.Transport;
-using System.Net.WebSockets;
+using ProtobuffEncoder.WebSockets;
 
 Console.WriteLine("=== Protobuf Bidirectional Streaming Client ===\n");
 
@@ -50,9 +49,7 @@ static async Task RunChatDemo(string serverUrl, bool verbose)
 {
     Console.WriteLine("\n--- Starting Bidirectional Chat Demo ---");
 
-    // ==========================================
-    // CONFIGURATION PHASE
-    // ==========================================
+    // Configuration
     Console.WriteLine("Configure your test run (Press Enter to use defaults):");
 
     Console.Write("  Number of messages to send [Default: 5]: ");
@@ -70,18 +67,33 @@ static async Task RunChatDemo(string serverUrl, bool verbose)
 
     Console.WriteLine($"\n[Config] Sending {msgCount} messages ('{customText}'), {delayMs}ms apart. Invalid msg: {sendInvalid}\n");
 
-    // ==========================================
-    // EXECUTION PHASE
-    // ==========================================
-    LogVerbose(verbose, "Initializing ClientWebSocket...");
+    // Use the framework client with retry
+    await using var client = new ProtobufWebSocketClient<NotificationMessage, NotificationMessage>(
+        new ProtobufWebSocketClientOptions
+        {
+            ServerUri = new Uri($"{serverUrl}/ws/chat"),
+            RetryPolicy = new RetryPolicy { MaxRetries = 3, InitialDelay = TimeSpan.FromSeconds(1) },
+            OnConnect = () =>
+            {
+                Console.WriteLine("  Connected to chat endpoint.");
+                return Task.CompletedTask;
+            },
+            OnRetry = (attempt, delay) =>
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"  [Retry] Attempt #{attempt}, waiting {delay.TotalSeconds:F1}s...");
+                Console.ResetColor();
+                return Task.CompletedTask;
+            },
+            OnError = ex =>
+            {
+                LogVerbose(verbose, $"[Error] {ex.Message}");
+                return Task.CompletedTask;
+            }
+        });
 
-    using var ws = new ClientWebSocket();
-    await ws.ConnectAsync(new Uri($"{serverUrl}/ws/chat"), CancellationToken.None);
-    Console.WriteLine("  Connected to chat endpoint.");
-
-    LogVerbose(verbose, "Wrapping WebSocket in ProtobufDuplexStream<NotificationMessage, NotificationMessage>...");
-    await using var duplex = new ProtobufDuplexStream<NotificationMessage, NotificationMessage>(
-        new ClientWebSocketStream(ws), ownsStream: true);
+    LogVerbose(verbose, "Connecting with automatic retry...");
+    await client.ConnectAsync();
 
     LogVerbose(verbose, "Starting concurrent Send and Receive tasks...");
 
@@ -100,22 +112,21 @@ static async Task RunChatDemo(string serverUrl, bool verbose)
                 Tags = ["demo", "auto-generated"]
             };
 
-            LogVerbose(verbose, $"[SendTask] Serializing and pushing message {i}/{msgCount} to stream...");
-            await duplex.SendAsync(msg);
+            LogVerbose(verbose, $"[SendTask] Pushing message {i}/{msgCount}...");
+            await client.SendAsync(msg);
             Console.WriteLine($"  [Sent] {text}");
 
-            if (i < msgCount || sendInvalid) // Don't delay after the last message unless sending the invalid one
+            if (i < msgCount || sendInvalid)
             {
-                LogVerbose(verbose, $"[SendTask] Pacing next message (delay {delayMs}ms)...");
+                LogVerbose(verbose, $"[SendTask] Pacing ({delayMs}ms)...");
                 await Task.Delay(delayMs);
             }
         }
 
-        // Trigger Validation Rejection conditionally
         if (sendInvalid)
         {
-            LogVerbose(verbose, "[SendTask] Firing intentionally invalid (empty) message to test server validation...");
-            await duplex.SendAsync(new NotificationMessage
+            LogVerbose(verbose, "[SendTask] Firing intentionally invalid (empty) message...");
+            await client.SendAsync(new NotificationMessage
             {
                 Source = "Client",
                 Text = "",
@@ -123,22 +134,22 @@ static async Task RunChatDemo(string serverUrl, bool verbose)
                 TimestampUtc = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
             });
             Console.WriteLine("  [Sent] (empty — should be rejected)");
-            await Task.Delay(500); // Give server a moment to reply with the error
+            await Task.Delay(500);
         }
 
         LogVerbose(verbose, "[SendTask] Initiating graceful closure...");
-        await ws.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "Done", CancellationToken.None);
-        LogVerbose(verbose, "[SendTask] Closure frame sent. Send task complete.");
+        await client.CloseAsync();
+        LogVerbose(verbose, "[SendTask] Send task complete.");
     });
 
     // --- Receive Task ---
     var receiveTask = Task.Run(async () =>
     {
-        LogVerbose(verbose, "[ReceiveTask] Awaiting incoming Protobuf frames via ReceiveAllAsync()...");
+        LogVerbose(verbose, "[ReceiveTask] Listening via ReceiveAllAsync()...");
 
-        await foreach (var reply in duplex.ReceiveAllAsync())
+        await foreach (var reply in client.ReceiveAllAsync())
         {
-            LogVerbose(verbose, $"[ReceiveTask] Deserialized incoming frame from {reply.Source}.");
+            LogVerbose(verbose, $"[ReceiveTask] Received from {reply.Source}.");
 
             var levelColor = reply.Level switch
             {
@@ -153,7 +164,7 @@ static async Task RunChatDemo(string serverUrl, bool verbose)
                 Console.WriteLine($"         Tags: {string.Join(", ", reply.Tags)}");
             Console.ResetColor();
         }
-        LogVerbose(verbose, "[ReceiveTask] IAsyncEnumerable completed. Connection closed by server.");
+        LogVerbose(verbose, "[ReceiveTask] Stream ended.");
     });
 
     await Task.WhenAll(sendTask, receiveTask);
@@ -167,16 +178,13 @@ static async Task RunWeatherDemo(string serverUrl, bool verbose)
 {
     Console.WriteLine("\n--- Starting Weather Request/Response Demo ---");
 
-    // ==========================================
-    // CONFIGURATION PHASE
-    // ==========================================
+    // Configuration
     Console.WriteLine("Configure your test run (Press Enter to use defaults):");
 
     Console.Write("  Enter cities separated by commas [Default: Amsterdam, London, Tokyo]: ");
     string citiesInput = Console.ReadLine()?.Trim() ?? "";
     if (string.IsNullOrEmpty(citiesInput)) citiesInput = "Amsterdam, London, Tokyo";
 
-    // Clean up the input string into a neat array
     string[] cities = citiesInput.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
     Console.Write("  Number of forecast days [Default: 3]: ");
@@ -187,17 +195,28 @@ static async Task RunWeatherDemo(string serverUrl, bool verbose)
 
     Console.WriteLine($"\n[Config] Requesting {days}-day forecast for {cities.Length} cities. Hourly data: {includeHourly}\n");
 
-    // ==========================================
-    // EXECUTION PHASE
-    // ==========================================
-    LogVerbose(verbose, "Initializing ClientWebSocket...");
+    // Use the framework client with retry
+    await using var client = new ProtobufWebSocketClient<WeatherRequest, WeatherResponse>(
+        new ProtobufWebSocketClientOptions
+        {
+            ServerUri = new Uri($"{serverUrl}/ws/weather-stream"),
+            RetryPolicy = new RetryPolicy { MaxRetries = 3 },
+            OnConnect = () =>
+            {
+                Console.WriteLine("  Connected to weather stream endpoint.");
+                return Task.CompletedTask;
+            },
+            OnRetry = (attempt, delay) =>
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"  [Retry] Attempt #{attempt}, waiting {delay.TotalSeconds:F1}s...");
+                Console.ResetColor();
+                return Task.CompletedTask;
+            }
+        });
 
-    using var ws = new ClientWebSocket();
-    await ws.ConnectAsync(new Uri($"{serverUrl}/ws/weather-stream"), CancellationToken.None);
-    Console.WriteLine("  Connected to weather stream endpoint.");
-
-    LogVerbose(verbose, "Wrapping WebSocket in ProtobufDuplexStream<WeatherRequest, WeatherResponse>...");
-    await using var duplex = new ProtobufDuplexStream<WeatherRequest, WeatherResponse>(new ClientWebSocketStream(ws), ownsStream: true);
+    LogVerbose(verbose, "Connecting...");
+    await client.ConnectAsync();
 
     foreach (var city in cities)
     {
@@ -208,12 +227,12 @@ static async Task RunWeatherDemo(string serverUrl, bool verbose)
             IncludeHourly = includeHourly
         };
 
-        LogVerbose(verbose, $"\n[Weather] Encoding WeatherRequest for '{city}'...");
-        await duplex.SendAsync(request);
+        LogVerbose(verbose, $"\n[Weather] Sending request for '{city}'...");
+        await client.SendAsync(request);
         Console.WriteLine($"  [Sent] Weather request for {city}");
 
-        LogVerbose(verbose, "[Weather] Yielding thread, awaiting WeatherResponse from stream...");
-        var response = await duplex.ReceiveAsync();
+        LogVerbose(verbose, "[Weather] Awaiting response...");
+        var response = await client.ReceiveAsync();
 
         if (response is null)
         {
@@ -228,13 +247,13 @@ static async Task RunWeatherDemo(string serverUrl, bool verbose)
         foreach (var day in response.Forecasts)
         {
             var wind = day.WindSpeed.HasValue ? $" | Wind: {day.WindSpeed:F1} km/h" : "";
-            Console.WriteLine($"         {day.Date}: {day.TemperatureMin:F1}°C – {day.TemperatureMax:F1}°C | {day.Condition} | Humidity: {day.HumidityPercent}%{wind}");
+            Console.WriteLine($"         {day.Date}: {day.TemperatureMin:F1} - {day.TemperatureMax:F1} C | {day.Condition} | Humidity: {day.HumidityPercent}%{wind}");
         }
-        LogVerbose(verbose, "[Weather] Response fully processed.");
+        LogVerbose(verbose, "[Weather] Response processed.");
     }
 
-    LogVerbose(verbose, "Closing WebSocket gracefully...");
-    await ws.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "Done", CancellationToken.None);
+    LogVerbose(verbose, "Closing connection...");
+    await client.CloseAsync();
     Console.WriteLine("--- Weather demo complete ---\n");
 }
 

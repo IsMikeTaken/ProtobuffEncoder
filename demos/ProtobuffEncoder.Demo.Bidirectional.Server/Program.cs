@@ -5,14 +5,17 @@ using System.Text;
 using System.Text.Json;
 using ProtobuffEncoder.Contracts;
 using ProtobuffEncoder.Transport;
+using ProtobuffEncoder.WebSockets;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Register connection managers for each protobuf WebSocket endpoint
+builder.Services.AddProtobufWebSocketEndpoint<NotificationMessage, NotificationMessage>();
+builder.Services.AddProtobufWebSocketEndpoint<WeatherResponse, WeatherRequest>();
+
 var app = builder.Build();
 
-// Configure WebSocket options (e.g., keep-alive intervals to prevent proxy timeouts)
-var webSocketOptions = new WebSocketOptions { KeepAliveInterval = TimeSpan.FromMinutes(2) };
-app.UseWebSockets(webSocketOptions);
-
+app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromMinutes(2) });
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
@@ -20,138 +23,149 @@ var jsonOpts = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPoli
 string[] conditions = ["Sunny", "Cloudy", "Rainy", "Partly Cloudy", "Stormy", "Snowy", "Windy"];
 
 // =============================================================================
-// Protobuf WebSocket endpoints
+// Protobuf WebSocket endpoints — using the framework
 // =============================================================================
 
-app.MapGet("/ws/chat", async (HttpContext ctx) =>
+var chatManager = app.Services.GetRequiredService<WebSocketConnectionManager<NotificationMessage, NotificationMessage>>();
+
+app.MapProtobufWebSocket<NotificationMessage, NotificationMessage>("/ws/chat", options =>
 {
-    if (!ctx.WebSockets.IsWebSocketRequest) { ctx.Response.StatusCode = 400; return; }
-    using var ws = await ctx.WebSockets.AcceptWebSocketAsync();
-    app.Logger.LogInformation("[Protobuf] Chat client connected");
+    options.ConfigureReceiveValidation = v =>
+        v.Require(m => !string.IsNullOrEmpty(m.Text), "Message text cannot be empty");
 
-    await using var duplex = new ProtobufDuplexStream<NotificationMessage, NotificationMessage>(
-        new WebSocketStream(ws), ownsStream: true);
+    options.OnInvalidReceive = InvalidMessageBehavior.Skip;
 
-    var validator = new ValidationPipeline<NotificationMessage>();
-    validator.Require(m => !string.IsNullOrEmpty(m.Text), "Message text cannot be empty");
+    options.OnMessageRejected = async (conn, msg, result) =>
+    {
+        await conn.SendAsync(new NotificationMessage
+        {
+            Source = "Server",
+            Text = $"Rejected: {result.ErrorMessage}",
+            Level = NotificationLevel.Error,
+            TimestampUtc = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+        });
+    };
+
+    // Background push task per connection
+    options.OnConnect = async conn =>
+    {
+        app.Logger.LogInformation("[Chat] Client {Id} connected ({Count} total)",
+            conn.ConnectionId, chatManager.Count);
+
+        // Fire a background task that pushes system messages on a timer
+        _ = Task.Run(async () =>
+        {
+            string[] tips =
+            [
+                "Tip: You can type /time to get the server's UTC time.",
+                "Tip: Type /quote for a random programming quote.",
+                "System: Memory usage is stable at 45MB.",
+                "System: Simulated backup completed successfully."
+            ];
+
+            try
+            {
+                while (conn.IsConnected)
+                {
+                    await Task.Delay(Random.Shared.Next(8000, 15000));
+                    if (!conn.IsConnected) break;
+
+                    await conn.SendAsync(new NotificationMessage
+                    {
+                        Source = "SystemBot",
+                        Text = tips[Random.Shared.Next(tips.Length)],
+                        Level = NotificationLevel.Info,
+                        TimestampUtc = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                        Tags = ["system", "broadcast"]
+                    });
+                }
+            }
+            catch { /* connection closed */ }
+        });
+    };
 
     int messageCount = 0;
 
-    // Create a linked token so we can cancel the background task when the socket closes
-    using var cts = CancellationTokenSource.CreateLinkedTokenSource(ctx.RequestAborted);
-
-    // FEATURE 1: Unsolicited Server Push (Background Thread)
-    // This demonstrates true full-duplex capabilities: writing to the stream 
-    // on a timer while the main thread is blocked waiting to read.
-    var serverPushTask = Task.Run(async () =>
+    options.OnMessage = async (conn, incoming) =>
     {
-        string[] tips = [
-            "Tip: You can type /time to get the server's UTC time.",
-            "Tip: Type /quote for a random programming quote.",
-            "System: Memory usage is stable at 45MB.",
-            "System: Simulated backup completed successfully."
-        ];
+        var count = Interlocked.Increment(ref messageCount);
 
-        try
+        app.Logger.LogInformation("[Chat] [{Level}] from {Source}: {Text}",
+            incoming.Level, incoming.Source, incoming.Text);
+
+        // Smart command routing
+        string responseText;
+        var text = incoming.Text.Trim().ToLower();
+
+        if (text == "/ping") responseText = "Pong!";
+        else if (text == "/time") responseText = $"Server Time: {DateTime.UtcNow:O}";
+        else if (text == "/quote") responseText = "\"There are only two hard things in Computer Science: cache invalidation and naming things.\"";
+        else if (text == "/broadcast")
         {
-            while (!cts.Token.IsCancellationRequested)
+            // Demonstrate broadcast: send to ALL connected chat clients
+            await chatManager.BroadcastAsync(new NotificationMessage
             {
-                await Task.Delay(Random.Shared.Next(8000, 15000), cts.Token);
-
-                await duplex.SendAsync(new NotificationMessage
-                {
-                    Source = "SystemBot",
-                    Text = tips[Random.Shared.Next(tips.Length)],
-                    Level = NotificationLevel.Info,
-                    TimestampUtc = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-                    Tags = ["system", "broadcast"]
-                });
-            }
-        }
-        catch (OperationCanceledException) { /* Expected on disconnect */ }
-    });
-
-    try
-    {
-        // FEATURE 2: Smart Command Routing
-        await foreach (var incoming in duplex.ReceiveAllAsync().WithCancellation(cts.Token))
-        {
-            var validation = validator.Validate(incoming);
-            if (!validation.IsValid)
-            {
-                await duplex.SendAsync(new NotificationMessage { Source = "Server", Text = $"Rejected: {validation.ErrorMessage}", Level = NotificationLevel.Error, TimestampUtc = DateTimeOffset.UtcNow.ToUnixTimeSeconds() });
-                continue;
-            }
-
-            messageCount++;
-            app.Logger.LogInformation("[Protobuf] [{Level}] from {Source}: {Text}", incoming.Level, incoming.Source, incoming.Text);
-
-            // Handle Bot Commands
-            string responseText;
-            var text = incoming.Text.Trim().ToLower();
-
-            if (text == "/ping") responseText = "Pong! 🏓";
-            else if (text == "/time") responseText = $"Server Time: {DateTime.UtcNow:O}";
-            else if (text == "/quote") responseText = "“There are only two hard things in Computer Science: cache invalidation and naming things.”";
-            else responseText = $"Ack #{messageCount}: received \"{incoming.Text}\"";
-
-            await duplex.SendAsync(new NotificationMessage
-            {
-                Source = "EchoBot",
-                Text = responseText,
-                Level = NotificationLevel.Info,
+                Source = "Broadcast",
+                Text = $"[{conn.ConnectionId}] says: {incoming.Text}",
+                Level = NotificationLevel.Warning,
                 TimestampUtc = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-                Tags = ["echo", $"msg-{messageCount}"]
+                Tags = ["broadcast"]
             });
+            return;
         }
-    }
-    catch (Exception ex) when (ex is WebSocketException || ex is OperationCanceledException) { }
-    finally
-    {
-        cts.Cancel(); // Ensure the background push task stops when the user disconnects
-    }
+        else responseText = $"Ack #{count}: received \"{incoming.Text}\"";
 
-    app.Logger.LogInformation("[Protobuf] Chat client disconnected. Total: {Count}", messageCount);
+        await conn.SendAsync(new NotificationMessage
+        {
+            Source = "EchoBot",
+            Text = responseText,
+            Level = NotificationLevel.Info,
+            TimestampUtc = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+            Tags = ["echo", $"msg-{count}"]
+        });
+    };
+
+    options.OnDisconnect = conn =>
+    {
+        app.Logger.LogInformation("[Chat] Client {Id} disconnected", conn.ConnectionId);
+        return Task.CompletedTask;
+    };
 });
 
-app.MapGet("/ws/weather-stream", async (HttpContext ctx) =>
+app.MapProtobufWebSocket<WeatherResponse, WeatherRequest>("/ws/weather-stream", options =>
 {
-    if (!ctx.WebSockets.IsWebSocketRequest) { ctx.Response.StatusCode = 400; return; }
-    using var ws = await ctx.WebSockets.AcceptWebSocketAsync();
-    app.Logger.LogInformation("[Protobuf] Weather client connected");
-
-    await using var duplex = new ProtobufDuplexStream<WeatherResponse, WeatherRequest>(
-        new WebSocketStream(ws), ownsStream: true);
-
-    try
+    options.OnConnect = conn =>
     {
-        await foreach (var request in duplex.ReceiveAllAsync().WithCancellation(ctx.RequestAborted))
+        app.Logger.LogInformation("[Weather] Client {Id} connected", conn.ConnectionId);
+        return Task.CompletedTask;
+    };
+
+    options.OnMessage = async (conn, request) =>
+    {
+        app.Logger.LogInformation("[Weather] Request: {City} for {Days} days", request.City, request.Days);
+
+        // Progressive streaming: immediate ack, then full response
+        await conn.SendAsync(new WeatherResponse
         {
-            app.Logger.LogInformation("[Protobuf] Weather request: {City} for {Days} days", request.City, request.Days);
+            City = $"[Calculating data for {request.City}...]",
+            GeneratedAtUtc = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+            Forecasts = []
+        });
 
-            // FEATURE 3: Progressive Streaming
-            // 1. Send an immediate "Ack/Processing" frame so the UI feels incredibly responsive
-            await duplex.SendAsync(new WeatherResponse
-            {
-                City = $"[Calculating data for {request.City}...]",
-                GeneratedAtUtc = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-                Forecasts = [] // Empty array to denote pending state
-            });
+        await Task.Delay(Random.Shared.Next(800, 1500));
 
-            // 2. Simulate heavy lifting (e.g., reaching out to a 3rd party Weather API)
-            await Task.Delay(Random.Shared.Next(800, 1500), ctx.RequestAborted);
+        await conn.SendAsync(BuildWeatherResponse(request.City, request.Days, request.IncludeHourly));
+    };
 
-            // 3. Stream the final, calculated payload
-            await duplex.SendAsync(BuildWeatherResponse(request.City, request.Days, request.IncludeHourly));
-        }
-    }
-    catch (Exception ex) when (ex is WebSocketException || ex is OperationCanceledException) { }
-
-    app.Logger.LogInformation("[Protobuf] Weather client disconnected");
+    options.OnDisconnect = conn =>
+    {
+        app.Logger.LogInformation("[Weather] Client {Id} disconnected", conn.ConnectionId);
+        return Task.CompletedTask;
+    };
 });
 
 // =============================================================================
-// JSON WebSocket endpoints
+// JSON WebSocket endpoints (browser dashboard bridge)
 // =============================================================================
 
 app.MapGet("/ws/chat/json", async (HttpContext ctx) =>
@@ -167,7 +181,6 @@ app.MapGet("/ws/chat/json", async (HttpContext ctx) =>
 
     try
     {
-        // Using the abstracted helper to clean up the loop
         await foreach (var incoming in ReadJsonStreamAsync<ChatJsonMessage>(ws, jsonOpts, ctx.RequestAborted))
         {
             var msg = new NotificationMessage
@@ -191,8 +204,7 @@ app.MapGet("/ws/chat/json", async (HttpContext ctx) =>
                 {
                     Source = "Server",
                     Text = $"Rejected: {validation.ErrorMessage}",
-                    Level = 2,
-                    Tags = [],
+                    Level = 2, Tags = [],
                     ByteSize = encoded.Length,
                     ProcessingTimeMs = sw.Elapsed.TotalMilliseconds
                 }, ctx.RequestAborted);
@@ -290,9 +302,6 @@ async Task SendJsonAsync<T>(WebSocket ws, T msg, CancellationToken ct)
     await ws.SendAsync(bytes, WebSocketMessageType.Text, true, ct);
 }
 
-// -----------------------------------------------------------------------------
-// CORE ENHANCEMENT: Reusable, safe, non-allocating JSON WebSocket Reader
-// -----------------------------------------------------------------------------
 async IAsyncEnumerable<T> ReadJsonStreamAsync<T>(WebSocket ws, JsonSerializerOptions opts, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
 {
     var buffer = ArrayPool<byte>.Shared.Rent(4096);
@@ -315,20 +324,11 @@ async IAsyncEnumerable<T> ReadJsonStreamAsync<T>(WebSocket ws, JsonSerializerOpt
             ms.Position = 0;
 
             T? deserializedObj = default;
-            try
-            {
-                deserializedObj = await JsonSerializer.DeserializeAsync<T>(ms, opts, ct);
-            }
-            catch (JsonException)
-            {
-                // If the browser sends malformed JSON, ignore it rather than crashing the loop
-                continue;
-            }
+            try { deserializedObj = await JsonSerializer.DeserializeAsync<T>(ms, opts, ct); }
+            catch (JsonException) { continue; }
 
             if (deserializedObj is not null)
-            {
                 yield return deserializedObj;
-            }
         }
     }
     finally

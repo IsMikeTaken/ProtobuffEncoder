@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\ProtobuffEncoder\ProtobuffEncoder.csproj" />
     <ProjectReference Include="..\..\src\ProtobuffEncoder.Contracts\ProtobuffEncoder.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\ProtobuffEncoder.WebSockets\ProtobuffEncoder.WebSockets.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
