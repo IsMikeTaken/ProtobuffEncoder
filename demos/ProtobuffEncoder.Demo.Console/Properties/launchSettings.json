@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "ProtobuffEncoder.Console": {
+      "commandName": "Project",
+      "commandLineArgs": "-v"
+    }
+  }
+}

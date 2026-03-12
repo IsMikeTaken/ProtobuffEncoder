@@ -1,0 +1,9 @@
+@ReceiverHost = http://localhost:5100
+
+### Health check
+GET {{ReceiverHost}}/health
+Accept: application/json
+
+### Schema info
+GET {{ReceiverHost}}/api/schema
+Accept: application/json

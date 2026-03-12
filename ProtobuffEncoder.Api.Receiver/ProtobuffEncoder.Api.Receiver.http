@@ -1,6 +1,0 @@
-@ProtobuffEncoder.Api.Receiver_HostAddress = http://localhost:5174
-
-GET {{ProtobuffEncoder.Api.Receiver_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###

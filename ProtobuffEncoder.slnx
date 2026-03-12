@@ -1,12 +1,33 @@
 <Solution>
-  <Project Path="ProtobuffEncoder.Api.Receiver/ProtobuffEncoder.Api.Receiver.csproj" />
-  <Project Path="ProtobuffEncoder.Api.Sender/ProtobuffEncoder.Api.Sender.csproj" />
-  <Project Path="ProtobuffEncoder.AspNetCore/ProtobuffEncoder.AspNetCore.csproj" />
-  <Project Path="ProtobuffEncoder.Console/ProtobuffEncoder.Console.csproj" />
-  <Project Path="ProtobuffEncoder.Contracts/ProtobuffEncoder.Contracts.csproj" />
-  <Project Path="ProtobuffEncoder.Tool/ProtobuffEncoder.Tool.csproj" />
-  <Project Path="ProtobuffEncoder/ProtobuffEncoder.csproj" />
+  <Folder Name="/src/">
+    <Project Path="src/ProtobuffEncoder/ProtobuffEncoder.csproj" />
+    <Project Path="src/ProtobuffEncoder.AspNetCore/ProtobuffEncoder.AspNetCore.csproj" />
+    <Project Path="src/ProtobuffEncoder.Contracts/ProtobuffEncoder.Contracts.csproj" />
+  </Folder>
+
+  <Folder Name="/tools/">
+    <Project Path="tools/ProtobuffEncoder.Tool/ProtobuffEncoder.Tool.csproj" />
+  </Folder>
+
+  <Folder Name="/demos/web/">
+    <Project Path="demos/ProtobuffEncoder.Demo.Api.Sender/ProtobuffEncoder.Demo.Api.Sender.csproj" />
+    <Project Path="demos/ProtobuffEncoder.Demo.Api.Receiver/ProtobuffEncoder.Demo.Api.Receiver.csproj" />
+    <Project Path="demos/ProtobuffEncoder.Demo.Bidirectional.Server/ProtobuffEncoder.Demo.Bidirectional.Server.csproj" />
+    <Project Path="demos/ProtobuffEncoder.Demo.Bidirectional.Client/ProtobuffEncoder.Demo.Bidirectional.Client.csproj" />
+  </Folder>
+
+  <Folder Name="/demos/console/">
+    <Project Path="demos/ProtobuffEncoder.Demo.Console/ProtobuffEncoder.Demo.Console.csproj" />
+  </Folder>
+
   <Folder Name="/docs/">
     <File Path="docs/README.md" />
+    <File Path="docs/guides/attributes.md" />
+    <File Path="docs/guides/serialization.md" />
+    <File Path="docs/guides/transport.md" />
+    <File Path="docs/guides/schema.md" />
+    <File Path="docs/api/aspnetcore.md" />
+    <File Path="docs/api/tool.md" />
+    <File Path="docs/demos/README.md" />
   </Folder>
 </Solution>
