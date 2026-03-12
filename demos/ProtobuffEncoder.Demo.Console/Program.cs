@@ -1,162 +1,268 @@
 using ProtobuffEncoder;
 using ProtobuffEncoder.Console;
 using ProtobuffEncoder.Transport;
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
 
-// --- Basic encode/decode with complex types ---
-var person = new Person
+// --- 1. Global Setup, CLI Args, & Telemetry ---
+var options = CliParser.Parse(args);
+
+// Define our global tracer
+var tracer = new ActivitySource("ProtobufEncoder.Showcase");
+
+// Attach an ActivityListener to dump trace spans to the console if Verbose
+using var listener = new ActivityListener
 {
-    Name = "Alice",
-    Email = "alice@example.com",
-    Age = 30,
-    InternalNotes = "should not appear in output",
-    HomeAddress = new Address
+    ShouldListenTo = source => source.Name == "ProtobufEncoder.Showcase",
+    Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
+    ActivityStopped = activity =>
     {
-        Street = "123 Main St",
-        City = "Springfield",
-        ZipCode = 62701
-    },
-    Score = 98.5,
-    Type = ContactType.Work,
-    Tags = ["developer", "lead"],
-    LuckyNumbers = [7, 13, 42],
-    PhoneNumbers =
-    [
-        new PhoneNumber { Number = "+1-555-0100", Type = ContactType.Work },
-        new PhoneNumber { Number = "+1-555-0101", Type = ContactType.Personal }
-    ]
+        if (options.Verbose)
+        {
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            Console.WriteLine($"[TRACE] {activity.OperationName} | Duration: {activity.Duration.TotalMilliseconds}ms | Tags: {string.Join(", ", activity.Tags.Select(t => $"{t.Key}={t.Value}"))}");
+            Console.ResetColor();
+        }
+    }
+};
+ActivitySource.AddActivityListener(listener);
+
+using var cts = new CancellationTokenSource();
+var token = cts.Token;
+
+Console.CancelKeyPress += (s, e) =>
+{
+    e.Cancel = true;
+    cts.Cancel();
+    Console.WriteLine("\n[System] Shutdown requested. Cancelling operations...");
 };
 
-byte[] encoded = ProtobufEncoder.Encode(person);
-System.Console.WriteLine($"Encoded {encoded.Length} bytes");
-
-var decoded = ProtobufEncoder.Decode<Person>(encoded);
-System.Console.WriteLine($"Name:      {decoded.Name}");
-System.Console.WriteLine($"Email:     {decoded.Email}");
-System.Console.WriteLine($"Age:       {decoded.Age}");
-System.Console.WriteLine($"Score:     {decoded.Score}");
-System.Console.WriteLine($"Type:      {decoded.Type}");
-System.Console.WriteLine($"Tags:      [{string.Join(", ", decoded.Tags)}]");
-System.Console.WriteLine($"Lucky:     [{string.Join(", ", decoded.LuckyNumbers.Select(n => n.ToString()))}]");
-System.Console.WriteLine($"Phones:    {decoded.PhoneNumbers.Count}");
-foreach (var p in decoded.PhoneNumbers)
-    System.Console.WriteLine($"           {p.Number} ({p.Type})");
-System.Console.WriteLine($"Address:   {decoded.HomeAddress?.Street}, {decoded.HomeAddress?.City} {decoded.HomeAddress?.ZipCode}");
-System.Console.WriteLine($"Notes:     '{decoded.InternalNotes}' (should be empty)");
-
-// --- Static message (pre-compiled) ---
-System.Console.WriteLine("\n--- Static Message ---");
-var staticMsg = ProtobufEncoder.CreateStaticMessage<Person>();
-byte[] fast = staticMsg.Encode(person);
-var back = staticMsg.Decode(fast);
-System.Console.WriteLine($"Static encode/decode: {back.Name}, tags=[{string.Join(", ", back.Tags)}]");
-
-// --- Streamed delimited messages ---
-System.Console.WriteLine("\n--- Streamed Messages ---");
-using var stream = new MemoryStream();
-
-ProtobufEncoder.WriteDelimitedMessage(
-    new Person { Name = "Bob", Age = 25, Tags = ["admin"] }, stream);
-ProtobufEncoder.WriteDelimitedMessage(
-    new Person { Name = "Carol", Age = 40, Score = 77.3 }, stream);
-
-stream.Position = 0;
-foreach (var msg in ProtobufEncoder.ReadDelimitedMessages<Person>(stream))
-{
-    System.Console.WriteLine($"  Streamed: {msg.Name}, age={msg.Age}, tags=[{string.Join(", ", msg.Tags)}], score={msg.Score}");
-}
-
-// --- Async streamed messages ---
-System.Console.WriteLine("\n--- Async Streamed ---");
-using var asyncStream = new MemoryStream();
-
-await ProtobufEncoder.WriteDelimitedMessageAsync(
-    new Person { Name = "Dave", Age = 35, LuckyNumbers = [1, 2, 3] }, asyncStream);
-await ProtobufEncoder.WriteDelimitedMessageAsync(
-    new Person { Name = "Eve", Age = 28 }, asyncStream);
-
-asyncStream.Position = 0;
-await foreach (var msg in ProtobufEncoder.ReadDelimitedMessagesAsync<Person>(asyncStream))
-{
-    System.Console.WriteLine($"  Async: {msg.Name}, age={msg.Age}, lucky=[{string.Join(", ", msg.LuckyNumbers)}]");
-}
-
-// --- Bi-directional streaming ---
-System.Console.WriteLine("\n--- Bi-Directional Streaming ---");
-using var sendPipe = new MemoryStream();
-using var recvPipe = new MemoryStream();
-
-// Simulate server: write two responses into recvPipe
-ProtobufEncoder.WriteDelimitedMessage(new Person { Name = "Server-Alice", Age = 30 }, recvPipe);
-ProtobufEncoder.WriteDelimitedMessage(new Person { Name = "Server-Bob", Age = 25 }, recvPipe);
-recvPipe.Position = 0;
-
-await using var duplex = new ProtobufDuplexStream<Person>(sendPipe, recvPipe, ownsStreams: false);
-
-// Send two requests
-await duplex.SendAsync(new Person { Name = "Client-Request-1", Age = 1 });
-await duplex.SendAsync(new Person { Name = "Client-Request-2", Age = 2 });
-
-// Receive the two server responses
-await foreach (var response in duplex.ReceiveAllAsync())
-{
-    System.Console.WriteLine($"  Received: {response.Name}, age={response.Age}");
-}
-
-// Verify what was sent
-sendPipe.Position = 0;
-foreach (var sent in ProtobufEncoder.ReadDelimitedMessages<Person>(sendPipe))
-{
-    System.Console.WriteLine($"  Sent:     {sent.Name}, age={sent.Age}");
-}
-
-// --- Validated Sender/Receiver ---
-System.Console.WriteLine("\n--- Validated Transport ---");
-using var validStream = new MemoryStream();
-
-await using var validSender = new ValidatedProtobufSender<Person>(validStream, ownsStream: false);
-validSender.Validation
-    .Require(p => !string.IsNullOrEmpty(p.Name), "Name is required")
-    .Require(p => p.Age >= 0, "Age must be non-negative");
-
-// Valid message — should succeed
-await validSender.SendAsync(new Person { Name = "ValidPerson", Age = 25 });
-System.Console.WriteLine("  Sent valid message OK");
-
-// Invalid message — should throw
 try
 {
-    await validSender.SendAsync(new Person { Name = "", Age = 25 });
+    Log($"Starting Protobuf Showcase (Verbose: {options.Verbose}, Silent: {options.Silent})\n", options);
+
+    // --- 2. Execute Modular Showcases ---
+
+    await BasicOperationsShowcase.RunAsync(tracer, token, options);
+    await StreamingShowcase.RunAsync(tracer, token, options);
+    await DuplexTransportShowcase.RunAsync(tracer, token, options);
+    await ValidatedTransportShowcase.RunAsync(tracer, token, options);
+
+    // --- 3. Keep Alive Block ---
+    Log("\n------------------------------------------------", options);
+    Log("All showcases executed.", options);
+    Log("Console is now acting as an async host.", options);
+    Log("Press Ctrl+C to exit gracefully.", options);
+    Log("------------------------------------------------", options);
+
+    await Task.Delay(Timeout.Infinite, token);
 }
-catch (MessageValidationException ex)
+catch (TaskCanceledException)
 {
-    System.Console.WriteLine("  Rejected send: " + ex.Message);
+    Console.WriteLine("\nApplication shut down successfully.");
 }
-
-// Read back with validated receiver that skips invalid
-validStream.Position = 0;
-await using var validReceiver = new ValidatedProtobufReceiver<Person>(validStream, ownsStream: false);
-validReceiver.Validation.Require(p => p.Age > 0, "Age must be positive");
-validReceiver.OnInvalid = InvalidMessageBehavior.Skip;
-validReceiver.MessageRejected += (msg, result) =>
-    System.Console.WriteLine("  Receiver skipped: " + msg.Name + " — " + (result.ErrorMessage ?? ""));
-
-await foreach (var msg in validReceiver.ReceiveAllAsync())
+catch (Exception ex)
 {
-    System.Console.WriteLine($"  Received valid: {msg.Name}, age={msg.Age}");
+    Console.WriteLine($"\nUnhandled Exception: {ex.Message}");
 }
 
-// --- Duplex with validation ---
-System.Console.WriteLine("\n--- Validated Duplex Stream ---");
-using var duplexSend = new MemoryStream();
-using var duplexRecv = new MemoryStream();
+// --- Helper to respect Silent mode for standard logs ---
+static void Log(string message, CliOptions opts)
+{
+    if (!opts.Silent)
+    {
+        Console.WriteLine(message);
+    }
+}
 
-// Pre-fill receive side
-ProtobufEncoder.WriteDelimitedMessage(new Person { Name = "Reply", Age = 42 }, duplexRecv);
-duplexRecv.Position = 0;
 
-await using var validDuplex = new ValidatedDuplexStream<Person, Person>(duplexSend, duplexRecv, ownsStreams: false);
-validDuplex.SendValidation.Require(p => !string.IsNullOrEmpty(p.Name), "Name required on send");
-validDuplex.ReceiveValidation.Require(p => p.Age > 0, "Age must be positive on receive");
+// ==============================================================================
+// CLI PARSER CLASSES
+// ==============================================================================
 
-var reply = await validDuplex.SendAndReceiveAsync(new Person { Name = "Question", Age = 1 });
-System.Console.WriteLine($"  Duplex reply: {reply?.Name ?? "null"}, age={reply?.Age.ToString() ?? "null"}");
+public class CliOptions
+{
+    public bool Verbose { get; set; }
+    public bool Silent { get; set; }
+}
+
+public static class CliParser
+{
+    public static CliOptions Parse(string[] args)
+    {
+        var options = new CliOptions();
+
+        foreach (var arg in args)
+        {
+            switch (arg.ToLowerInvariant())
+            {
+                case "-v":
+                case "--verbose":
+                    options.Verbose = true;
+                    break;
+                case "-s":
+                case "--silent":
+                    options.Silent = true;
+                    break;
+            }
+        }
+
+        return options;
+    }
+}
+
+// ==============================================================================
+// SHOWCASE CLASSES
+// ==============================================================================
+
+public static class BasicOperationsShowcase
+{
+    public static async Task RunAsync(ActivitySource tracer, CancellationToken token, CliOptions options)
+    {
+        using var activity = tracer.StartActivity("BasicEncodeDecode");
+        if (!options.Silent) Console.WriteLine("--- Basic Encode/Decode ---");
+        var sw = Stopwatch.StartNew();
+
+        var person = new Person
+        {
+            Name = "Alice",
+            Email = "alice@example.com",
+            Age = 30,
+            Type = ContactType.Work,
+            Tags = ["developer", "lead"],
+            LuckyNumbers = [7, 13, 42]
+        };
+
+        // Encode
+        byte[] encoded = ProtobufEncoder.Encode(person);
+        activity?.SetTag("bytes.encoded", encoded.Length);
+
+        // Decode
+        var decoded = ProtobufEncoder.Decode<Person>(encoded);
+
+        sw.Stop();
+        if (!options.Silent) Console.WriteLine($"  Success: {decoded.Name} | Size: {encoded.Length} bytes | Took: {sw.ElapsedMilliseconds}ms");
+
+        // Static Compile
+        using var staticActivity = tracer.StartActivity("StaticCompileEncode");
+        var staticSw = Stopwatch.StartNew();
+
+        var staticMsg = ProtobufEncoder.CreateStaticMessage<Person>();
+        byte[] fast = staticMsg.Encode(person);
+        var back = staticMsg.Decode(fast);
+
+        staticSw.Stop();
+        staticActivity?.SetTag("bytes.encoded", fast.Length);
+        if (!options.Silent) Console.WriteLine($"  Static Success: {back.Name} | Size: {fast.Length} bytes | Took: {staticSw.ElapsedMilliseconds}ms");
+    }
+}
+
+public static class StreamingShowcase
+{
+    public static async Task RunAsync(ActivitySource tracer, CancellationToken token, CliOptions options)
+    {
+        using var activity = tracer.StartActivity("AsyncStreaming");
+        if (!options.Silent) Console.WriteLine("\n--- Async Streamed Messages ---");
+        var sw = Stopwatch.StartNew();
+
+        await using var asyncStream = new MemoryStream();
+
+        // Simulate ongoing writes
+        var writeActivity = tracer.StartActivity("StreamWrites");
+        await ProtobufEncoder.WriteDelimitedMessageAsync(new Person { Name = "Dave", Age = 35 }, asyncStream, token);
+        await ProtobufEncoder.WriteDelimitedMessageAsync(new Person { Name = "Eve", Age = 28 }, asyncStream, token);
+        writeActivity?.SetTag("bytes.written", asyncStream.Position);
+        writeActivity?.Dispose();
+
+        asyncStream.Position = 0;
+
+        // Read dynamically as they "arrive"
+        int msgCount = 0;
+        await foreach (var msg in ProtobufEncoder.ReadDelimitedMessagesAsync<Person>(asyncStream).WithCancellation(token))
+        {
+            msgCount++;
+            if (!options.Silent) Console.WriteLine($"  Received: {msg.Name}, age={msg.Age}");
+        }
+
+        sw.Stop();
+        activity?.SetTag("messages.processed", msgCount);
+        activity?.SetTag("bytes.total", asyncStream.Length);
+        if (!options.Silent) Console.WriteLine($"  Stream processing complete. {msgCount} msgs | {asyncStream.Length} bytes | Took: {sw.ElapsedMilliseconds}ms");
+    }
+}
+
+public static class DuplexTransportShowcase
+{
+    public static async Task RunAsync(ActivitySource tracer, CancellationToken token, CliOptions options)
+    {
+        using var activity = tracer.StartActivity("BiDirectionalStreaming");
+        if (!options.Silent) Console.WriteLine("\n--- Bi-Directional Streaming ---");
+        var sw = Stopwatch.StartNew();
+
+        await using var sendPipe = new MemoryStream();
+        await using var recvPipe = new MemoryStream();
+
+        // Pre-fill server response to simulate incoming traffic
+        ProtobufEncoder.WriteDelimitedMessage(new Person { Name = "Server-Alice", Age = 30 }, recvPipe);
+        ProtobufEncoder.WriteDelimitedMessage(new Person { Name = "Server-Bob", Age = 25 }, recvPipe);
+        recvPipe.Position = 0;
+
+        await using var duplex = new ProtobufDuplexStream<Person>(sendPipe, recvPipe, ownsStreams: false);
+
+        // Send Phase
+        using var sendActivity = tracer.StartActivity("DuplexSend");
+        await duplex.SendAsync(new Person { Name = "Client-Request-1", Age = 1 }, token);
+        await duplex.SendAsync(new Person { Name = "Client-Request-2", Age = 2 }, token);
+        sendActivity?.SetTag("bytes.sent", sendPipe.Length);
+        sendActivity?.Dispose();
+
+        // Receive Phase
+        using var recvActivity = tracer.StartActivity("DuplexReceive");
+        int recvCount = 0;
+        await foreach (var response in duplex.ReceiveAllAsync().WithCancellation(token))
+        {
+            recvCount++;
+            if (!options.Silent) Console.WriteLine($"  Server Replied: {response.Name}");
+        }
+        recvActivity?.SetTag("messages.received", recvCount);
+        recvActivity?.SetTag("bytes.received", recvPipe.Length);
+
+        sw.Stop();
+        if (!options.Silent) Console.WriteLine($"  Duplex exchange complete | Sent: {sendPipe.Length}b | Recv: {recvPipe.Length}b | Took: {sw.ElapsedMilliseconds}ms");
+    }
+}
+
+public static class ValidatedTransportShowcase
+{
+    public static async Task RunAsync(ActivitySource tracer, CancellationToken token, CliOptions options)
+    {
+        using var activity = tracer.StartActivity("ValidatedTransport");
+        if (!options.Silent) Console.WriteLine("\n--- Validated Transport ---");
+        var sw = Stopwatch.StartNew();
+
+        await using var validStream = new MemoryStream();
+        await using var validSender = new ValidatedProtobufSender<Person>(validStream, ownsStream: false);
+
+        validSender.Validation
+            .Require(p => !string.IsNullOrEmpty(p.Name), "Name is required")
+            .Require(p => p.Age >= 0, "Age must be non-negative");
+
+        // Valid send
+        await validSender.SendAsync(new Person { Name = "ValidPerson", Age = 25 }, token);
+
+        // Invalid send
+        try
+        {
+            using var errorActivity = tracer.StartActivity("InvalidSendAttempt");
+            await validSender.SendAsync(new Person { Name = "", Age = 25 }, token);
+        }
+        catch (MessageValidationException ex)
+        {
+            if (!options.Silent) Console.WriteLine($"  [Validation Blocked] {ex.Message}");
+        }
+
+        sw.Stop();
+        activity?.SetTag("bytes.written", validStream.Length);
+        if (!options.Silent) Console.WriteLine($"  Validated logic executed | Processed: {validStream.Length} bytes | Took: {sw.ElapsedMilliseconds}ms");
+    }
+}

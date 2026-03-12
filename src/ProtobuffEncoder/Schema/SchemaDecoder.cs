@@ -79,6 +79,16 @@ public sealed class SchemaDecoder
     /// </summary>
     public IReadOnlyCollection<string> RegisteredEnums => _enums.Keys;
 
+    /// <summary>
+    /// Gets a message definition by name. Returns null if not found.
+    /// </summary>
+    public ProtoMessageDef? GetMessage(string name) => _messages.GetValueOrDefault(name);
+
+    /// <summary>
+    /// Gets an enum definition by name. Returns null if not found.
+    /// </summary>
+    public ProtoEnumDef? GetEnum(string name) => _enums.GetValueOrDefault(name);
+
     #region Registration
 
     private void RegisterMessages(List<ProtoMessageDef> messages)

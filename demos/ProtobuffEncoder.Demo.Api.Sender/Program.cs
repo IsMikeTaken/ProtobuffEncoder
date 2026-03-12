@@ -10,6 +10,9 @@ builder.Services.AddHttpClient("ReceiverApi", client =>
 
 var app = builder.Build();
 
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 // --- Request weather from the Receiver API ---
 app.MapGet("/api/send-weather", async (
     string city,

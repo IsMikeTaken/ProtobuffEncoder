@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Protobuf Receiver - Schema Explorer</title>
+  <style>
+    :root { --bg: #0f1117; --surface: #1a1d27; --border: #2a2d3a; --accent: #6c5ce7; --green: #00b894; --red: #e17055; --yellow: #fdcb6e; --text: #dfe6e9; --muted: #636e72; --blue: #74b9ff; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+    .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; align-items: center; gap: 16px; }
+    .header h1 { font-size: 18px; font-weight: 600; }
+    .header .sub { font-size: 12px; color: var(--muted); }
+    .header .badge { font-size: 11px; padding: 3px 8px; border-radius: 12px; font-weight: 600; }
+    .badge.ok { background: rgba(0,184,148,0.15); color: var(--green); }
+    .badge.warn { background: rgba(253,203,110,0.15); color: var(--yellow); }
+    .container { display: grid; grid-template-columns: 300px 1fr; gap: 20px; padding: 20px; max-width: 1400px; margin: 0 auto; min-height: calc(100vh - 60px); }
+    .sidebar { display: flex; flex-direction: column; gap: 12px; }
+    .sidebar-section { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+    .sidebar-section h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); padding: 12px 16px; border-bottom: 1px solid var(--border); }
+    .sidebar-item { padding: 10px 16px; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: background 0.15s; border-bottom: 1px solid var(--border); }
+    .sidebar-item:last-child { border-bottom: none; }
+    .sidebar-item:hover { background: rgba(108,92,231,0.1); }
+    .sidebar-item.active { background: rgba(108,92,231,0.15); border-left: 3px solid var(--accent); }
+    .sidebar-item .icon { font-size: 14px; }
+    .sidebar-item .count { margin-left: auto; font-size: 11px; color: var(--muted); background: var(--bg); padding: 1px 6px; border-radius: 4px; }
+    .main { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
+    .main-header { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .main-header h2 { font-size: 16px; font-weight: 600; }
+    .main-body { padding: 18px; flex: 1; overflow-y: auto; }
+    .field-table { width: 100%; border-collapse: collapse; }
+    .field-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); padding: 8px 12px; border-bottom: 2px solid var(--border); }
+    .field-table td { padding: 8px 12px; font-size: 13px; border-bottom: 1px solid var(--border); }
+    .field-table tr:hover { background: rgba(108,92,231,0.05); }
+    .type-badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 500; }
+    .type-badge.scalar { background: rgba(116,185,255,0.15); color: var(--blue); }
+    .type-badge.message { background: rgba(108,92,231,0.15); color: var(--accent); }
+    .type-badge.repeated { background: rgba(0,184,148,0.15); color: var(--green); }
+    .type-badge.enum { background: rgba(253,203,110,0.15); color: var(--yellow); }
+    .enum-values { margin-top: 8px; }
+    .enum-value { display: flex; justify-content: space-between; padding: 4px 12px; font-size: 12px; border-bottom: 1px solid var(--border); }
+    .enum-value:last-child { border-bottom: none; }
+    .enum-value .name { color: var(--text); }
+    .enum-value .num { color: var(--muted); }
+    .proto-source { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-top: 16px; }
+    .proto-source pre { font-size: 12px; line-height: 1.6; color: var(--text); white-space: pre-wrap; font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace; }
+    .proto-source .keyword { color: var(--accent); }
+    .proto-source .type { color: var(--blue); }
+    .proto-source .comment { color: var(--muted); }
+    .info-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 12px; display: flex; gap: 20px; }
+    .info-card .stat { text-align: center; }
+    .info-card .stat .num { font-size: 24px; font-weight: 700; color: var(--accent); }
+    .info-card .stat .label { font-size: 11px; color: var(--muted); }
+    .empty { color: var(--muted); text-align: center; padding: 60px 20px; font-size: 13px; }
+    @media (max-width: 768px) { .container { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Protobuf Receiver</h1>
+    <span class="sub">Schema-driven decoding &mdash; no compile-time contract references</span>
+    <span id="statusBadge" class="badge warn">Loading...</span>
+  </div>
+
+  <div class="container">
+    <div class="sidebar" id="sidebar">
+      <div class="sidebar-section" id="messagesSection">
+        <h3>Messages</h3>
+        <div id="messagesList"></div>
+      </div>
+      <div class="sidebar-section" id="enumsSection">
+        <h3>Enums</h3>
+        <div id="enumsList"></div>
+      </div>
+    </div>
+
+    <div class="main">
+      <div class="main-header">
+        <h2 id="detailTitle">Schema Explorer</h2>
+      </div>
+      <div class="main-body" id="detailBody">
+        <div class="empty">Select a message or enum from the sidebar</div>
+      </div>
+    </div>
+  </div>
+
+<script>
+let schemaData = null;
+let protoContent = null;
+
+async function loadSchema() {
+  try {
+    const res = await fetch('/api/schema');
+    schemaData = await res.json();
+
+    document.getElementById('statusBadge').textContent = `${schemaData.messages.length} messages loaded`;
+    document.getElementById('statusBadge').className = 'badge ok';
+
+    renderSidebar();
+    showOverview();
+  } catch (e) {
+    document.getElementById('statusBadge').textContent = 'Failed to load';
+    document.getElementById('statusBadge').className = 'badge warn';
+  }
+}
+
+async function loadProtoFile() {
+  try {
+    const res = await fetch('/api/proto-source');
+    protoContent = await res.text();
+  } catch { protoContent = null; }
+}
+
+function renderSidebar() {
+  const msgList = document.getElementById('messagesList');
+  const enumList = document.getElementById('enumsList');
+
+  msgList.innerHTML = schemaData.messages.map(m =>
+    `<div class="sidebar-item" onclick="showMessage('${m}')" id="item-${m}"><span class="icon">&#9641;</span>${m}</div>`
+  ).join('');
+
+  if (schemaData.enums && schemaData.enums.length) {
+    enumList.innerHTML = schemaData.enums.map(e =>
+      `<div class="sidebar-item" onclick="showEnum('${e}')" id="item-${e}"><span class="icon">&#9671;</span>${e}</div>`
+    ).join('');
+  } else {
+    enumList.innerHTML = '<div style="padding:12px 16px;color:var(--muted);font-size:12px;">No enums</div>';
+  }
+}
+
+function showOverview() {
+  const body = document.getElementById('detailBody');
+  document.getElementById('detailTitle').textContent = 'Schema Overview';
+
+  let html = `<div class="info-card">
+    <div class="stat"><div class="num">${schemaData.messages.length}</div><div class="label">Messages</div></div>
+    <div class="stat"><div class="num">${schemaData.enums ? schemaData.enums.length : 0}</div><div class="label">Enums</div></div>
+    <div class="stat"><div class="num">${schemaData.protoDirectory ? '1' : '0'}</div><div class="label">Proto Files</div></div>
+  </div>`;
+
+  html += '<p style="font-size:13px;color:var(--muted);margin:12px 0;">This receiver has <strong>no compile-time reference</strong> to the sender\'s C# contracts. All decoding is driven by <code>.proto</code> schema files loaded at startup.</p>';
+
+  if (protoContent) {
+    html += '<div class="proto-source"><pre>' + highlightProto(protoContent) + '</pre></div>';
+  }
+
+  body.innerHTML = html;
+}
+
+async function showMessage(name) {
+  setActive(name);
+  document.getElementById('detailTitle').textContent = `message ${name}`;
+
+  try {
+    const res = await fetch(`/api/schema/${encodeURIComponent(name)}`);
+    const msg = await res.json();
+
+    let html = `<table class="field-table"><thead><tr><th>#</th><th>Name</th><th>Type</th><th>Label</th></tr></thead><tbody>`;
+    msg.fields.forEach(f => {
+      const typeClass = f.isRepeated ? 'repeated' : (isScalar(f.type) ? 'scalar' : 'message');
+      const label = f.isRepeated ? 'repeated' : (f.isOptional ? 'optional' : '');
+      html += `<tr>
+        <td style="color:var(--muted)">${f.number}</td>
+        <td>${f.name}</td>
+        <td><span class="type-badge ${typeClass}">${f.type}</span></td>
+        <td style="color:var(--muted)">${label}</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+
+    body.innerHTML = html;
+  } catch {
+    document.getElementById('detailBody').innerHTML = '<div class="empty">Failed to load message details</div>';
+  }
+}
+
+async function showEnum(name) {
+  setActive(name);
+  document.getElementById('detailTitle').textContent = `enum ${name}`;
+
+  try {
+    const res = await fetch(`/api/schema/${encodeURIComponent(name)}`);
+    const data = await res.json();
+
+    let html = '<div class="enum-values">';
+    if (data.values) {
+      data.values.forEach(v => {
+        html += `<div class="enum-value"><span class="name">${v.name}</span><span class="num">= ${v.number}</span></div>`;
+      });
+    }
+    html += '</div>';
+    document.getElementById('detailBody').innerHTML = html;
+  } catch {
+    document.getElementById('detailBody').innerHTML = '<div class="empty">Failed to load enum details</div>';
+  }
+}
+
+function setActive(name) {
+  document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
+  const el = document.getElementById('item-' + name);
+  if (el) el.classList.add('active');
+}
+
+function isScalar(type) {
+  return ['int32','int64','uint32','uint64','sint32','sint64','bool','string','bytes','double','float','fixed32','fixed64','sfixed32','sfixed64'].includes(type);
+}
+
+function highlightProto(src) {
+  return src
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/(\/\/.*$)/gm, '<span class="comment">$1</span>')
+    .replace(/\b(syntax|message|enum|repeated|optional|oneof|map|package|import)\b/g, '<span class="keyword">$1</span>')
+    .replace(/\b(string|int32|int64|uint32|uint64|bool|double|float|bytes|fixed64|fixed32)\b/g, '<span class="type">$1</span>');
+}
+
+loadSchema();
+loadProtoFile();
+</script>
+</body>
+</html>

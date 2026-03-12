@@ -12,6 +12,9 @@ builder.Services.AddSingleton(_ => SchemaDecoder.FromDirectory(protoDir));
 
 var app = builder.Build();
 
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 SchemaDecoder decoder = app.Services.GetRequiredService<SchemaDecoder>();
 app.Logger.LogInformation("Loaded proto schemas: {Messages}", string.Join(", ", decoder.RegisteredMessages));
 
@@ -27,11 +30,6 @@ app.MapPost("/api/weather", async (HttpContext ctx, SchemaDecoder schema) =>
 
     app.Logger.LogInformation("Weather request: city={City}, days={Days}, hourly={Hourly}", city, days, includeHourly);
 
-    // Build the WeatherResponse using ProtobufWriter — no C# contract types needed.
-    // Field layout from the .proto:
-    //   message WeatherResponse { string City = 1; repeated DayForecast Forecasts = 2; int64 GeneratedAtUtc = 3; }
-    //   message DayForecast { string Date = 1; double TemperatureMin = 2; double TemperatureMax = 3;
-    //                         string Condition = 4; int32 HumidityPercent = 5; optional double WindSpeed = 6; }
     string[] conditions = ["Sunny", "Cloudy", "Rainy", "Partly Cloudy", "Stormy", "Snowy", "Windy"];
 
     var forecasts = new List<ProtobufWriter>();
@@ -71,7 +69,6 @@ app.MapPost("/api/notifications", async (HttpContext ctx, SchemaDecoder schema) 
         "[{Level}] from {Source}: {Text} (tags: {Tags})",
         level, source, text, string.Join(", ", tags));
 
-    // Build AckResponse: message AckResponse { bool Accepted = 1; string MessageId = 2; }
     var ack = new ProtobufWriter();
     ack.WriteBool(1, true);
     ack.WriteString(2, Guid.NewGuid().ToString("N"));
@@ -79,7 +76,7 @@ app.MapPost("/api/notifications", async (HttpContext ctx, SchemaDecoder schema) 
     return Results.Bytes(ack.ToByteArray(), ProtobufMediaType.Protobuf);
 });
 
-// --- Schema info: list what messages we know about ---
+// --- Dashboard API: schema info ---
 app.MapGet("/api/schema", (SchemaDecoder schema) =>
 {
     return Results.Ok(new
@@ -88,6 +85,55 @@ app.MapGet("/api/schema", (SchemaDecoder schema) =>
         enums = schema.RegisteredEnums,
         protoDirectory = protoDir
     });
+});
+
+// --- Dashboard API: message/enum detail ---
+app.MapGet("/api/schema/{name}", (string name, SchemaDecoder schema) =>
+{
+    var msg = schema.GetMessage(name);
+    if (msg is not null)
+    {
+        return Results.Ok(new
+        {
+            type = "message",
+            msg.Name,
+            fields = msg.Fields.Select(f => new
+            {
+                f.Name,
+                number = f.FieldNumber,
+                type = f.TypeName,
+                f.IsRepeated,
+                f.IsOptional,
+                f.IsMap,
+                f.MapKeyType,
+                f.MapValueType
+            })
+        });
+    }
+
+    var enumDef = schema.GetEnum(name);
+    if (enumDef is not null)
+    {
+        return Results.Ok(new
+        {
+            type = "enum",
+            enumDef.Name,
+            values = enumDef.Values.Select(v => new { v.Name, v.Number })
+        });
+    }
+
+    return Results.NotFound();
+});
+
+// --- Dashboard API: raw proto source ---
+app.MapGet("/api/proto-source", () =>
+{
+    var protoFiles = Directory.GetFiles(protoDir, "*.proto");
+    if (protoFiles.Length == 0) return Results.NotFound();
+
+    var content = string.Join("\n\n// --- next file ---\n\n",
+        protoFiles.Select(File.ReadAllText));
+    return Results.Text(content, "text/plain");
 });
 
 app.MapGet("/health", () => Results.Ok("Receiver is running"));

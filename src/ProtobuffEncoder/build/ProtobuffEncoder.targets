@@ -18,7 +18,7 @@
           AfterTargets="Build"
           Condition="'$(GenerateProtoOnBuild)' == 'true'">
 
-    <Exec Command="dotnet run --project &quot;$(MSBuildThisFileDirectory)..\..\..\ProtobuffEncoder.Tool\ProtobuffEncoder.Tool.csproj&quot; -- &quot;$(TargetPath)&quot; &quot;$(ProjectDir)$(ProtoOutputDir)&quot; &quot;$(ProjectDir)$(ProjectFileName)&quot;"
+    <Exec Command="dotnet run --project &quot;$(MSBuildThisFileDirectory)..\..\..\tools\ProtobuffEncoder.Tool\ProtobuffEncoder.Tool.csproj&quot; -- &quot;$(TargetPath)&quot; &quot;$(ProjectDir)$(ProtoOutputDir)&quot; &quot;$(ProjectDir)$(ProjectFileName)&quot;"
           WorkingDirectory="$(SolutionDir)"
           ConsoleToMsBuild="true" />
 

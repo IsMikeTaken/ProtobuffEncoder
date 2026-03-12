@@ -1,0 +1,9 @@
+@BidirHost = http://localhost:5300
+
+### Health check
+GET {{BidirHost}}/health
+Accept: application/json
+
+### WebSocket endpoints (use the Client project or a WebSocket client):
+# ws://localhost:5300/ws/chat          - Bidirectional chat (NotificationMessage both ways)
+# ws://localhost:5300/ws/weather-stream - Weather request/response stream

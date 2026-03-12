@@ -1,0 +1,7 @@
+{
+  "profiles": {
+    "ProtobuffEncoder.Demo.Bidirectional.Client": {
+      "commandName": "Project"
+    }
+  }
+}

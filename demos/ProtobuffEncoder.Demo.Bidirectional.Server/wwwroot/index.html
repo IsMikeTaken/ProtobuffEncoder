@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Protobuf Bidirectional Streaming</title>
+  <style>
+    :root { --bg: #0f1117; --surface: #1a1d27; --border: #2a2d3a; --accent: #6c5ce7; --green: #00b894; --red: #e17055; --yellow: #fdcb6e; --text: #dfe6e9; --muted: #636e72; --blue: #74b9ff; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+    .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; align-items: center; gap: 16px; }
+    .header h1 { font-size: 18px; font-weight: 600; }
+    .header .badge { font-size: 11px; padding: 3px 8px; border-radius: 12px; font-weight: 600; }
+    .badge.connected { background: rgba(0,184,148,0.15); color: var(--green); }
+    .badge.disconnected { background: rgba(225,112,85,0.15); color: var(--red); }
+    .container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 20px; max-width: 1400px; margin: 0 auto; }
+    .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
+    .panel-header { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .panel-header h2 { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    .panel-header .dot { width: 8px; height: 8px; border-radius: 50%; }
+    .dot.green { background: var(--green); box-shadow: 0 0 6px var(--green); }
+    .dot.blue { background: var(--blue); box-shadow: 0 0 6px var(--blue); }
+    .panel-body { padding: 14px 18px; flex: 1; overflow-y: auto; max-height: 400px; }
+    .controls { padding: 14px 18px; border-top: 1px solid var(--border); display: flex; gap: 10px; flex-wrap: wrap; }
+    input, select { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 8px; font-size: 13px; outline: none; }
+    input:focus, select:focus { border-color: var(--accent); }
+    input[type="text"] { flex: 1; min-width: 150px; }
+    button { background: var(--accent); color: white; border: none; padding: 8px 16px; border-radius: 8px; font-size: 13px; cursor: pointer; font-weight: 500; transition: opacity 0.2s; }
+    button:hover { opacity: 0.85; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    button.secondary { background: var(--border); }
+    button.danger { background: var(--red); }
+    .msg { padding: 8px 12px; margin-bottom: 6px; border-radius: 8px; font-size: 13px; line-height: 1.5; animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+    .msg.sent { background: rgba(108,92,231,0.12); border-left: 3px solid var(--accent); }
+    .msg.recv { background: rgba(0,184,148,0.08); border-left: 3px solid var(--green); }
+    .msg.error { background: rgba(225,112,85,0.1); border-left: 3px solid var(--red); }
+    .msg.warn { background: rgba(253,203,110,0.1); border-left: 3px solid var(--yellow); }
+    .msg.system { background: rgba(99,110,114,0.1); border-left: 3px solid var(--muted); color: var(--muted); }
+    .msg .meta { font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+    .msg .tags { margin-top: 4px; }
+    .msg .tag { display: inline-block; font-size: 10px; padding: 1px 6px; background: rgba(116,185,255,0.15); color: var(--blue); border-radius: 4px; margin-right: 4px; }
+    .weather-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 8px; }
+    .weather-card h3 { font-size: 14px; margin-bottom: 8px; color: var(--blue); }
+    .forecast-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 12px; border-bottom: 1px solid var(--border); }
+    .forecast-row:last-child { border-bottom: none; }
+    .forecast-row .temp { color: var(--yellow); }
+    .forecast-row .condition { color: var(--muted); }
+    .stats { display: flex; gap: 20px; padding: 10px 18px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); }
+    .stats span { display: flex; align-items: center; gap: 4px; }
+    .stats .num { color: var(--text); font-weight: 600; }
+    .empty { color: var(--muted); font-size: 13px; text-align: center; padding: 40px 20px; }
+    @media (max-width: 768px) { .container { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Protobuf Bidirectional Streaming</h1>
+    <span id="chatStatus" class="badge disconnected">Chat: Disconnected</span>
+    <span id="weatherStatus" class="badge disconnected">Weather: Disconnected</span>
+  </div>
+
+  <div class="container">
+    <!-- Chat Panel -->
+    <div class="panel">
+      <div class="panel-header">
+        <h2><span class="dot green"></span> Chat Stream</h2>
+        <div style="display:flex;gap:6px;">
+          <button id="btnChatConnect" onclick="connectChat()">Connect</button>
+          <button id="btnChatDisconnect" class="danger" onclick="disconnectChat()" disabled>Disconnect</button>
+        </div>
+      </div>
+      <div class="panel-body" id="chatMessages">
+        <div class="empty">Connect to start the chat stream</div>
+      </div>
+      <div class="controls">
+        <input type="text" id="chatInput" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendChat()" disabled>
+        <select id="chatLevel" disabled>
+          <option value="0">Info</option>
+          <option value="1">Warning</option>
+          <option value="2">Error</option>
+        </select>
+        <button id="btnChatSend" onclick="sendChat()" disabled>Send</button>
+      </div>
+      <div class="stats">
+        <span>Sent: <span class="num" id="chatSentCount">0</span></span>
+        <span>Received: <span class="num" id="chatRecvCount">0</span></span>
+        <span>Bytes out: <span class="num" id="chatBytesOut">0</span></span>
+      </div>
+    </div>
+
+    <!-- Weather Panel -->
+    <div class="panel">
+      <div class="panel-header">
+        <h2><span class="dot blue"></span> Weather Stream</h2>
+        <div style="display:flex;gap:6px;">
+          <button id="btnWeatherConnect" onclick="connectWeather()">Connect</button>
+          <button id="btnWeatherDisconnect" class="danger" onclick="disconnectWeather()" disabled>Disconnect</button>
+        </div>
+      </div>
+      <div class="panel-body" id="weatherMessages">
+        <div class="empty">Connect to request weather forecasts</div>
+      </div>
+      <div class="controls">
+        <input type="text" id="weatherCity" placeholder="City name" value="Amsterdam" disabled>
+        <input type="number" id="weatherDays" placeholder="Days" value="3" min="1" max="14" style="width:70px" disabled>
+        <label style="display:flex;align-items:center;gap:4px;font-size:12px;">
+          <input type="checkbox" id="weatherHourly" disabled> Wind
+        </label>
+        <button id="btnWeatherSend" onclick="sendWeather()" disabled>Request</button>
+      </div>
+      <div class="stats">
+        <span>Requests: <span class="num" id="weatherReqCount">0</span></span>
+        <span>Responses: <span class="num" id="weatherResCount">0</span></span>
+      </div>
+    </div>
+  </div>
+
+<script>
+// We can't use raw protobuf in the browser without a JS protobuf library,
+// so the server exposes JSON-over-WebSocket endpoints for the dashboard.
+// The server internally still uses ProtobufDuplexStream for the /ws/chat and /ws/weather-stream endpoints.
+
+let chatWs = null, weatherWs = null;
+let chatSent = 0, chatRecv = 0, chatBytes = 0, weatherReqs = 0, weatherRes = 0;
+
+function connectChat() {
+  const host = location.host;
+  chatWs = new WebSocket(`ws://${host}/ws/chat/json`);
+  chatWs.onopen = () => {
+    updateStatus('chatStatus', true);
+    toggleChat(true);
+    addChatMsg('system', 'Connected to server', null);
+  };
+  chatWs.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    chatRecv++;
+    document.getElementById('chatRecvCount').textContent = chatRecv;
+    const level = ['Info','Warning','Error'][msg.level] || 'Info';
+    const cls = msg.level === 2 ? 'error' : msg.level === 1 ? 'warn' : 'recv';
+    addChatMsg(cls, msg.text, msg.source, msg.tags, level, msg.byteSize);
+  };
+  chatWs.onclose = () => {
+    updateStatus('chatStatus', false);
+    toggleChat(false);
+    addChatMsg('system', 'Disconnected', null);
+  };
+  chatWs.onerror = () => addChatMsg('error', 'Connection error', null);
+}
+
+function disconnectChat() {
+  if (chatWs) chatWs.close();
+}
+
+function sendChat() {
+  if (!chatWs || chatWs.readyState !== 1) return;
+  const text = document.getElementById('chatInput').value.trim();
+  if (!text) return;
+  const level = parseInt(document.getElementById('chatLevel').value);
+  const msg = { source: 'Browser', text, level, tags: ['dashboard'] };
+  const payload = JSON.stringify(msg);
+  chatWs.send(payload);
+  chatSent++;
+  chatBytes += payload.length;
+  document.getElementById('chatSentCount').textContent = chatSent;
+  document.getElementById('chatBytesOut').textContent = chatBytes;
+  addChatMsg('sent', text, 'You', ['dashboard'], ['Info','Warning','Error'][level]);
+  document.getElementById('chatInput').value = '';
+}
+
+function connectWeather() {
+  const host = location.host;
+  weatherWs = new WebSocket(`ws://${host}/ws/weather-stream/json`);
+  weatherWs.onopen = () => {
+    updateStatus('weatherStatus', true);
+    toggleWeather(true);
+    addWeatherMsg('system', 'Connected to weather stream');
+  };
+  weatherWs.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+    weatherRes++;
+    document.getElementById('weatherResCount').textContent = weatherRes;
+    renderWeatherCard(data);
+  };
+  weatherWs.onclose = () => {
+    updateStatus('weatherStatus', false);
+    toggleWeather(false);
+    addWeatherMsg('system', 'Disconnected');
+  };
+  weatherWs.onerror = () => addWeatherMsg('error', 'Connection error');
+}
+
+function disconnectWeather() {
+  if (weatherWs) weatherWs.close();
+}
+
+function sendWeather() {
+  if (!weatherWs || weatherWs.readyState !== 1) return;
+  const city = document.getElementById('weatherCity').value.trim() || 'Amsterdam';
+  const days = parseInt(document.getElementById('weatherDays').value) || 3;
+  const includeHourly = document.getElementById('weatherHourly').checked;
+  const msg = { city, days, includeHourly };
+  weatherWs.send(JSON.stringify(msg));
+  weatherReqs++;
+  document.getElementById('weatherReqCount').textContent = weatherReqs;
+  addWeatherMsg('sent', `Requested forecast for ${city} (${days} days)`);
+}
+
+function addChatMsg(cls, text, source, tags, level, byteSize) {
+  const container = document.getElementById('chatMessages');
+  if (container.querySelector('.empty')) container.innerHTML = '';
+  const div = document.createElement('div');
+  div.className = `msg ${cls}`;
+  let html = '';
+  const byteBadge = byteSize ? ` &middot; <span class="tag">${byteSize}b protobuf</span>` : '';
+  if (source || level) {
+    html += `<div class="meta">${source ? source : ''}${level ? ` &middot; ${level}` : ''} &middot; ${new Date().toLocaleTimeString()}${byteBadge}</div>`;
+  }
+  html += text;
+  if (tags && tags.length) {
+    html += `<div class="tags">${tags.map(t => `<span class="tag">${t}</span>`).join('')}</div>`;
+  }
+  div.innerHTML = html;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+function addWeatherMsg(cls, text) {
+  const container = document.getElementById('weatherMessages');
+  if (container.querySelector('.empty')) container.innerHTML = '';
+  const div = document.createElement('div');
+  div.className = `msg ${cls}`;
+  div.innerHTML = `<div class="meta">${new Date().toLocaleTimeString()}</div>${text}`;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+function renderWeatherCard(data) {
+  const container = document.getElementById('weatherMessages');
+  if (container.querySelector('.empty')) container.innerHTML = '';
+  const div = document.createElement('div');
+  div.className = 'weather-card';
+  div.style.animation = 'fadeIn 0.3s ease';
+  const byteInfo = data.protobufRequestBytes ? `<span class="tag" style="float:right">req: ${data.protobufRequestBytes}b &rarr; res: ${data.protobufResponseBytes}b protobuf</span>` : '';
+  let html = `<h3>${data.city} ${byteInfo}</h3>`;
+  if (data.forecasts) {
+    data.forecasts.forEach(f => {
+      const wind = f.windSpeed != null ? ` | Wind: ${f.windSpeed.toFixed(1)} km/h` : '';
+      html += `<div class="forecast-row">
+        <span>${f.date}</span>
+        <span class="temp">${f.temperatureMin.toFixed(1)} – ${f.temperatureMax.toFixed(1)}°C</span>
+        <span class="condition">${f.condition}</span>
+        <span>${f.humidityPercent}%${wind}</span>
+      </div>`;
+    });
+  }
+  div.innerHTML = html;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+function updateStatus(id, connected) {
+  const el = document.getElementById(id);
+  el.className = `badge ${connected ? 'connected' : 'disconnected'}`;
+  el.textContent = el.textContent.split(':')[0] + ': ' + (connected ? 'Connected' : 'Disconnected');
+}
+
+function toggleChat(on) {
+  document.getElementById('btnChatConnect').disabled = on;
+  document.getElementById('btnChatDisconnect').disabled = !on;
+  document.getElementById('chatInput').disabled = !on;
+  document.getElementById('chatLevel').disabled = !on;
+  document.getElementById('btnChatSend').disabled = !on;
+}
+
+function toggleWeather(on) {
+  document.getElementById('btnWeatherConnect').disabled = on;
+  document.getElementById('btnWeatherDisconnect').disabled = !on;
+  document.getElementById('weatherCity').disabled = !on;
+  document.getElementById('weatherDays').disabled = !on;
+  document.getElementById('weatherHourly').disabled = !on;
+  document.getElementById('btnWeatherSend').disabled = !on;
+}
+</script>
+</body>
+</html>

@@ -1,6 +1,9 @@
-@ProtobuffEncoder.Api.Receiver_HostAddress = http://localhost:5174
+@ReceiverHost = http://localhost:5100
 
-GET {{ProtobuffEncoder.Api.Receiver_HostAddress}}/weatherforecast/
+### Health check
+GET {{ReceiverHost}}/health
 Accept: application/json
 
-###
+### Schema info
+GET {{ReceiverHost}}/api/schema
+Accept: application/json

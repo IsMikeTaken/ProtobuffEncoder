@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\ProtobuffEncoder.AspNetCore\ProtobuffEncoder.AspNetCore.csproj" />
+    <ProjectReference Include="..\..\src\ProtobuffEncoder\ProtobuffEncoder.csproj" />
     <ProjectReference Include="..\..\src\ProtobuffEncoder.Contracts\ProtobuffEncoder.Contracts.csproj" />
   </ItemGroup>
 
