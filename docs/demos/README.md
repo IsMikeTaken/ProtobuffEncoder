@@ -10,6 +10,8 @@ The solution includes several demo applications that showcase different features
 | Demo.Api.Receiver | Web API | 5100 | Schema-only receiver with proto schema explorer |
 | Demo.Bidirectional.Server | Web API | 5300 | WebSocket server with real-time streaming dashboard |
 | Demo.Bidirectional.Client | Console | - | WebSocket client for bidirectional streaming |
+| Demo.Grpc.Server | Web API | 5400 / 5401 | Code-first gRPC server (no .proto files) |
+| Demo.Grpc.Client | Console | - | gRPC client with typed proxy (connects to 5401) |
 | Demo.Console | Console | - | Feature showcase (encoding, streaming, validation) |
 
 ## HTTP Sender & Receiver
@@ -114,6 +116,48 @@ The console client connects via WebSocket and runs two demos:
 
 1. **Chat** — sends 5 messages concurrently with receiving, including an empty message to trigger server-side validation rejection
 2. **Weather** — sequential request-response for Amsterdam, London, and Tokyo
+
+## gRPC
+
+Demonstrates code-first gRPC using `[ProtoService]` and `[ProtoMethod]` attributes with the
+unified `AddProtobuffEncoder()` setup. No `.proto` files or code generation required.
+
+### Running
+
+```bash
+# Start the gRPC server (HTTP/1.1 on 5400, HTTP/2 on 5401)
+dotnet run --project demos/ProtobuffEncoder.Demo.Grpc.Server
+
+# Run the console client (connects to gRPC on 5401)
+dotnet run --project demos/ProtobuffEncoder.Demo.Grpc.Client
+```
+
+### Browser Dashboard
+
+Open `http://localhost:5400` (HTTP/1.1 port) for an overview dashboard showing:
+- Registered services and methods
+- Method types (Unary, ServerStreaming, DuplexStreaming)
+- Request/response type mappings
+- gRPC route table
+- Quick-start code examples
+
+### Services
+
+**Weather** (`/Weather/...`):
+- `GetForecast` (Unary) — single city forecast
+- `StreamForecasts` (Server Streaming) — day-by-day forecast stream with simulated delays
+
+**Chat** (`/Chat/...`):
+- `Chat` (Duplex Streaming) — bidirectional message stream with command routing (`/ping`, `/time`, `/stats`)
+- `SendNotification` (Unary) — single notification with acknowledgement
+
+### Console Client
+
+Interactive menu with four demos:
+1. **Unary Weather** — configure city, days, and wind; receive a full forecast
+2. **Streaming Weather** — watch forecasts arrive day-by-day in real time
+3. **Unary Notification** — send a message and receive an `AckResponse`
+4. **Duplex Chat** — configurable message count and delay, concurrent send/receive
 
 ## Console Showcase
 

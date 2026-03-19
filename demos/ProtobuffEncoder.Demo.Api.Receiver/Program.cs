@@ -54,6 +54,35 @@ app.MapPost("/api/weather", async (HttpContext ctx, SchemaDecoder schema) =>
     return Results.Bytes(response.ToByteArray(), ProtobufMediaType.Protobuf);
 });
 
+/*
+ *
+ service EquipmentGrpcService {
+     rpc Create(CreateRequest) returns (CreatedEquipmentResponse);
+     rpc GetById(GetByIdRequest) returns (CreatedEquipmentIdResponse);
+     rpc GetByAreaId(GetEquipmentByAreaIdRequest) returns (CollectionByIdEquipmentResponse);
+     rpc GetAll(GetAllEquipmentRequest) returns (CollectionEquipmentResponse);
+     rpc Update(UpdateEquipmentRequest) returns (UpdatedEquipmentResponse);
+     rpc Delete(DeleteEquipmentRequest) returns (RemovedEquipmentResponse);
+   }
+
+equipment.proto
+
+message CreateEquipmentResponse:
+   EquipmentBody equipmentBody
+
+message CreateByIdEquipmentResponse:
+   EquipmentBody equipmentBody
+
+message CreateEquipmentResponse:
+   repeated EquipmentBody equipmentBody: 1,
+
+message EquipmentBody:
+ string id
+ AnyValue value 
+
+ */
+
+
 // --- Notification endpoint: schema-only decode + raw protobuf ACK ---
 app.MapPost("/api/notifications", async (HttpContext ctx, SchemaDecoder schema) =>
 {

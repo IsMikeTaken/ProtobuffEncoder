@@ -1,0 +1,14 @@
+@host = http://localhost:5400
+
+### Health check
+GET {{host}}/health
+Accept: application/json
+
+### Note: gRPC endpoints require an HTTP/2 gRPC client (not REST).
+### Use the ProtobuffEncoder.Demo.Grpc.Client console app or grpcurl.
+###
+### Services:
+###   Weather/GetForecast       — Unary
+###   Weather/StreamForecasts   — Server streaming
+###   Chat/Chat                 — Duplex streaming
+###   Chat/SendNotification     — Unary

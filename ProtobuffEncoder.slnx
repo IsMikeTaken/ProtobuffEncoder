@@ -4,6 +4,7 @@
     <Project Path="src/ProtobuffEncoder.AspNetCore/ProtobuffEncoder.AspNetCore.csproj" />
     <Project Path="src/ProtobuffEncoder.Contracts/ProtobuffEncoder.Contracts.csproj" />
     <Project Path="src/ProtobuffEncoder.WebSockets/ProtobuffEncoder.WebSockets.csproj" />
+    <Project Path="src/ProtobuffEncoder.Grpc/ProtobuffEncoder.Grpc.csproj" />
   </Folder>
   <Folder Name="/tests/" />
 
@@ -16,6 +17,8 @@
     <Project Path="demos/ProtobuffEncoder.Demo.Api.Receiver/ProtobuffEncoder.Demo.Api.Receiver.csproj" />
     <Project Path="demos/ProtobuffEncoder.Demo.Bidirectional.Server/ProtobuffEncoder.Demo.Bidirectional.Server.csproj" />
     <Project Path="demos/ProtobuffEncoder.Demo.Bidirectional.Client/ProtobuffEncoder.Demo.Bidirectional.Client.csproj" />
+    <Project Path="demos/ProtobuffEncoder.Demo.Grpc.Server/ProtobuffEncoder.Demo.Grpc.Server.csproj" />
+    <Project Path="demos/ProtobuffEncoder.Demo.Grpc.Client/ProtobuffEncoder.Demo.Grpc.Client.csproj" />
   </Folder>
   <Folder Name="/demos/" />
 
@@ -25,12 +28,24 @@
 
   <Folder Name="/docs/">
     <File Path="docs/README.md" />
+  </Folder>
+
+  <Folder Name="/docs/guides/">
     <File Path="docs/guides/attributes.md" />
     <File Path="docs/guides/serialization.md" />
     <File Path="docs/guides/transport.md" />
     <File Path="docs/guides/schema.md" />
+    <File Path="docs/guides/setup.md" />
+    <File Path="docs/guides/websockets.md" />
+    <File Path="docs/guides/grpc.md" />
+  </Folder>
+
+  <Folder Name="/docs/api/">
     <File Path="docs/api/aspnetcore.md" />
     <File Path="docs/api/tool.md" />
+  </Folder>
+
+  <Folder Name="/docs/demos/">
     <File Path="docs/demos/README.md" />
   </Folder>
 </Solution>

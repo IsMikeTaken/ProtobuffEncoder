@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ProtobuffEncoder — gRPC Server Dashboard</title>
+<style>
+  :root { --bg: #0f1117; --surface: #1a1d27; --border: #2a2d3a; --text: #e4e4e7; --muted: #71717a; --accent: #6366f1; --green: #22c55e; --red: #ef4444; --yellow: #eab308; --cyan: #06b6d4; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 1.2rem 2rem; display: flex; align-items: center; gap: 1rem; }
+  .header h1 { font-size: 1.3rem; font-weight: 600; }
+  .header .badge { background: var(--accent); color: white; padding: .2rem .6rem; border-radius: .3rem; font-size: .75rem; font-weight: 600; }
+  .main { max-width: 1100px; margin: 2rem auto; padding: 0 1.5rem; }
+  .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+  .info-card { background: var(--surface); border: 1px solid var(--border); border-radius: .5rem; padding: 1.2rem; }
+  .info-card h3 { font-size: .85rem; color: var(--muted); margin-bottom: .5rem; text-transform: uppercase; letter-spacing: .05em; }
+  .info-card .value { font-size: 1.6rem; font-weight: 700; }
+  .service-section { background: var(--surface); border: 1px solid var(--border); border-radius: .5rem; padding: 1.5rem; margin-bottom: 1.5rem; }
+  .service-section h2 { font-size: 1.1rem; margin-bottom: 1rem; display: flex; align-items: center; gap: .5rem; }
+  .method-tag { font-size: .7rem; padding: .15rem .5rem; border-radius: .25rem; font-weight: 600; text-transform: uppercase; }
+  .method-tag.unary { background: rgba(34,197,94,.15); color: var(--green); }
+  .method-tag.server-streaming { background: rgba(6,182,212,.15); color: var(--cyan); }
+  .method-tag.duplex { background: rgba(234,179,8,.15); color: var(--yellow); }
+  table { width: 100%; border-collapse: collapse; margin-top: .5rem; }
+  th, td { text-align: left; padding: .6rem .8rem; border-bottom: 1px solid var(--border); font-size: .9rem; }
+  th { color: var(--muted); font-weight: 500; font-size: .8rem; text-transform: uppercase; }
+  code { background: rgba(99,102,241,.1); color: var(--accent); padding: .15rem .4rem; border-radius: .2rem; font-size: .85rem; font-family: 'Cascadia Code', 'Fira Code', monospace; }
+  .proto-flow { background: var(--bg); border: 1px solid var(--border); border-radius: .5rem; padding: 1.2rem; margin-top: 1rem; }
+  .proto-flow h4 { font-size: .85rem; color: var(--muted); margin-bottom: .8rem; }
+  .flow-diagram { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; font-size: .85rem; }
+  .flow-step { background: var(--surface); border: 1px solid var(--border); padding: .4rem .8rem; border-radius: .3rem; }
+  .flow-arrow { color: var(--accent); font-weight: bold; }
+  .highlight { color: var(--accent); font-weight: 600; }
+  .footer { text-align: center; padding: 2rem; color: var(--muted); font-size: .8rem; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>ProtobuffEncoder gRPC Server</h1>
+  <span class="badge">gRPC</span>
+  <span class="badge" style="background:var(--green)">HTTP/2</span>
+  <span class="badge" style="background:var(--cyan)">No .proto files</span>
+</div>
+
+<div class="main">
+  <div class="info-grid">
+    <div class="info-card">
+      <h3>Transport</h3>
+      <div class="value" style="color:var(--accent)">gRPC</div>
+    </div>
+    <div class="info-card">
+      <h3>Serialization</h3>
+      <div class="value" style="color:var(--green)">ProtobuffEncoder</div>
+    </div>
+    <div class="info-card">
+      <h3>Services</h3>
+      <div class="value">2</div>
+    </div>
+    <div class="info-card">
+      <h3>Methods</h3>
+      <div class="value">4</div>
+    </div>
+  </div>
+
+  <div class="service-section">
+    <h2>Weather Service <span class="method-tag unary">Unary</span> <span class="method-tag server-streaming">Server Streaming</span></h2>
+    <table>
+      <thead><tr><th>Method</th><th>Type</th><th>Request</th><th>Response</th><th>Route</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>GetForecast</code></td>
+          <td><span class="method-tag unary">Unary</span></td>
+          <td><code>WeatherRequest</code></td>
+          <td><code>WeatherResponse</code></td>
+          <td><code>/Weather/GetForecast</code></td>
+        </tr>
+        <tr>
+          <td><code>StreamForecasts</code></td>
+          <td><span class="method-tag server-streaming">Server Streaming</span></td>
+          <td><code>WeatherRequest</code></td>
+          <td><code>WeatherResponse</code> (stream)</td>
+          <td><code>/Weather/StreamForecasts</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="service-section">
+    <h2>Chat Service <span class="method-tag duplex">Duplex</span> <span class="method-tag unary">Unary</span></h2>
+    <table>
+      <thead><tr><th>Method</th><th>Type</th><th>Request</th><th>Response</th><th>Route</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>Chat</code></td>
+          <td><span class="method-tag duplex">Duplex Streaming</span></td>
+          <td><code>NotificationMessage</code> (stream)</td>
+          <td><code>NotificationMessage</code> (stream)</td>
+          <td><code>/Chat/Chat</code></td>
+        </tr>
+        <tr>
+          <td><code>SendNotification</code></td>
+          <td><span class="method-tag unary">Unary</span></td>
+          <td><code>NotificationMessage</code></td>
+          <td><code>AckResponse</code></td>
+          <td><code>/Chat/SendNotification</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="proto-flow">
+    <h4>How it works — no .proto files required</h4>
+    <div class="flow-diagram">
+      <span class="flow-step"><span class="highlight">[ProtoService]</span> interface</span>
+      <span class="flow-arrow">&rarr;</span>
+      <span class="flow-step"><span class="highlight">[ProtoMethod]</span> methods</span>
+      <span class="flow-arrow">&rarr;</span>
+      <span class="flow-step">Reflection discovers types</span>
+      <span class="flow-arrow">&rarr;</span>
+      <span class="flow-step"><span class="highlight">ProtobufMarshaller</span></span>
+      <span class="flow-arrow">&rarr;</span>
+      <span class="flow-step">gRPC pipeline</span>
+    </div>
+    <div class="flow-diagram" style="margin-top:.8rem">
+      <span class="flow-step">Client</span>
+      <span class="flow-arrow">&rarr;</span>
+      <span class="flow-step"><code>channel.CreateProtobufClient&lt;T&gt;()</code></span>
+      <span class="flow-arrow">&rarr;</span>
+      <span class="flow-step">DispatchProxy</span>
+      <span class="flow-arrow">&rarr;</span>
+      <span class="flow-step"><span class="highlight">Same interface</span></span>
+    </div>
+  </div>
+
+  <div class="service-section" style="margin-top:1.5rem">
+    <h2>Quick Start</h2>
+    <pre style="background:var(--bg);padding:1rem;border-radius:.4rem;font-size:.85rem;overflow-x:auto;color:var(--text);font-family:'Cascadia Code','Fira Code',monospace;line-height:1.6">
+<span style="color:var(--muted)">// Server registration (Program.cs)</span>
+builder.Services.AddGrpc();
+builder.Services.AddProtobufGrpcService&lt;WeatherGrpcServiceImpl&gt;();
+app.MapGrpcService&lt;WeatherGrpcServiceImpl&gt;();
+
+<span style="color:var(--muted)">// Client usage</span>
+<span style="color:var(--cyan)">var</span> channel = GrpcChannel.ForAddress(<span style="color:var(--green)">"http://localhost:5400"</span>);
+<span style="color:var(--cyan)">var</span> client = channel.CreateProtobufClient&lt;IWeatherGrpcService&gt;();
+<span style="color:var(--cyan)">var</span> forecast = <span style="color:var(--yellow)">await</span> client.GetForecast(<span style="color:var(--yellow)">new</span> WeatherRequest { City = <span style="color:var(--green)">"Amsterdam"</span> });</pre>
+  </div>
+</div>
+
+<div class="footer">
+  ProtobuffEncoder.Grpc &mdash; Code-first gRPC without .proto files
+</div>
+</body>
+</html>

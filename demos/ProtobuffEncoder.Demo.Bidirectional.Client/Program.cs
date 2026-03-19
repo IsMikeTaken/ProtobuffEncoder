@@ -68,8 +68,7 @@ static async Task RunChatDemo(string serverUrl, bool verbose)
     Console.WriteLine($"\n[Config] Sending {msgCount} messages ('{customText}'), {delayMs}ms apart. Invalid msg: {sendInvalid}\n");
 
     // Use the framework client with retry
-    await using var client = new ProtobufWebSocketClient<NotificationMessage, NotificationMessage>(
-        new ProtobufWebSocketClientOptions
+    await using var client = new ProtobufWebSocketClient<NotificationMessage, NotificationMessage>(new ProtobufWebSocketClientOptions
         {
             ServerUri = new Uri($"{serverUrl}/ws/chat"),
             RetryPolicy = new RetryPolicy { MaxRetries = 3, InitialDelay = TimeSpan.FromSeconds(1) },
@@ -196,8 +195,7 @@ static async Task RunWeatherDemo(string serverUrl, bool verbose)
     Console.WriteLine($"\n[Config] Requesting {days}-day forecast for {cities.Length} cities. Hourly data: {includeHourly}\n");
 
     // Use the framework client with retry
-    await using var client = new ProtobufWebSocketClient<WeatherRequest, WeatherResponse>(
-        new ProtobufWebSocketClientOptions
+    await using var client = new ProtobufWebSocketClient<WeatherRequest, WeatherResponse>(new ProtobufWebSocketClientOptions
         {
             ServerUri = new Uri($"{serverUrl}/ws/weather-stream"),
             RetryPolicy = new RetryPolicy { MaxRetries = 3 },

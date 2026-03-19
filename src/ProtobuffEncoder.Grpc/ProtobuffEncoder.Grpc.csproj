@@ -2,12 +2,15 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ProtobuffEncoder\ProtobuffEncoder.csproj" />
-    <ProjectReference Include="..\ProtobuffEncoder.WebSockets\ProtobuffEncoder.WebSockets.csproj" />
-    <ProjectReference Include="..\ProtobuffEncoder.Grpc\ProtobuffEncoder.Grpc.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Grpc.AspNetCore.Server" />
+    <PackageReference Include="Grpc.Net.Client" />
   </ItemGroup>
 
   <PropertyGroup>

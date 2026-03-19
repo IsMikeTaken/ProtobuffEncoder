@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ProtobuffEncoder\ProtobuffEncoder.csproj" />
+    <ProjectReference Include="..\..\src\ProtobuffEncoder.Contracts\ProtobuffEncoder.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\ProtobuffEncoder.Grpc\ProtobuffEncoder.Grpc.csproj" />
+    <ProjectReference Include="..\..\src\ProtobuffEncoder.AspNetCore\ProtobuffEncoder.AspNetCore.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+</Project>
