@@ -17,6 +17,9 @@
   <Folder Name="/tools/">
     <Project Path="tools/ProtobuffEncoder.Tool/ProtobuffEncoder.Tool.csproj" />
   </Folder>
+  <Folder Name="/demos/tool/">
+    <Project Path="demos/ProtobuffEncoder.Demo.SchemaGen/ProtobuffEncoder.Demo.SchemaGen.csproj" />
+  </Folder>
 
   <Folder Name="/demos/web/">
     <Project Path="demos/ProtobuffEncoder.Demo.Api.Sender/ProtobuffEncoder.Demo.Api.Sender.csproj" />
@@ -26,9 +29,7 @@
     <Project Path="demos/ProtobuffEncoder.Demo.Grpc.Server/ProtobuffEncoder.Demo.Grpc.Server.csproj" />
     <Project Path="demos/ProtobuffEncoder.Demo.Grpc.Client/ProtobuffEncoder.Demo.Grpc.Client.csproj" />
   </Folder>
-  <Folder Name="/demos/">
-    <Project Path="demos/ProtobuffEncoder.Demo.SchemaGen/ProtobuffEncoder.Demo.SchemaGen.csproj" />
-  </Folder>
+  <Folder Name="/demos/" />
 
   <Folder Name="/demos/console/">
     <Project Path="demos/ProtobuffEncoder.Demo.Console/ProtobuffEncoder.Demo.Console.csproj" />
