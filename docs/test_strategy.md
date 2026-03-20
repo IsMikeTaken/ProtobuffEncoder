@@ -94,4 +94,4 @@ dotnet test --filter "FullyQualifiedName~Validation"
 
 ## Benchmarks
 
-See the [benchmark documentation](benchmarks/) for comprehensive performance testing across .NET 8, 9, and 10 with 15 benchmark suites covering all features.
+See the [benchmark documentation](benchmarks/README.md) for comprehensive performance testing across .NET 8, 9, and 10 with 15 benchmark suites covering all features.

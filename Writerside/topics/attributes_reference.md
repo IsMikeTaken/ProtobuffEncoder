@@ -6,7 +6,7 @@ ProtobuffEncoder uses .NET attributes to define protobuf contracts without `.pro
 
 Marks a class, struct, or enum for protobuf serialization.
 
-```csharp
+```C#
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Enum)]
 public sealed class ProtoContractAttribute : Attribute
 ```
@@ -25,7 +25,7 @@ public sealed class ProtoContractAttribute : Attribute
 
 ### Examples
 
-```csharp
+```C#
 // Basic contract - all public properties included automatically
 [ProtoContract]
 public class SimpleMessage
@@ -69,7 +69,7 @@ public class DerivedMessage : BaseMessage
 
 Overrides protobuf field metadata for a property.
 
-```csharp
+```C#
 [AttributeUsage(AttributeTargets.Property)]
 public sealed class ProtoFieldAttribute : Attribute
 ```
@@ -88,7 +88,7 @@ public sealed class ProtoFieldAttribute : Attribute
 
 ### Examples
 
-```csharp
+```C#
 [ProtoContract]
 public class DetailedMessage
 {
@@ -113,7 +113,7 @@ public class DetailedMessage
 
 Marks a `Dictionary<K,V>` property as a protobuf map field.
 
-```csharp
+```C#
 [AttributeUsage(AttributeTargets.Property)]
 public sealed class ProtoMapAttribute : Attribute
 ```
@@ -127,7 +127,7 @@ public sealed class ProtoMapAttribute : Attribute
 
 ### Example
 
-```csharp
+```C#
 [ProtoContract]
 public class ConfigMessage
 {
@@ -154,7 +154,7 @@ message ConfigMessage {
 
 Groups properties into a protobuf `oneof` union. At most one property in the group should have a non-default value.
 
-```csharp
+```C#
 [AttributeUsage(AttributeTargets.Property)]
 public sealed class ProtoOneOfAttribute : Attribute
 ```
@@ -167,7 +167,7 @@ public sealed class ProtoOneOfAttribute : Attribute
 
 ### Example
 
-```csharp
+```C#
 [ProtoContract]
 public class ContactInfo
 {
@@ -203,7 +203,7 @@ During encoding, only the **first non-default** property in the group is written
 
 Declares a known derived type for polymorphic serialization.
 
-```csharp
+```C#
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
 public sealed class ProtoIncludeAttribute : Attribute
 ```
@@ -217,7 +217,7 @@ public sealed class ProtoIncludeAttribute : Attribute
 
 ### Example
 
-```csharp
+```C#
 [ProtoContract]
 [ProtoInclude(10, typeof(Dog))]
 [ProtoInclude(11, typeof(Cat))]
@@ -245,14 +245,14 @@ The derived type's fields are encoded as a nested message at the specified field
 
 Excludes a property from serialization.
 
-```csharp
+```C#
 [AttributeUsage(AttributeTargets.Property)]
 public sealed class ProtoIgnoreAttribute : Attribute
 ```
 
 ### Example
 
-```csharp
+```C#
 [ProtoContract]
 public class UserProfile
 {
@@ -266,7 +266,7 @@ public class UserProfile
 
 Marks an interface as a gRPC service definition for code-first service generation.
 
-```csharp
+```C#
 [AttributeUsage(AttributeTargets.Interface)]
 public sealed class ProtoServiceAttribute : Attribute
 ```
@@ -283,7 +283,7 @@ public sealed class ProtoServiceAttribute : Attribute
 
 Marks a method on a `[ProtoService]` interface as an RPC method.
 
-```csharp
+```C#
 [AttributeUsage(AttributeTargets.Method)]
 public sealed class ProtoMethodAttribute : Attribute
 ```
@@ -297,7 +297,7 @@ public sealed class ProtoMethodAttribute : Attribute
 
 ### Example
 
-```csharp
+```C#
 [ProtoService("WeatherService")]
 public interface IWeatherService
 {

@@ -30,7 +30,7 @@ dotnet add package ProtobuffEncoder.WebSockets
 
 Mark any class with `[ProtoContract]` and its properties with `[ProtoField(N)]`:
 
-```csharp
+```C#
 using ProtobuffEncoder.Attributes;
 
 [ProtoContract]
@@ -45,7 +45,7 @@ public class Person
 
 ## Encode and Decode
 
-```csharp
+```C#
 using ProtobuffEncoder;
 
 // Encode to bytes
@@ -62,7 +62,7 @@ Console.WriteLine(decoded.Name); // "Alice"
 
 Write and read length-delimited messages over any `Stream`:
 
-```csharp
+```C#
 // Write multiple messages
 await using var file = File.Create("people.bin");
 foreach (var p in people)
@@ -78,7 +78,7 @@ await foreach (var p in ProtobufEncoder.ReadDelimitedMessagesAsync<Person>(reade
 
 For hot-path serialization, create a `StaticMessage` that caches reflection lookups:
 
-```csharp
+```C#
 var msg = ProtobufEncoder.CreateStaticMessage<Person>();
 
 // Fast encode/decode
@@ -92,7 +92,7 @@ Person? next = msg.ReadDelimited(stream);
 
 ## Generate .proto Schema
 
-```csharp
+```C#
 using ProtobuffEncoder.Schema;
 
 string proto = ProtoSchemaGenerator.Generate(typeof(Person));
@@ -118,7 +118,7 @@ message Person {
 
 Use typed senders and receivers for structured streaming:
 
-```csharp
+```C#
 using ProtobuffEncoder.Transport;
 
 // Sender
@@ -138,7 +138,7 @@ var response = await duplex.SendAndReceiveAsync(request);
 
 ## ASP.NET Core Setup
 
-```csharp
+```C#
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddProtobuffEncoder(options =>

@@ -1,6 +1,5 @@
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
-using BenchmarkDotNet.Environments;
 using BenchmarkDotNet.Jobs;
 using BenchmarkDotNet.Running;
 using ProtobuffEncoder;
@@ -14,13 +13,12 @@ namespace ProtobuffEncoder.Benchmarks;
 // Multi-TFM Configuration
 // ═══════════════════════════════════════════════════
 
-public class MultiTfmConfig : ManualConfig
+public class BenchmarkConfig : ManualConfig
 {
-    public MultiTfmConfig()
+    public BenchmarkConfig()
     {
-        AddJob(Job.ShortRun.WithRuntime(CoreRuntime.Core80).WithId("net8.0"));
-        AddJob(Job.ShortRun.WithRuntime(CoreRuntime.Core90).WithId("net9.0"));
-        AddJob(Job.ShortRun.WithRuntime(CoreRuntime.CreateForNewVersion("net10.0", ".NET 10.0")).WithId("net10.0"));
+        AddJob(Job.ShortRun);
+        AddExporter(BenchmarkDotNet.Exporters.MarkdownExporter.GitHub);
     }
 }
 
@@ -28,7 +26,7 @@ public class MultiTfmConfig : ManualConfig
 // 1. Core Encode / Decode
 // ═══════════════════════════════════════════════════
 
-[Config(typeof(MultiTfmConfig))]
+[Config(typeof(BenchmarkConfig))]
 [MemoryDiagnoser]
 public class EncoderBenchmarks
 {
@@ -72,7 +70,7 @@ public class EncoderBenchmarks
 // 2. Collections (List + Map)
 // ═══════════════════════════════════════════════════
 
-[Config(typeof(MultiTfmConfig))]
+[Config(typeof(BenchmarkConfig))]
 [MemoryDiagnoser]
 public class CollectionBenchmarks
 {
@@ -116,7 +114,7 @@ public class CollectionBenchmarks
 // 3. Static Message (pre-compiled delegates)
 // ═══════════════════════════════════════════════════
 
-[Config(typeof(MultiTfmConfig))]
+[Config(typeof(BenchmarkConfig))]
 [MemoryDiagnoser]
 public class StaticMessageBenchmarks
 {
@@ -149,7 +147,7 @@ public class StaticMessageBenchmarks
 // 4. Streaming (length-delimited messages)
 // ═══════════════════════════════════════════════════
 
-[Config(typeof(MultiTfmConfig))]
+[Config(typeof(BenchmarkConfig))]
 [MemoryDiagnoser]
 public class StreamingBenchmarks
 {
@@ -199,7 +197,7 @@ public class StreamingBenchmarks
 // 5. Duplex Stream
 // ═══════════════════════════════════════════════════
 
-[Config(typeof(MultiTfmConfig))]
+[Config(typeof(BenchmarkConfig))]
 [MemoryDiagnoser]
 public class DuplexStreamBenchmarks
 {
@@ -244,7 +242,7 @@ public class DuplexStreamBenchmarks
 // 6. Validation Pipeline
 // ═══════════════════════════════════════════════════
 
-[Config(typeof(MultiTfmConfig))]
+[Config(typeof(BenchmarkConfig))]
 [MemoryDiagnoser]
 public class ValidationBenchmarks
 {
@@ -284,7 +282,7 @@ public class ValidationBenchmarks
 // 7. Schema Generation
 // ═══════════════════════════════════════════════════
 
-[Config(typeof(MultiTfmConfig))]
+[Config(typeof(BenchmarkConfig))]
 [MemoryDiagnoser]
 public class SchemaGenerationBenchmarks
 {
@@ -313,7 +311,7 @@ public class SchemaGenerationBenchmarks
 // 8. Schema Parsing + SchemaDecoder
 // ═══════════════════════════════════════════════════
 
-[Config(typeof(MultiTfmConfig))]
+[Config(typeof(BenchmarkConfig))]
 [MemoryDiagnoser]
 public class SchemaParsingBenchmarks
 {
@@ -342,7 +340,7 @@ public class SchemaParsingBenchmarks
 // 9. ProtobufWriter (low-level)
 // ═══════════════════════════════════════════════════
 
-[Config(typeof(MultiTfmConfig))]
+[Config(typeof(BenchmarkConfig))]
 [MemoryDiagnoser]
 public class ProtobufWriterBenchmarks
 {
@@ -390,7 +388,7 @@ public class ProtobufWriterBenchmarks
 // 10. Payload Scaling
 // ═══════════════════════════════════════════════════
 
-[Config(typeof(MultiTfmConfig))]
+[Config(typeof(BenchmarkConfig))]
 [MemoryDiagnoser]
 public class PayloadScalingBenchmarks
 {
@@ -435,7 +433,7 @@ public class PayloadScalingBenchmarks
 // 11. Nested / Complex Objects
 // ═══════════════════════════════════════════════════
 
-[Config(typeof(MultiTfmConfig))]
+[Config(typeof(BenchmarkConfig))]
 [MemoryDiagnoser]
 public class NestedObjectBenchmarks
 {
@@ -482,7 +480,7 @@ public class NestedObjectBenchmarks
 // 12. OneOf Encoding
 // ═══════════════════════════════════════════════════
 
-[Config(typeof(MultiTfmConfig))]
+[Config(typeof(BenchmarkConfig))]
 [MemoryDiagnoser]
 public class OneOfBenchmarks
 {
@@ -517,7 +515,7 @@ public class OneOfBenchmarks
 // 13. Inheritance (ProtoInclude)
 // ═══════════════════════════════════════════════════
 
-[Config(typeof(MultiTfmConfig))]
+[Config(typeof(BenchmarkConfig))]
 [MemoryDiagnoser]
 public class InheritanceBenchmarks
 {
@@ -542,7 +540,7 @@ public class InheritanceBenchmarks
 // 14. Async Streaming
 // ═══════════════════════════════════════════════════
 
-[Config(typeof(MultiTfmConfig))]
+[Config(typeof(BenchmarkConfig))]
 [MemoryDiagnoser]
 public class AsyncStreamingBenchmarks
 {
@@ -583,7 +581,7 @@ public class AsyncStreamingBenchmarks
 // 15. ContractResolver Caching
 // ═══════════════════════════════════════════════════
 
-[Config(typeof(MultiTfmConfig))]
+[Config(typeof(BenchmarkConfig))]
 [MemoryDiagnoser]
 public class ContractResolverBenchmarks
 {

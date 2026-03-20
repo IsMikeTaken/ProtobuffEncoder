@@ -76,7 +76,7 @@ Each map entry is a length-delimited message with `key = field 1` and `value = f
 
 ## Encode API
 
-```csharp
+```C#
 // Sync - returns byte array
 byte[] bytes = ProtobufEncoder.Encode(instance);
 
@@ -93,7 +93,7 @@ await ProtobufEncoder.WriteDelimitedMessageAsync(instance, stream, ct);
 
 ## Decode API
 
-```csharp
+```C#
 // Sync - from byte array/span
 T result = ProtobufEncoder.Decode<T>(bytes);
 object result = ProtobufEncoder.Decode(typeof(T), bytes);
@@ -117,7 +117,7 @@ await foreach (var msg in ProtobufEncoder.ReadDelimitedMessagesAsync<T>(stream, 
 
 Pre-compiled message handlers that cache reflection lookups at creation time:
 
-```csharp
+```C#
 // Create once, reuse many times
 StaticMessage<T> msg = ProtobufEncoder.CreateStaticMessage<T>();
 

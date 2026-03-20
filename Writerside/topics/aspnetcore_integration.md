@@ -4,7 +4,7 @@ The `ProtobuffEncoder.AspNetCore` package provides REST API formatters, HttpClie
 
 ## Setup with Builder Pattern
 
-```csharp
+```C#
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddProtobuffEncoder(options =>
@@ -46,7 +46,7 @@ Fluent builder returned by `AddProtobuffEncoder()`:
 
 The builder uses the strategy pattern. Each transport implements `IProtobufTransportStrategy`:
 
-```csharp
+```C#
 public interface IProtobufTransportStrategy
 {
     void ConfigureServices(IServiceCollection services, ProtobufEncoderOptions options);
@@ -68,7 +68,7 @@ Built-in strategies:
 
 Reads `application/x-protobuf` request bodies and deserializes them:
 
-```csharp
+```C#
 // Automatically used by MVC when client sends Content-Type: application/x-protobuf
 [HttpPost("/api/orders")]
 public IActionResult CreateOrder([FromBody] OrderMessage order)
@@ -86,7 +86,7 @@ Requirements:
 
 Writes `application/x-protobuf` response bodies:
 
-```csharp
+```C#
 [HttpGet("/api/orders/{id}")]
 public OrderMessage GetOrder(int id)
 {
@@ -100,7 +100,7 @@ The formatter sets `Content-Length` automatically.
 
 ### Media Type
 
-```csharp
+```C#
 public static class ProtobufMediaType
 {
     public const string Protobuf = "application/x-protobuf";
@@ -111,7 +111,7 @@ public static class ProtobufMediaType
 
 `HttpContent` implementation for sending protobuf bodies with `HttpClient`:
 
-```csharp
+```C#
 var content = new ProtobufHttpContent(orderMessage);
 // Content-Type is automatically set to application/x-protobuf
 // Content-Length is computed from the serialized bytes
@@ -123,7 +123,7 @@ Convenience methods for sending and receiving protobuf messages:
 
 ### PostProtobufAsync (with response)
 
-```csharp
+```C#
 var response = await httpClient.PostProtobufAsync<OrderRequest, OrderResponse>(
     "/api/orders",
     new OrderRequest { OrderId = 1 });
@@ -132,7 +132,7 @@ var response = await httpClient.PostProtobufAsync<OrderRequest, OrderResponse>(
 
 ### PostProtobufAsync (fire-and-forget)
 
-```csharp
+```C#
 var httpResponse = await httpClient.PostProtobufAsync(
     "/api/notifications",
     new NotificationMessage { Text = "Hello" });
@@ -141,14 +141,14 @@ var httpResponse = await httpClient.PostProtobufAsync(
 
 ### GetProtobufAsync
 
-```csharp
+```C#
 var status = await httpClient.GetProtobufAsync<StatusResponse>("/api/status");
 // Sends Accept: application/x-protobuf, deserializes response
 ```
 
 ## Complete Server Example
 
-```csharp
+```C#
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
@@ -163,7 +163,7 @@ app.MapControllers();
 app.Run();
 ```
 
-```csharp
+```C#
 [ApiController]
 [Route("api/[controller]")]
 public class WeatherController : ControllerBase
@@ -183,7 +183,7 @@ public class WeatherController : ControllerBase
 
 ## Complete Client Example
 
-```csharp
+```C#
 var client = new HttpClient { BaseAddress = new Uri("http://localhost:5000") };
 
 var response = await client.PostProtobufAsync<WeatherRequest, WeatherResponse>(

@@ -34,7 +34,7 @@
 
 ### 1. Define a Contract
 
-```csharp
+```C#
 [ProtoContract]
 public class WeatherRequest
 {
@@ -45,7 +45,7 @@ public class WeatherRequest
 
 ### 2. Encode and Decode
 
-```csharp
+```C#
 var request = new WeatherRequest { City = "Amsterdam", Days = 5 };
 byte[] bytes = ProtobufEncoder.Encode(request);
 WeatherRequest decoded = ProtobufEncoder.Decode<WeatherRequest>(bytes);
@@ -53,14 +53,14 @@ WeatherRequest decoded = ProtobufEncoder.Decode<WeatherRequest>(bytes);
 
 ### 3. Stream Over Transport
 
-```csharp
+```C#
 await using var sender = new ProtobufSender<WeatherRequest>(networkStream);
 await sender.SendAsync(request);
 ```
 
 ### 4. Generate .proto Schema
 
-```csharp
+```C#
 string proto = ProtoSchemaGenerator.Generate(typeof(WeatherRequest));
 // syntax = "proto3";
 // message WeatherRequest {

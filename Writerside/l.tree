@@ -29,7 +29,14 @@
     </toc-element>
     <toc-element toc-title="Quality">
         <toc-element topic="test_strategy_overview.md"/>
-        <toc-element topic="benchmarks_overview.md"/>
+        <toc-element topic="benchmarks_overview.md">
+            <toc-element topic="collections_and_types1.md"/>
+            <toc-element topic="core_performance1.md"/>
+            <toc-element topic="infrastructure1.md"/>
+            <toc-element topic="README1.md"/>
+            <toc-element topic="schema_operations1.md"/>
+            <toc-element topic="streaming_and_transport1.md"/>
+        </toc-element>
     </toc-element>
 
 </instance-profile>

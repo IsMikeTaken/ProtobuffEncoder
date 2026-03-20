@@ -6,7 +6,7 @@ The transport layer provides typed, stream-based message passing built on top of
 
 Sends protobuf-encoded messages over a stream using length-delimited framing.
 
-```csharp
+```C#
 public sealed class ProtobufSender<T> : IAsyncDisposable, IDisposable
     where T : class, new()
 ```
@@ -22,7 +22,7 @@ public sealed class ProtobufSender<T> : IAsyncDisposable, IDisposable
 
 ### Example
 
-```csharp
+```C#
 await using var sender = new ProtobufSender<OrderMessage>(networkStream);
 
 // Single message
@@ -39,7 +39,7 @@ await sender.SendManyAsync(GenerateOrdersAsync());
 
 Receives protobuf-encoded messages from a stream using length-delimited framing.
 
-```csharp
+```C#
 public sealed class ProtobufReceiver<T> : IAsyncDisposable, IDisposable
     where T : class, new()
 ```
@@ -56,7 +56,7 @@ public sealed class ProtobufReceiver<T> : IAsyncDisposable, IDisposable
 
 ### Example
 
-```csharp
+```C#
 await using var receiver = new ProtobufReceiver<OrderMessage>(networkStream);
 
 // Read all
@@ -74,13 +74,13 @@ await receiver.ListenAsync(async order =>
 
 Bi-directional streaming channel. Supports sending and receiving simultaneously with thread-safe internal locks.
 
-```csharp
+```C#
 public sealed class ProtobufDuplexStream<TSend, TReceive> : IAsyncDisposable, IDisposable
 ```
 
 ### Constructors
 
-```csharp
+```C#
 // Single bi-directional stream (TCP, pipe)
 new ProtobufDuplexStream<TSend, TReceive>(duplexStream, ownsStream: true)
 
@@ -107,7 +107,7 @@ new ProtobufDuplexStream<TSend, TReceive>(sendStream, receiveStream, ownsStreams
 
 For same-type bidirectional streaming:
 
-```csharp
+```C#
 // ProtobufDuplexStream<T> wraps ProtobufDuplexStream<T, T>
 await using var duplex = new ProtobufDuplexStream<ChatMessage>(tcpStream);
 ```
@@ -116,13 +116,13 @@ await using var duplex = new ProtobufDuplexStream<ChatMessage>(tcpStream);
 
 #### Request-Response
 
-```csharp
+```C#
 var response = await duplex.SendAndReceiveAsync(request);
 ```
 
 #### Concurrent Bidirectional
 
-```csharp
+```C#
 await duplex.RunDuplexAsync(
     outgoing: GenerateRequestsAsync(),
     onReceived: async response =>
@@ -134,7 +134,7 @@ await duplex.RunDuplexAsync(
 
 #### Server-Side Processing
 
-```csharp
+```C#
 await duplex.ProcessAsync(async request =>
 {
     var result = await ComputeResult(request);
@@ -149,7 +149,7 @@ All transport classes accept an `ownsStream` / `ownsStreams` parameter:
 - `true` (default): The transport disposes the underlying stream when disposed
 - `false`: The caller retains ownership and is responsible for disposal
 
-```csharp
+```C#
 // Transport owns the stream
 await using var sender = new ProtobufSender<T>(stream); // disposes stream
 

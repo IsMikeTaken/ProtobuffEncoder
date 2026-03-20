@@ -6,7 +6,7 @@ The `ProtoSchemaGenerator` generates `.proto` schema files from C# types marked 
 
 Generate a `.proto` file for a single type and all its dependencies:
 
-```csharp
+```C#
 using ProtobuffEncoder.Schema;
 
 string proto = ProtoSchemaGenerator.Generate(typeof(OrderMessage));
@@ -38,7 +38,7 @@ message OrderItem {
 
 Generate all `.proto` files for every `[ProtoContract]` and `[ProtoService]` type in an assembly:
 
-```csharp
+```C#
 Dictionary<string, string> files = ProtoSchemaGenerator.GenerateAll(assembly);
 
 foreach (var (filename, content) in files)
@@ -49,7 +49,7 @@ foreach (var (filename, content) in files)
 
 Write all generated `.proto` files to disk:
 
-```csharp
+```C#
 List<string> paths = ProtoSchemaGenerator.GenerateToDirectory(assembly, "./proto-output");
 // Returns: ["./proto-output/myapp_models.proto", "./proto-output/v1/Order.proto", ...]
 ```
@@ -71,7 +71,7 @@ Types are grouped into `.proto` files based on:
 
 When a type references another type that belongs to a different file, import statements are automatically generated:
 
-```csharp
+```C#
 [ProtoContract(Version = 1, Name = "Order")]
 public class Order
 {
@@ -110,7 +110,7 @@ The import resolver:
 
 Interfaces decorated with `[ProtoService]` generate gRPC service definitions:
 
-```csharp
+```C#
 [ProtoService("OrderProcessingService")]
 public interface IOrderProcessingService
 {
@@ -136,7 +136,7 @@ service OrderProcessingService {
 
 If a method's parameter or return type doesn't end in `Request` or `Response`, the generator auto-creates wrapper messages:
 
-```csharp
+```C#
 [ProtoMethod(ProtoMethodType.Unary)]
 Task<Order> GetOrder(string orderId); // orderId is not a *Request type
 ```

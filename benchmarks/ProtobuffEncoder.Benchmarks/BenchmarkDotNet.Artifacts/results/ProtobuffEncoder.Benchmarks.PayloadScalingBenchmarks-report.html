@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>ProtobuffEncoder.Benchmarks.PayloadScalingBenchmarks-20260320-163445</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet v0.15.8, Windows 11 (10.0.26200.7840/25H2/2025Update/HudsonValley2)
+12th Gen Intel Core i9-12900H 2.50GHz, 1 CPU, 20 logical and 14 physical cores
+.NET SDK 10.0.201
+  [Host]   : .NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3
+  ShortRun : .NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3
+</code></pre>
+<pre><code>Job=ShortRun  IterationCount=3  LaunchCount=1  
+WarmupCount=3  
+</code></pre>
+
+<table>
+<thead><tr><th>Method</th><th>Mean  </th><th>Error </th><th>StdDev</th><th>Ratio</th><th>RatioSD</th><th>Gen0</th><th>Gen1</th><th>Gen2</th><th>Allocated</th><th>Alloc Ratio</th>
+</tr>
+</thead><tbody><tr><td>Encode_100B</td><td>1,315.1 ns</td><td>654.70 ns</td><td>35.89 ns</td><td>1.00</td><td>0.03</td><td>0.0916</td><td>-</td><td>-</td><td>1.2 KB</td><td>1.00</td>
+</tr><tr><td>Encode_10KB</td><td>6,767.8 ns</td><td>27,753.55 ns</td><td>1,521.27 ns</td><td>5.15</td><td>1.01</td><td>4.8523</td><td>0.2899</td><td>-</td><td>59.57 KB</td><td>49.51</td>
+</tr><tr><td>Encode_100KB</td><td>114,831.7 ns</td><td>47,958.73 ns</td><td>2,628.78 ns</td><td>87.36</td><td>2.69</td><td>187.2559</td><td>187.2559</td><td>187.2559</td><td>587.17 KB</td><td>488.03</td>
+</tr><tr><td>Decode_100B</td><td>600.1 ns</td><td>89.66 ns</td><td>4.91 ns</td><td>0.46</td><td>0.01</td><td>0.0820</td><td>-</td><td>-</td><td>1.02 KB</td><td>0.85</td>
+</tr><tr><td>Decode_10KB</td><td>2,807.4 ns</td><td>17,363.14 ns</td><td>951.73 ns</td><td>2.14</td><td>0.63</td><td>2.4414</td><td>0.1297</td><td>-</td><td>30.02 KB</td><td>24.95</td>
+</tr><tr><td>Decode_100KB</td><td>31,563.9 ns</td><td>57,668.90 ns</td><td>3,161.03 ns</td><td>24.01</td><td>2.16</td><td>90.8813</td><td>90.8813</td><td>90.8813</td><td>293.74 KB</td><td>244.15</td>
+</tr></tbody></table>
+</body>
+</html>

@@ -6,7 +6,7 @@ The `ProtobuffEncoder.WebSockets` package provides a managed WebSocket client an
 
 ### Endpoint Registration
 
-```csharp
+```C#
 builder.Services.AddProtobuffEncoder()
     .WithWebSocket(ws => ws
         .AddEndpoint<NotificationMessage, NotificationMessage>());
@@ -14,7 +14,7 @@ builder.Services.AddProtobuffEncoder()
 
 ### Endpoint Configuration
 
-```csharp
+```C#
 .WithWebSocket(ws => ws
     .AddEndpoint<WeatherResponse, WeatherRequest>(options =>
     {
@@ -88,7 +88,7 @@ Each connected client is represented by a `ProtobufWebSocketConnection<TSend, TR
 
 Thread-safe tracker of all active connections for an endpoint. Supports broadcast and filtered broadcast.
 
-```csharp
+```C#
 // Inject via DI
 var manager = app.Services.GetRequiredService<
     WebSocketConnectionManager<NotificationMessage, NotificationMessage>>();
@@ -115,7 +115,7 @@ IReadOnlyCollection<Connection> all = manager.Connections;
 
 ### ProtobufWebSocketClient
 
-```csharp
+```C#
 using ProtobuffEncoder.WebSockets;
 
 await using var client = new ProtobufWebSocketClient<WeatherRequest, WeatherResponse>(
@@ -155,7 +155,7 @@ await client.ConnectAsync();
 
 #### Request-Response
 
-```csharp
+```C#
 var response = await client.SendAndReceiveAsync(
     new WeatherRequest { City = "Amsterdam" });
 Console.WriteLine($"Temperature: {response.Temperature}");
@@ -163,7 +163,7 @@ Console.WriteLine($"Temperature: {response.Temperature}");
 
 #### Continuous Listening
 
-```csharp
+```C#
 await client.ListenAsync(async response =>
 {
     Console.WriteLine($"Update: {response.Temperature}C");
@@ -172,7 +172,7 @@ await client.ListenAsync(async response =>
 
 #### Bidirectional Streaming
 
-```csharp
+```C#
 await client.RunDuplexAsync(
     outgoing: GenerateRequestsAsync(),
     onReceived: async response =>
@@ -195,7 +195,7 @@ Configures exponential backoff retry for the WebSocket client:
 
 ### Presets
 
-```csharp
+```C#
 // Default: 5 retries, 1s initial, 30s max, 2x backoff
 RetryPolicy.Default
 
@@ -205,7 +205,7 @@ RetryPolicy.None
 
 ### Custom Policy
 
-```csharp
+```C#
 var policy = new RetryPolicy
 {
     MaxRetries = 10,
@@ -237,7 +237,7 @@ Example with defaults: 1s, 2s, 4s, 8s, 16s (capped at 30s).
 
 ### Configuring the WebSocket
 
-```csharp
+```C#
 ConfigureWebSocket = ws =>
 {
     ws.Options.SetRequestHeader("Authorization", "Bearer token");

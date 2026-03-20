@@ -49,7 +49,7 @@ protobuf-encoder ./bin/Release/net10.0/MyApp.Contracts.dll ./protos ./MyApp.Serv
 
 For an assembly containing:
 
-```csharp
+```C#
 [ProtoContract(Version = 1, Name = "Order")]
 public class Order { ... }
 
@@ -85,7 +85,7 @@ The `ProjectModifier` class handles `.csproj` file manipulation:
 
 ### API
 
-```csharp
+```C#
 ProjectModifier.AppendToCsproj(csprojPath, protoFilePaths);
 ```
 

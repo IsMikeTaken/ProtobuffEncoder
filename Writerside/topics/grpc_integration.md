@@ -6,7 +6,7 @@ The `ProtobuffEncoder.Grpc` package enables code-first gRPC services and clients
 
 Creates gRPC `Marshaller<T>` instances that use `ProtobufEncoder` for serialization:
 
-```csharp
+```C#
 using ProtobuffEncoder.Grpc;
 
 Marshaller<WeatherRequest> marshaller = ProtobufMarshaller.Create<WeatherRequest>();
@@ -20,7 +20,7 @@ This is the foundation that all other gRPC components build on.
 
 Use `[ProtoService]` on an interface and `[ProtoMethod]` on each RPC method:
 
-```csharp
+```C#
 using ProtobuffEncoder.Attributes;
 
 [ProtoService("WeatherService")]
@@ -54,7 +54,7 @@ public interface IWeatherGrpcService
 
 ## Implementing a Service
 
-```csharp
+```C#
 public class WeatherGrpcServiceImpl : IWeatherGrpcService
 {
     public Task<WeatherResponse> GetForecast(WeatherRequest request)
@@ -86,7 +86,7 @@ public class WeatherGrpcServiceImpl : IWeatherGrpcService
 
 ### With Builder Pattern
 
-```csharp
+```C#
 builder.Services.AddProtobuffEncoder()
     .WithGrpc(grpc => grpc
         .AddService<WeatherGrpcServiceImpl>()
@@ -95,7 +95,7 @@ builder.Services.AddProtobuffEncoder()
 
 ### Direct Registration
 
-```csharp
+```C#
 builder.Services.AddGrpc();
 builder.Services.AddProtobufGrpcService<WeatherGrpcServiceImpl>();
 ```
@@ -106,7 +106,7 @@ The `ProtobufGrpcClientProxy` creates a `DispatchProxy`-based runtime implementa
 
 ### Creating a Client
 
-```csharp
+```C#
 using Grpc.Net.Client;
 using ProtobuffEncoder.Grpc.Client;
 
@@ -128,7 +128,7 @@ var response = await client.GetForecast(new WeatherRequest { City = "Amsterdam" 
 
 ### DI Registration
 
-```csharp
+```C#
 builder.Services.AddProtobufGrpcClient<IWeatherGrpcService>(
     channel => GrpcChannel.ForAddress("http://localhost:5400"));
 ```
@@ -170,7 +170,7 @@ Both checks throw `ArgumentException` with descriptive messages if violated.
 
 ### Server
 
-```csharp
+```C#
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddGrpc();
@@ -184,7 +184,7 @@ app.Run();
 
 ### Client
 
-```csharp
+```C#
 var channel = GrpcChannel.ForAddress("http://localhost:5400");
 var client = channel.CreateProtobufClient<IWeatherGrpcService>();
 

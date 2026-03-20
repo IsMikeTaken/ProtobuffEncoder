@@ -6,7 +6,7 @@ ProtobuffEncoder provides tools for working with protobuf data using only `.prot
 
 Parses `.proto` file content into `ProtoFile` models.
 
-```csharp
+```C#
 using ProtobuffEncoder.Schema;
 
 // Parse from string
@@ -40,7 +40,7 @@ Decodes protobuf binary payloads using parsed `.proto` definitions. Returns `Dec
 
 ### Creating a Decoder
 
-```csharp
+```C#
 // From .proto content string
 var decoder = SchemaDecoder.FromProtoContent(protoContent);
 
@@ -56,7 +56,7 @@ var decoder = new SchemaDecoder(file1, file2, file3);
 
 ### Decoding Messages
 
-```csharp
+```C#
 byte[] binaryData = ReceiveFromNetwork();
 
 DecodedMessage message = decoder.Decode("OrderMessage", binaryData);
@@ -80,7 +80,7 @@ var settings = (Dictionary<object, object?>)message["Settings"];
 
 ### Registering Additional Schemas
 
-```csharp
+```C#
 var decoder = new SchemaDecoder();
 decoder.Register(ProtoSchemaParser.ParseFile("base.proto"));
 decoder.Register(ProtoSchemaParser.ParseFile("orders.proto"));
@@ -88,7 +88,7 @@ decoder.Register(ProtoSchemaParser.ParseFile("orders.proto"));
 
 ### Introspection
 
-```csharp
+```C#
 // List all registered message types
 IReadOnlyCollection<string> messages = decoder.RegisteredMessages;
 
@@ -104,7 +104,7 @@ ProtoEnumDef? enumDef = decoder.GetEnum("OrderStatus");
 
 A dynamic message representation with field-name-based access:
 
-```csharp
+```C#
 public sealed class DecodedMessage
 {
     public string TypeName { get; }
@@ -134,13 +134,13 @@ public sealed class DecodedMessage
 
 Low-level protobuf writer for building messages manually without C# contract types. Useful for dynamic message construction, testing, or interop.
 
-```csharp
+```C#
 var writer = new ProtobufWriter();
 ```
 
 ### Scalar Fields
 
-```csharp
+```C#
 writer.WriteVarint(1, 42);              // field 1 = 42 (varint)
 writer.WriteBool(2, true);              // field 2 = true
 writer.WriteString(3, "hello");         // field 3 = "hello"
@@ -152,7 +152,7 @@ writer.WriteBytes(7, new byte[] {1,2}); // field 7 = bytes
 
 ### Nested Messages
 
-```csharp
+```C#
 var inner = new ProtobufWriter();
 inner.WriteVarint(1, 100);
 inner.WriteString(2, "nested");
@@ -164,7 +164,7 @@ outer.WriteMessage(2, inner);  // field 2 = nested message
 
 ### Repeated Fields
 
-```csharp
+```C#
 // Packed varints
 writer.WritePackedVarints(1, new long[] { 1, 2, 3, 4, 5 });
 
@@ -177,7 +177,7 @@ writer.WriteRepeatedMessage(3, new[] { inner1, inner2 });
 
 ### Map Fields
 
-```csharp
+```C#
 // map<string, string>
 writer.WriteStringStringMap(1, settings);
 
@@ -198,7 +198,7 @@ writer.WriteMapEntry(5,
 
 ### Output
 
-```csharp
+```C#
 byte[] bytes = writer.ToByteArray();
 
 // Decode with SchemaDecoder or ProtobufEncoder
@@ -208,7 +208,7 @@ var message = decoder.Decode("MyMessage", bytes);
 
 ## Round-Trip Example
 
-```csharp
+```C#
 // 1. Generate schema from C# type
 string proto = ProtoSchemaGenerator.Generate(typeof(OrderMessage));
 

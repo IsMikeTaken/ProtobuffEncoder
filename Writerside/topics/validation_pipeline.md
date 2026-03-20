@@ -4,7 +4,7 @@ The validation pipeline provides a composable, rule-based validation system for 
 
 ## ValidationPipeline
 
-```csharp
+```C#
 public sealed class ValidationPipeline<T>
 ```
 
@@ -21,7 +21,7 @@ public sealed class ValidationPipeline<T>
 
 ### Example
 
-```csharp
+```C#
 var pipeline = new ValidationPipeline<OrderMessage>();
 
 // Simple predicate rules
@@ -45,7 +45,7 @@ if (!result.IsValid)
 
 ## ValidationResult
 
-```csharp
+```C#
 public readonly struct ValidationResult
 {
     public bool IsValid { get; }
@@ -60,7 +60,7 @@ public readonly struct ValidationResult
 
 Custom validator interface:
 
-```csharp
+```C#
 public interface IMessageValidator<in T>
 {
     ValidationResult Validate(T message);
@@ -69,7 +69,7 @@ public interface IMessageValidator<in T>
 
 ### Example
 
-```csharp
+```C#
 public class OrderTotalValidator : IMessageValidator<OrderMessage>
 {
     public ValidationResult Validate(OrderMessage message)
@@ -98,7 +98,7 @@ Controls what happens when a received message fails validation:
 
 Wraps a `ProtobufSender<T>` with outgoing validation. Invalid messages throw `MessageValidationException` and are never written to the stream.
 
-```csharp
+```C#
 await using var sender = new ValidatedProtobufSender<OrderMessage>(stream);
 
 // Configure validation rules
@@ -113,7 +113,7 @@ sender.Send(invalidOrder); // MessageValidationException
 
 Wraps a `ProtobufReceiver<T>` with incoming validation and configurable failure behavior.
 
-```csharp
+```C#
 await using var receiver = new ValidatedProtobufReceiver<OrderMessage>(stream);
 
 // Configure validation
@@ -137,7 +137,7 @@ await foreach (var order in receiver.ReceiveAllAsync(ct))
 
 Combines bi-directional streaming with validation on both send and receive sides.
 
-```csharp
+```C#
 await using var duplex = new ValidatedDuplexStream<Request, Response>(stream);
 
 // Send-side validation
@@ -175,7 +175,7 @@ var response = await duplex.SendAndReceiveAsync(request);
 
 Thrown when a message fails validation (when behavior is `Throw`):
 
-```csharp
+```C#
 public class MessageValidationException : Exception
 {
     public object? InvalidMessage { get; }
