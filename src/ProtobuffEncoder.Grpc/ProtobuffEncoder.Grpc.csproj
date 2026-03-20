@@ -19,4 +19,8 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="ProtobuffEncoder.Grpc.Tests" />
+  </ItemGroup>
+
 </Project>

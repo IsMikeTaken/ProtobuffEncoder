@@ -112,9 +112,26 @@ multiple transports.
 using Grpc.Net.Client;
 using ProtobuffEncoder.Grpc.Client;
 
-// Connect to the HTTP/2 endpoint (grpcPort from UseKestrel)
+// Direct creation
 var channel = GrpcChannel.ForAddress("http://localhost:5401");
 var client = channel.CreateProtobufClient<IWeatherGrpcService>();
+
+// Or via Dependency Injection (recommended)
+builder.Services.AddProtobufGrpcClient<IWeatherGrpcService>("http://localhost:5401");
+```
+
+When using DI, the client is registered as a Singleton and can be injected into your controllers or services:
+
+```csharp
+public class MyController(IWeatherGrpcService weatherClient) : ControllerBase
+{
+    [HttpGet]
+    public async Task<IActionResult> Get()
+    {
+        var forecast = await weatherClient.GetForecast(new WeatherRequest { City = "Amsterdam" });
+        return Ok(forecast);
+    }
+}
 ```
 
 `CreateProtobufClient<T>()` returns a `DispatchProxy` that implements your service interface.

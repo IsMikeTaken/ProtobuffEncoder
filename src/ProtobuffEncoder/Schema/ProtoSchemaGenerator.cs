@@ -26,34 +26,207 @@ public static class ProtoSchemaGenerator
     /// </summary>
     public static Dictionary<string, string> GenerateAll(Assembly assembly)
     {
-        var results = new Dictionary<string, string>();
         var contractTypes = assembly.GetTypes()
-            .Where(t => t.GetCustomAttribute<ProtoContractAttribute>() is not null)
+            .Where(t => t.GetCustomAttribute<ProtoContractAttribute>() is not null ||
+                        t.GetCustomAttribute<ProtoServiceAttribute>() is not null)
             .ToList();
 
-        // Group types by namespace to produce one .proto per namespace
-        var grouped = contractTypes.GroupBy(t => t.Namespace ?? "default");
+        // Phase 1: Build the type → file key registry so we know where every type lives
+        var typeToFileKey = new Dictionary<Type, string>();
+        foreach (var type in contractTypes)
+        {
+            var key = ResolveFileKey(type);
+            typeToFileKey[type] = key;
+        }
+
+        // Also discover [ProtoService] interfaces referenced by implementation types
+        var serviceInterfaces = new List<Type>();
+        foreach (var type in contractTypes)
+        {
+            foreach (var iface in type.GetInterfaces())
+            {
+                if (iface.GetCustomAttribute<ProtoServiceAttribute>() is not null && !typeToFileKey.ContainsKey(iface))
+                {
+                    var key = ResolveServiceFileKey(iface);
+                    typeToFileKey[iface] = key;
+                    serviceInterfaces.Add(iface);
+                }
+            }
+        }
+
+        // Group types by file key
+        var grouped = contractTypes
+            .Concat(serviceInterfaces)
+            .GroupBy(t => typeToFileKey[t]);
+
+        // Phase 2: Build ProtoFile models with file-boundary-aware collection
+        var files = new Dictionary<string, ProtoFile>();
 
         foreach (var group in grouped)
         {
+            var firstType = group.First();
             var file = new ProtoFile
             {
                 Syntax = "proto3",
-                Package = group.Key
+                Package = firstType.Namespace ?? "default",
+                FilePath = group.Key
             };
 
             var visited = new HashSet<Type>();
             foreach (var type in group)
             {
-                CollectType(type, file, visited);
+                CollectType(type, file, visited, typeToFileKey, group.Key);
             }
 
-            string filename = group.Key.Replace('.', '_').ToLowerInvariant() + ".proto";
-            results[filename] = Render(file);
+            foreach (var type in group)
+            {
+                CollectServices(type, file, visited, typeToFileKey, group.Key);
+            }
+
+            files[group.Key] = file;
+        }
+
+        // Phase 3: Resolve cross-file imports
+        ResolveImports(files, typeToFileKey);
+
+        // Phase 4: Render all files
+        var results = new Dictionary<string, string>();
+        foreach (var (key, file) in files)
+        {
+            results[key] = Render(file);
         }
 
         return results;
     }
+
+    /// <summary>
+    /// Determines the output .proto file key for a [ProtoContract] type.
+    /// </summary>
+    internal static string ResolveFileKey(Type type)
+    {
+        var contractAttr = type.GetCustomAttribute<ProtoContractAttribute>();
+        var serviceAttr = type.GetCustomAttribute<ProtoServiceAttribute>();
+
+        // Service interfaces get their own file based on service name + version
+        if (serviceAttr is not null && contractAttr is null)
+        {
+            return ResolveServiceFileKey(type);
+        }
+
+        if (contractAttr is not null && (contractAttr.Version > 0 || !string.IsNullOrEmpty(contractAttr.Name)))
+        {
+            string dir = contractAttr.Version > 0 ? $"v{contractAttr.Version}/" : "";
+            string name = !string.IsNullOrEmpty(contractAttr.Name) ? contractAttr.Name : (type.Namespace?.Replace('.', '_').ToLowerInvariant() ?? "default");
+            return $"{dir}{name}.proto";
+        }
+
+        return (type.Namespace ?? "default").Replace('.', '_').ToLowerInvariant() + ".proto";
+    }
+
+    private static string ResolveServiceFileKey(Type serviceType)
+    {
+        var serviceAttr = serviceType.GetCustomAttribute<ProtoServiceAttribute>();
+        if (serviceAttr is null)
+            return (serviceType.Namespace ?? "default").Replace('.', '_').ToLowerInvariant() + ".proto";
+
+        string dir = serviceAttr.Version > 0 ? $"v{serviceAttr.Version}/" : "";
+        return $"{dir}{serviceAttr.ServiceName}.proto";
+    }
+
+    /// <summary>
+    /// Walks all files' messages and services to find cross-file type references,
+    /// then adds import statements to each file.
+    /// </summary>
+    private static void ResolveImports(Dictionary<string, ProtoFile> files, Dictionary<Type, string> typeToFileKey)
+    {
+        foreach (var (fileKey, file) in files)
+        {
+            var imports = new HashSet<string>();
+
+            // Check message field references
+            foreach (var msg in file.Messages)
+            {
+                CollectImportsFromMessage(msg, fileKey, typeToFileKey, files, imports);
+            }
+
+            // Check service RPC type references
+            foreach (var svc in file.Services)
+            {
+                foreach (var rpc in svc.Methods)
+                {
+                    TryAddImportForTypeName(rpc.RequestTypeName, fileKey, files, imports);
+                    TryAddImportForTypeName(rpc.ResponseTypeName, fileKey, files, imports);
+                }
+            }
+
+            file.Imports = imports.OrderBy(i => i).ToList();
+        }
+    }
+
+    private static void CollectImportsFromMessage(ProtoMessageDef msg, string currentFileKey,
+        Dictionary<Type, string> typeToFileKey, Dictionary<string, ProtoFile> files, HashSet<string> imports)
+    {
+        // Check if any field references a type in another file
+        foreach (var field in msg.Fields)
+        {
+            TryAddImportForTypeName(field.TypeName, currentFileKey, files, imports);
+            if (field.IsMap)
+            {
+                TryAddImportForTypeName(field.MapKeyType, currentFileKey, files, imports);
+                TryAddImportForTypeName(field.MapValueType, currentFileKey, files, imports);
+            }
+        }
+
+        foreach (var oneOf in msg.OneOfs)
+        {
+            foreach (var field in oneOf.Fields)
+            {
+                TryAddImportForTypeName(field.TypeName, currentFileKey, files, imports);
+            }
+        }
+
+        // Check nested messages recursively
+        foreach (var nested in msg.NestedMessages)
+        {
+            CollectImportsFromMessage(nested, currentFileKey, typeToFileKey, files, imports);
+        }
+
+        // Check if the message's SourceType belongs to another file
+        if (msg.SourceType is not null && typeToFileKey.TryGetValue(msg.SourceType, out var sourceFileKey)
+            && sourceFileKey != currentFileKey)
+        {
+            imports.Add(sourceFileKey);
+        }
+    }
+
+    /// <summary>
+    /// Checks if a proto type name refers to a message/enum defined in another file and adds the import.
+    /// </summary>
+    private static void TryAddImportForTypeName(string? typeName, string currentFileKey,
+        Dictionary<string, ProtoFile> files, HashSet<string> imports)
+    {
+        if (string.IsNullOrEmpty(typeName) || IsScalarProtoType(typeName))
+            return;
+
+        foreach (var (otherFileKey, otherFile) in files)
+        {
+            if (otherFileKey == currentFileKey) continue;
+
+            if (otherFile.Messages.Any(m => m.Name == typeName) || otherFile.Enums.Any(e => e.Name == typeName))
+            {
+                imports.Add(otherFileKey);
+                return;
+            }
+        }
+    }
+
+    private static bool IsScalarProtoType(string typeName) => typeName switch
+    {
+        "bool" or "int32" or "uint32" or "int64" or "uint64" or "float" or "double"
+            or "string" or "bytes" or "sint32" or "sint64" or "fixed32" or "fixed64"
+            or "sfixed32" or "sfixed64" or "empty" => true,
+        _ => false
+    };
 
     /// <summary>
     /// Generates all .proto files from an assembly and writes them to the output directory.
@@ -69,6 +242,11 @@ public static class ProtoSchemaGenerator
         foreach (var (filename, content) in files)
         {
             var path = Path.Combine(outputDirectory, filename);
+            var dir = Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(dir))
+            {
+                Directory.CreateDirectory(dir);
+            }
             File.WriteAllText(path, content);
             paths.Add(path);
         }
@@ -91,10 +269,21 @@ public static class ProtoSchemaGenerator
         return file;
     }
 
-    private static void CollectType(Type type, ProtoFile file, HashSet<Type> visited)
+    private static void CollectType(Type type, ProtoFile file, HashSet<Type> visited,
+        Dictionary<Type, string>? typeToFileKey = null, string? currentFileKey = null)
     {
         if (!visited.Add(type))
             return;
+
+        // If file-boundary-aware: skip types that belong to a different file
+        if (typeToFileKey is not null && currentFileKey is not null)
+        {
+            if (typeToFileKey.TryGetValue(type, out var ownerKey) && ownerKey != currentFileKey)
+            {
+                visited.Remove(type); // allow it to be visited in its own file
+                return;
+            }
+        }
 
         if (type.IsEnum)
         {
@@ -105,28 +294,147 @@ public static class ProtoSchemaGenerator
         var contract = type.GetCustomAttribute<ProtoContractAttribute>();
         if (contract is null) return;
 
-        var msgDef = BuildMessage(type, file, visited);
+        var msgDef = BuildMessage(type, file, visited, typeToFileKey, currentFileKey);
         file.Messages.Add(msgDef);
 
         // Process [ProtoInclude] — generate messages for derived types too
         var includes = type.GetCustomAttributes<ProtoIncludeAttribute>();
         foreach (var inc in includes)
         {
-            CollectType(inc.DerivedType, file, visited);
+            CollectType(inc.DerivedType, file, visited, typeToFileKey, currentFileKey);
         }
     }
 
-    private static ProtoMessageDef BuildMessage(Type type, ProtoFile file, HashSet<Type> visited)
+    private static void CollectServices(Type type, ProtoFile file, HashSet<Type> visited,
+        Dictionary<Type, string>? typeToFileKey = null, string? currentFileKey = null)
+    {
+        // Check if the type itself is a service (e.g. interface with [ProtoService])
+        var serviceAttr = type.GetCustomAttribute<ProtoServiceAttribute>();
+        if (serviceAttr is not null)
+        {
+            var svcDef = BuildService(type, serviceAttr, file, visited, typeToFileKey, currentFileKey);
+            if (svcDef is not null)
+                file.Services.Add(svcDef);
+        }
+
+        // Also check interfaces implemented by the type
+        foreach (var iface in type.GetInterfaces())
+        {
+            var ifaceAttr = iface.GetCustomAttribute<ProtoServiceAttribute>();
+            if (ifaceAttr is not null && !file.Services.Any(s => s.SourceType == iface))
+            {
+                var svcDef = BuildService(iface, ifaceAttr, file, visited, typeToFileKey, currentFileKey);
+                if (svcDef is not null)
+                    file.Services.Add(svcDef);
+            }
+        }
+    }
+
+    private static ProtoServiceDef? BuildService(Type serviceType, ProtoServiceAttribute attr, ProtoFile file,
+        HashSet<Type> visited, Dictionary<Type, string>? typeToFileKey = null, string? currentFileKey = null)
+    {
+        var svc = new ProtoServiceDef
+        {
+            Name = attr.ServiceName,
+            SourceType = serviceType,
+            Metadata = attr.Metadata ?? serviceType.GetCustomAttribute<ProtoContractAttribute>()?.Metadata
+        };
+
+        foreach (var method in serviceType.GetMethods())
+        {
+            var methodAttr = method.GetCustomAttribute<ProtoMethodAttribute>();
+            if (methodAttr is null) continue;
+
+            var (reqType, resType) = ExtractRpcTypes(method, methodAttr.MethodType);
+            string rpcName = methodAttr.Name ?? method.Name;
+
+            // Resolve proto type names (which also collects types into the current file if they belong here)
+            string baseReqName = MapToProtoType(reqType, file, visited, typeToFileKey, currentFileKey);
+            string baseResName = resType == typeof(void) ? "empty" : MapToProtoType(resType, file, visited, typeToFileKey, currentFileKey);
+
+            // Auto-wrap request
+            string finalReqName = baseReqName;
+            if (!baseReqName.EndsWith("Request", StringComparison.OrdinalIgnoreCase))
+            {
+                finalReqName = rpcName + "Request";
+                var wrapReq = new ProtoMessageDef { Name = finalReqName, SourceType = serviceType, Metadata = "Auto-generated RPC request wrapper" };
+                if (baseReqName != "empty")
+                    wrapReq.Fields.Add(new ProtoFieldDef { Name = "data", FieldNumber = 1, TypeName = baseReqName });
+                file.Messages.Add(wrapReq);
+            }
+
+            // Auto-wrap response
+            string finalResName = baseResName;
+            if (!baseResName.EndsWith("Response", StringComparison.OrdinalIgnoreCase))
+            {
+                finalResName = rpcName + "Response";
+                var wrapRes = new ProtoMessageDef { Name = finalResName, SourceType = serviceType, Metadata = "Auto-generated RPC response wrapper" };
+                if (baseResName != "empty")
+                    wrapRes.Fields.Add(new ProtoFieldDef { Name = "data", FieldNumber = 1, TypeName = baseResName });
+                file.Messages.Add(wrapRes);
+            }
+
+            svc.Methods.Add(new ProtoRpcDef
+            {
+                Name = rpcName,
+                MethodType = methodAttr.MethodType,
+                RequestTypeName = finalReqName,
+                ResponseTypeName = finalResName
+            });
+        }
+
+        return svc.Methods.Count > 0 ? svc : null;
+    }
+
+    private static (Type request, Type response) ExtractRpcTypes(MethodInfo method, ProtoMethodType methodType)
+    {
+        var parameters = method.GetParameters()
+            .Where(p => p.ParameterType != typeof(CancellationToken))
+            .ToArray();
+
+        Type reqType = parameters.Length > 0 ? parameters[0].ParameterType : typeof(void);
+        Type resType = method.ReturnType;
+
+        if (methodType is ProtoMethodType.ClientStreaming or ProtoMethodType.DuplexStreaming)
+        {
+            if (reqType.IsGenericType && reqType.GetGenericTypeDefinition() == typeof(IAsyncEnumerable<>))
+                reqType = reqType.GetGenericArguments()[0];
+        }
+
+        if (resType == typeof(Task) || resType == typeof(ValueTask))
+        {
+            resType = typeof(void);
+        }
+        else if (resType.IsGenericType)
+        {
+            var genericDef = resType.GetGenericTypeDefinition();
+            if (genericDef == typeof(Task<>) || genericDef == typeof(ValueTask<>) || genericDef == typeof(IAsyncEnumerable<>))
+            {
+                resType = resType.GetGenericArguments()[0];
+            }
+        }
+
+        return (reqType, resType);
+    }
+
+    private static ProtoMessageDef BuildMessage(Type type, ProtoFile file, HashSet<Type> visited,
+        Dictionary<Type, string>? typeToFileKey = null, string? currentFileKey = null)
     {
         var descriptors = ContractResolver.Resolve(type);
-        var msg = new ProtoMessageDef { Name = type.Name };
+        var contract = type.GetCustomAttribute<ProtoContractAttribute>();
+        var msg = new ProtoMessageDef
+        {
+            Name = !string.IsNullOrEmpty(contract?.Name) ? contract.Name : type.Name,
+            SourceType = type,
+            Metadata = contract?.Metadata
+        };
 
         // Group fields by oneof
         var oneOfGroups = new Dictionary<string, ProtoOneOfDef>();
 
         foreach (var field in descriptors)
         {
-            var fieldDef = BuildFieldDef(field, file, visited);
+            var fieldDef = BuildFieldDef(field, file, visited, typeToFileKey, currentFileKey);
 
             if (field.OneOfGroup is not null)
             {
@@ -150,7 +458,7 @@ public static class ProtoSchemaGenerator
         var includes = type.GetCustomAttributes<ProtoIncludeAttribute>();
         foreach (var inc in includes)
         {
-            CollectType(inc.DerivedType, file, visited);
+            CollectType(inc.DerivedType, file, visited, typeToFileKey, currentFileKey);
             msg.Fields.Add(new ProtoFieldDef
             {
                 Name = inc.DerivedType.Name,
@@ -163,13 +471,14 @@ public static class ProtoSchemaGenerator
         return msg;
     }
 
-    private static ProtoFieldDef BuildFieldDef(FieldDescriptor field, ProtoFile file, HashSet<Type> visited)
+    private static ProtoFieldDef BuildFieldDef(FieldDescriptor field, ProtoFile file, HashSet<Type> visited,
+        Dictionary<Type, string>? typeToFileKey = null, string? currentFileKey = null)
     {
         // Map field
         if (field.IsMap && field.MapKeyType is not null && field.MapValueType is not null)
         {
-            string keyTypeName = MapToProtoType(field.MapKeyType, file, visited);
-            string valueTypeName = MapToProtoType(field.MapValueType, file, visited);
+            string keyTypeName = MapToProtoType(field.MapKeyType, file, visited, typeToFileKey, currentFileKey);
+            string valueTypeName = MapToProtoType(field.MapValueType, file, visited, typeToFileKey, currentFileKey);
 
             return new ProtoFieldDef
             {
@@ -190,11 +499,11 @@ public static class ProtoSchemaGenerator
         string typeName;
         if (isRepeated && field.ElementType is not null)
         {
-            typeName = MapToProtoType(field.ElementType, file, visited);
+            typeName = MapToProtoType(field.ElementType, file, visited, typeToFileKey, currentFileKey);
         }
         else
         {
-            typeName = MapToProtoType(underlying, file, visited);
+            typeName = MapToProtoType(underlying, file, visited, typeToFileKey, currentFileKey);
         }
 
         return new ProtoFieldDef
@@ -222,7 +531,8 @@ public static class ProtoSchemaGenerator
         return def;
     }
 
-    private static string MapToProtoType(Type clrType, ProtoFile file, HashSet<Type> visited)
+    private static string MapToProtoType(Type clrType, ProtoFile file, HashSet<Type> visited,
+        Dictionary<Type, string>? typeToFileKey = null, string? currentFileKey = null)
     {
         var underlying = Nullable.GetUnderlyingType(clrType) ?? clrType;
 
@@ -236,18 +546,18 @@ public static class ProtoSchemaGenerator
         if (underlying == typeof(string)) return "string";
         if (underlying == typeof(byte[])) return "bytes";
 
-        // Enum — collect it and reference by name
+        // Enum — collect it if it belongs to this file, reference by name either way
         if (underlying.IsEnum)
         {
-            CollectType(underlying, file, visited);
+            CollectType(underlying, file, visited, typeToFileKey, currentFileKey);
             return underlying.Name;
         }
 
         // Nested message — works with both explicit [ProtoContract] and implicit types
-        if (underlying.GetCustomAttribute<ProtoContractAttribute>() is not null)
+        if (underlying.GetCustomAttribute<ProtoContractAttribute>() is var contract && contract is not null)
         {
-            CollectType(underlying, file, visited);
-            return underlying.Name;
+            CollectType(underlying, file, visited, typeToFileKey, currentFileKey);
+            return !string.IsNullOrEmpty(contract.Name) ? contract.Name : underlying.Name;
         }
 
         // Implicit nested type (class without [ProtoContract] used in an ImplicitFields context)
@@ -260,7 +570,7 @@ public static class ProtoSchemaGenerator
                 var implicitMsg = new ProtoMessageDef { Name = underlying.Name };
                 foreach (var f in implicitDescriptors)
                 {
-                    implicitMsg.Fields.Add(BuildFieldDef(f, file, visited));
+                    implicitMsg.Fields.Add(BuildFieldDef(f, file, visited, typeToFileKey, currentFileKey));
                 }
                 file.Messages.Add(implicitMsg);
             }
@@ -286,6 +596,15 @@ public static class ProtoSchemaGenerator
             sb.AppendLine();
         }
 
+        if (file.Imports.Count > 0)
+        {
+            foreach (var import in file.Imports)
+            {
+                sb.AppendLine($"import \"{import}\";");
+            }
+            sb.AppendLine();
+        }
+
         foreach (var enumDef in file.Enums)
         {
             RenderEnum(sb, enumDef, indent: 0);
@@ -298,12 +617,28 @@ public static class ProtoSchemaGenerator
             sb.AppendLine();
         }
 
+        foreach (var svc in file.Services)
+        {
+            RenderService(sb, svc, indent: 0);
+            sb.AppendLine();
+        }
+
         return sb.ToString().TrimEnd() + Environment.NewLine;
     }
 
     private static void RenderMessage(StringBuilder sb, ProtoMessageDef msg, int indent)
     {
         var pad = new string(' ', indent * 2);
+
+        if (msg.SourceType is not null)
+        {
+            sb.AppendLine($"{pad}// Imported from C# class: {msg.SourceType.FullName}");
+        }
+        if (!string.IsNullOrWhiteSpace(msg.Metadata))
+        {
+            sb.AppendLine($"{pad}// Metadata: {msg.Metadata}");
+        }
+
         sb.AppendLine($"{pad}message {msg.Name} {{");
 
         foreach (var nestedEnum in msg.NestedEnums)
@@ -355,6 +690,28 @@ public static class ProtoSchemaGenerator
         {
             sb.AppendLine($"{pad}  {val.Name} = {val.Number};");
         }
+        sb.AppendLine($"{pad}}}");
+    }
+
+    private static void RenderService(StringBuilder sb, ProtoServiceDef svc, int indent)
+    {
+        var pad = new string(' ', indent * 2);
+
+        if (svc.SourceType is not null)
+            sb.AppendLine($"{pad}// Imported from C# service: {svc.SourceType.FullName}");
+        if (!string.IsNullOrWhiteSpace(svc.Metadata))
+            sb.AppendLine($"{pad}// Metadata: {svc.Metadata}");
+
+        sb.AppendLine($"{pad}service {svc.Name} {{");
+
+        foreach (var rpc in svc.Methods)
+        {
+            string reqStream = rpc.MethodType is ProtoMethodType.ClientStreaming or ProtoMethodType.DuplexStreaming ? "stream " : "";
+            string resStream = rpc.MethodType is ProtoMethodType.ServerStreaming or ProtoMethodType.DuplexStreaming ? "stream " : "";
+
+            sb.AppendLine($"{pad}  rpc {rpc.Name} ({reqStream}{rpc.RequestTypeName}) returns ({resStream}{rpc.ResponseTypeName});");
+        }
+
         sb.AppendLine($"{pad}}}");
     }
 

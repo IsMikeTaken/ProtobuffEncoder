@@ -11,13 +11,13 @@ This enables the **shared contract** pattern: define types in C#, generate `.pro
 ```csharp
 using ProtobuffEncoder.Schema;
 
-// Generate .proto content for a single type
+// Generate .proto content for a single type (includes all dependencies)
 string proto = ProtoSchemaGenerator.Generate(typeof(WeatherRequest));
 
-// Generate for all [ProtoContract] types in an assembly
+// Generate for all [ProtoContract] and [ProtoService] types in an assembly
 var allProto = ProtoSchemaGenerator.GenerateAll(assembly);
 
-// Generate to disk (one .proto file per namespace)
+// Generate to disk (one .proto file per type/namespace/service)
 List<string> paths = ProtoSchemaGenerator.GenerateToDirectory(assembly, "protos/");
 ```
 
@@ -31,9 +31,14 @@ dotnet run --project tools/ProtobuffEncoder.Tool -- \
 ```
 
 Arguments:
-1. `assembly-path` — path to the compiled DLL containing `[ProtoContract]` types
-2. `proto-output-dir` — directory to write `.proto` files
-3. `csproj-path` (optional) — `.csproj` file to auto-append `<Content>` entries for the generated proto files
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `assembly-path` | Yes | Path to the compiled DLL containing `[ProtoContract]` types |
+| `proto-output-dir` | Yes | Directory to write `.proto` files |
+| `csproj-path` | No | `.csproj` file to auto-append `<Content>` entries for the generated proto files |
+| `--verbose` | No | Show import relationships and service details |
+| `--help` | No | Show usage information |
 
 ### MSBuild Integration
 
@@ -52,9 +57,138 @@ Configure with properties:
 </PropertyGroup>
 ```
 
-### Generated Output
+## File Grouping & Naming
+
+The generator groups types into `.proto` files based on these rules:
+
+| Rule | Condition | Example output |
+|------|-----------|----------------|
+| Named contract | `[ProtoContract(Name = "Order")]` | `Order.proto` |
+| Versioned contract | `[ProtoContract(Version = 1)]` | `v1/<namespace>.proto` |
+| Named + versioned | `[ProtoContract(Version = 1, Name = "Order")]` | `v1/Order.proto` |
+| Service interface | `[ProtoService("OrderService")]` | `OrderService.proto` |
+| Versioned service | `[ProtoService("OrderService", Version = 2)]` | `v2/OrderService.proto` |
+| Default | No name/version | `<namespace>.proto` |
+
+## Cross-File Imports {id="imports"}
+
+When a type references another type that belongs to a different `.proto` file, the generator automatically adds an `import` statement.
+
+### How it works
+
+1. **Phase 1** — All `[ProtoContract]` and `[ProtoService]` types are scanned and assigned to file groups
+2. **Phase 2** — Types are collected into their assigned file. Types belonging to a different file are skipped (not duplicated)
+3. **Phase 3** — The import resolver walks all messages and services, checks which type names reference definitions in other files, and adds `import` statements
+4. **Phase 4** — All files are rendered with their imports
+
+### Example
 
 Given these C# types:
+
+```csharp
+[ProtoContract(Version = 1, Name = "Order")]
+public class Order
+{
+    [ProtoField(1)] public Guid Id { get; set; }
+    [ProtoField(2)] public CustomerDetails Customer { get; set; } = new();
+    [ProtoField(3)] public List<OrderLineItem> Items { get; set; } = [];
+}
+
+[ProtoContract]
+public class CustomerDetails
+{
+    [ProtoField(1)] public string FirstName { get; set; } = "";
+    [ProtoField(2)] public ShippingAddress Address { get; set; } = new();
+}
+
+[ProtoService("OrderProcessingService")]
+public interface IOrderProcessingService
+{
+    [ProtoMethod(ProtoMethodType.Unary)]
+    Task<Order> GetOrderAsync(GetOrderRequest request);
+}
+```
+
+The generator produces:
+
+**`v1/Order.proto`** — imports the namespace file for `CustomerDetails`:
+```proto
+syntax = "proto3";
+package MyApp.Models;
+
+import "myapp_models.proto";
+
+message Order {
+  bytes Id = 1;
+  CustomerDetails Customer = 2;
+  repeated OrderLineItem Items = 3;
+}
+```
+
+**`OrderProcessingService.proto`** — imports both message files:
+```proto
+syntax = "proto3";
+package MyApp.Services;
+
+import "GetOrderRequest.proto";
+import "v1/Order.proto";
+
+message GetOrderAsyncResponse {
+  Order data = 1;
+}
+
+service OrderProcessingService {
+  rpc GetOrderAsync (GetOrderRequest) returns (GetOrderAsyncResponse);
+}
+```
+
+> No type definitions are duplicated across files — each type is defined exactly once in its canonical file.
+
+## Service Generation {id="services"}
+
+Types marked with `[ProtoService]` automatically generate gRPC service definitions with proper request/response message wiring.
+
+### Auto-wrapping
+
+When an RPC method's parameter or return type does not end with `Request` or `Response`, the generator creates a wrapper message:
+
+| Method signature | Generated wrapper |
+|-----------------|-------------------|
+| `Task<Order> GetOrderAsync(GetOrderRequest req)` | `GetOrderRequest` used directly, `GetOrderAsyncResponse` wraps `Order` |
+| `Task ExecuteAsync(Order order)` | `ExecuteAsyncRequest` wraps `Order`, `ExecuteAsyncResponse` is empty |
+| `IAsyncEnumerable<Order> Stream(Empty req)` | `StreamRequest` wraps `Empty`, `StreamResponse` wraps `Order` |
+
+### Streaming methods
+
+The `[ProtoMethod]` attribute's `MethodType` maps to gRPC streaming keywords:
+
+| ProtoMethodType | Proto syntax |
+|----------------|-------------|
+| `Unary` | `rpc Name (Req) returns (Res);` |
+| `ServerStreaming` | `rpc Name (Req) returns (stream Res);` |
+| `ClientStreaming` | `rpc Name (stream Req) returns (Res);` |
+| `DuplexStreaming` | `rpc Name (stream Req) returns (stream Res);` |
+
+### Service metadata
+
+Add documentation comments to the generated `.proto` file:
+
+```csharp
+[ProtoService("OrderService", Metadata = "Handles order lifecycle")]
+public interface IOrderService { ... }
+```
+
+Produces:
+```proto
+// Metadata: Handles order lifecycle
+service OrderService {
+  ...
+}
+```
+
+## Generated Output {id="output"}
+
+### Simple message
 
 ```csharp
 [ProtoContract]
@@ -66,7 +200,7 @@ public class WeatherRequest
 }
 ```
 
-The generator produces:
+Produces:
 
 ```proto
 syntax = "proto3";
@@ -79,14 +213,23 @@ message WeatherRequest {
 }
 ```
 
+### Supported constructs
+
 The generator handles:
-- Nested messages
-- Enums
-- Repeated fields
-- Optional fields (nullable types)
-- Map fields (`[ProtoMap]`)
-- OneOf groups (`[ProtoOneOf]`)
-- Deprecated annotations (`[ProtoField(IsDeprecated = true)]`)
+
+| Construct | Attribute/pattern |
+|-----------|------------------|
+| Nested messages | Property with `[ProtoContract]` type |
+| Enums | Enum types (with or without `[ProtoContract]`) |
+| Repeated fields | `List<T>`, `T[]`, `ICollection<T>` |
+| Optional fields | `Nullable<T>` types |
+| Map fields | `Dictionary<K,V>` with `[ProtoMap]` |
+| OneOf groups | `[ProtoOneOf("group")]` |
+| Deprecated | `[ProtoField(IsDeprecated = true)]` |
+| Inheritance | `[ProtoInclude]` derived types |
+| Implicit types | `[ProtoContract(ImplicitFields = true)]` |
+| Services | `[ProtoService]` / `[ProtoMethod]` |
+| Cross-file imports | Automatic when types span files |
 
 ## Parsing .proto Files
 
@@ -169,13 +312,13 @@ Build protobuf messages by field number — no C# types needed.
 using ProtobuffEncoder.Schema;
 
 var writer = new ProtobufWriter();
-writer.WriteString(1, "Amsterdam");        // string field
-writer.WriteVarint(2, 3);                  // int32 field
-writer.WriteBool(3, true);                 // bool field
-writer.WriteDouble(4, 52.3676);            // double field
-writer.WriteFloat(5, 4.89f);              // float field
-writer.WriteFixed64(6, timestamp);         // fixed64 field
-writer.WriteBytes(7, rawData);             // bytes field
+writer.WriteString(1, "Amsterdam");
+writer.WriteVarint(2, 3);
+writer.WriteBool(3, true);
+writer.WriteDouble(4, 52.3676);
+writer.WriteFloat(5, 4.89f);
+writer.WriteFixed64(6, timestamp);
+writer.WriteBytes(7, rawData);
 
 // Nested messages
 var inner = new ProtobufWriter();
@@ -183,10 +326,10 @@ inner.WriteString(1, "2026-03-12");
 inner.WriteDouble(2, 5.3);
 
 var outer = new ProtobufWriter();
-outer.WriteMessage(1, inner);                          // single nested message
-outer.WriteRepeatedMessage(2, [inner1, inner2]);       // repeated messages
-outer.WriteRepeatedString(3, ["a", "b", "c"]);         // repeated strings
-outer.WritePackedVarints(4, [1L, 2L, 3L]);             // packed repeated ints
+outer.WriteMessage(1, inner);
+outer.WriteRepeatedMessage(2, [inner1, inner2]);
+outer.WriteRepeatedString(3, ["a", "b", "c"]);
+outer.WritePackedVarints(4, [1L, 2L, 3L]);
 
 byte[] result = outer.ToByteArray();
 ```

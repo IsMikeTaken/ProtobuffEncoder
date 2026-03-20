@@ -8,8 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddProtobuffEncoder()
     .WithGrpc(grpc => grpc
         .UseKestrel(httpPort: 5400, grpcPort: 5401)
-        .AddService<WeatherGrpcServiceImpl>()
-        .AddService<ChatGrpcServiceImpl>());
+        .AddServiceAssembly(typeof(Program).Assembly));
 
 var app = builder.Build();
 
@@ -22,8 +21,8 @@ app.MapProtobufEndpoints();
 app.MapGet("/health", () => Results.Ok(new
 {
     status = "gRPC server is running",
-    services = new[] { "Weather (Unary, ServerStreaming)", "Chat (DuplexStreaming, Unary)" },
-    transport = "ProtobuffEncoder (no .proto files)",
+    modes = "Auto-discovered via AddServiceAssembly",
+    transport = "ProtobuffEncoder (no .proto files needed at runtime)",
     endpoints = new { http = "http://localhost:5400 (dashboard)", grpc = "http://localhost:5401 (gRPC)" }
 }));
 

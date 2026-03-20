@@ -6,7 +6,13 @@
     <Project Path="src/ProtobuffEncoder.WebSockets/ProtobuffEncoder.WebSockets.csproj" />
     <Project Path="src/ProtobuffEncoder.Grpc/ProtobuffEncoder.Grpc.csproj" />
   </Folder>
-  <Folder Name="/tests/" />
+  <Folder Name="/tests/">
+    <Project Path="tests/ProtobuffEncoder.Tests/ProtobuffEncoder.Tests.csproj" />
+    <Project Path="tests/ProtobuffEncoder.AspNetCore.Tests/ProtobuffEncoder.AspNetCore.Tests.csproj" />
+    <Project Path="tests/ProtobuffEncoder.Grpc.Tests/ProtobuffEncoder.Grpc.Tests.csproj" />
+    <Project Path="tests/ProtobuffEncoder.WebSockets.Tests/ProtobuffEncoder.WebSockets.Tests.csproj" />
+    <Project Path="tests/ProtobuffEncoder.Tool.Tests/ProtobuffEncoder.Tool.Tests.csproj" />
+  </Folder>
 
   <Folder Name="/tools/">
     <Project Path="tools/ProtobuffEncoder.Tool/ProtobuffEncoder.Tool.csproj" />
@@ -20,7 +26,9 @@
     <Project Path="demos/ProtobuffEncoder.Demo.Grpc.Server/ProtobuffEncoder.Demo.Grpc.Server.csproj" />
     <Project Path="demos/ProtobuffEncoder.Demo.Grpc.Client/ProtobuffEncoder.Demo.Grpc.Client.csproj" />
   </Folder>
-  <Folder Name="/demos/" />
+  <Folder Name="/demos/">
+    <Project Path="demos/ProtobuffEncoder.Demo.SchemaGen/ProtobuffEncoder.Demo.SchemaGen.csproj" />
+  </Folder>
 
   <Folder Name="/demos/console/">
     <Project Path="demos/ProtobuffEncoder.Demo.Console/ProtobuffEncoder.Demo.Console.csproj" />

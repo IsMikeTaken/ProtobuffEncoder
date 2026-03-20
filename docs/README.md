@@ -8,17 +8,19 @@ A lightweight, attribute-driven .NET library that serializes and deserializes C#
 - **Auto-mapping** — public properties are included by default with auto-assigned, collision-free field numbers
 - **Complex types** — arrays, `List<T>`, `Dictionary<K,V>`, nullable value types, enums, nested messages, inheritance
 - **Advanced attributes** — `[ProtoMap]` for dictionaries, `[ProtoOneOf]` for unions, `[ProtoInclude]` for polymorphism, `[ProtoService]`/`[ProtoMethod]` for gRPC
+- **Flexible Attributes** — Shorthand constructors like `[ProtoField(1)]`, `[ProtoContract("Name")]`, and support for enums
+- **Versioning & Metadata** — `Version` and `Metadata` properties on contracts for schema organisation and documentation
 - **Packed encoding** — scalar collections use proto3 packed wire format
 - **Streaming** — length-delimited framing for multi-message streams
 - **Bi-directional** — `ProtobufDuplexStream<TSend, TReceive>` for full-duplex communication
 - **Validation** — `ValidationPipeline<T>` with configurable rules on send/receive
 - **Async** — full `async`/`await` and `IAsyncEnumerable<T>` support
 - **Static messages** — pre-compiled encode/decode delegates to eliminate reflection overhead
-- **Schema generation** — auto-generate `.proto` files from C# types
+- **Schema generation** — auto-generate versioned `.proto` files with cross-file imports, service definitions, and request/response wrappers
 - **Schema decoding** — decode protobuf binary using only `.proto` schemas, no C# types needed
 - **ASP.NET Core** — input/output formatters and `HttpClient` extensions
 - **WebSockets** — managed connections, broadcast, lifecycle hooks, and auto-reconnect
-- **gRPC** — code-first services via `[ProtoService]`/`[ProtoMethod]` with typed client proxies
+- **gRPC** — code-first services with typed client proxies and simplified DI registration
 - **Unified setup** — single `AddProtobuffEncoder()` call with strategy pattern for all transports
 - **Multi-target** — supports .NET 10, .NET 9, and .NET 8
 
@@ -138,7 +140,8 @@ ProtobuffEncoder/
 │   ├── Demo.Bidirectional.Client/               WebSocket console client
 │   ├── Demo.Grpc.Server/                        gRPC server (port 5400)
 │   ├── Demo.Grpc.Client/                        gRPC console client
-│   └── Demo.Console/                            Feature showcase
+│   ├── Demo.Console/                            Feature showcase
+│   └── Demo.SchemaGen/                          Schema generation showcase
 │
 └── docs/
     ├── guides/                                  In-depth guides
@@ -155,6 +158,45 @@ ProtobuffEncoder/
     └── demos/                                   Demo documentation
         └── README.md                            Running the demos
 ```
+
+## Performance & Benchmarking
+
+The project include a dedicated benchmark project using `BenchmarkDotNet` to ensure high performance and zero-regression across .NET versions.
+
+### Running Benchmarks
+```powershell
+dotnet run -c Release --project benchmarks/ProtobuffEncoder.Benchmarks/ProtobuffEncoder.Benchmarks.csproj
+```
+
+Typical performance on modern hardware (e.g., Core i9):
+- **Small Message (Encode/Decode)**: ~150-300ns
+- **Large Collections**: ~1-5μs depending on size
+
+## Testing & Quality
+
+Comprehensive test suite with **441+ tests** across 5 test projects using **FIRST-U Pass/Fail patterns**:
+
+| Project | Tests | Coverage |
+|---------|-------|----------|
+| Core Library | 231 | Encode/decode, attributes, collections, maps, oneof, inheritance, validation, streaming, schema generation, cross-file imports, service wiring, concurrency |
+| ASP.NET Core | 41 | Formatters, HttpClient extensions, setup builder, strategies (TestHost integration) |
+| gRPC | 34 | Marshaller, service discovery (all 4 method types), channel/DI extensions |
+| WebSockets | 123 | Stream, retry, connection manager, client lifecycle, endpoint integration |
+| Tool | 12 | ProjectModifier, duplicate prevention, batch operations |
+
+### Advanced Test Patterns
+- **Rollback**: Recovery after failed decodes and stream errors
+- **Deadlock-Resolution**: Concurrent encode/decode across types with timeout guards
+- **Loading-Test**: Scaling message counts (1 → 1000) and payload sizes (100B → 100KB)
+- **Resource-Stress-Test**: Memory pressure and rapid connect/disconnect
+- **Bit-Error-Simulation**: Random bytes fuzzing, truncated messages, malformed varints
+- **Component-Simulation**: Full pipeline tests with ASP.NET Core TestHost
+
+### Benchmarks (7 categories)
+Located in `benchmarks/ProtobuffEncoder.Benchmarks/`:
+- Core encode/decode, collections, static vs. dynamic, streaming, validation, schema generation, payload scaling
+
+See [test_strategy.md](guides/../test_strategy.md) for full details.
 
 ## Supported .NET Versions
 

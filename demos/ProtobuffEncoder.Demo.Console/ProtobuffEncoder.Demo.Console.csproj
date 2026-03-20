@@ -1,7 +1,8 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\ProtobuffEncoder\ProtobuffEncoder.csproj" />
+    <ProjectReference Include="..\..\src\ProtobuffEncoder.Contracts\ProtobuffEncoder.Contracts.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

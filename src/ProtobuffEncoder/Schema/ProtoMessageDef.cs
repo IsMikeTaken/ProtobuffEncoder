@@ -6,6 +6,8 @@ namespace ProtobuffEncoder.Schema;
 public sealed class ProtoMessageDef
 {
     public string Name { get; set; } = "";
+    public Type? SourceType { get; set; }
+    public string? Metadata { get; set; }
     public List<ProtoFieldDef> Fields { get; set; } = [];
     public List<ProtoMessageDef> NestedMessages { get; set; } = [];
     public List<ProtoEnumDef> NestedEnums { get; set; } = [];

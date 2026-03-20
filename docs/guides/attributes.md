@@ -23,6 +23,24 @@ public class Sensor
 | `IncludeBaseFields` | `bool` | `false` | When `true`, base class properties are included in serialization (walked up the inheritance chain). |
 | `ImplicitFields` | `bool` | `false` | When `true`, nested object properties whose types lack `[ProtoContract]` are implicitly treated as contracts and auto-serialized. |
 | `SkipDefaults` | `bool` | `true` | When `true`, fields holding their type's default value are skipped (proto3 behavior). Individual fields can override via `ProtoField.WriteDefault`. |
+| `Version` | `int` | `0` | Specifies the version of the contract for schema generation (e.g., outputs to `v1/` directory). |
+| `Metadata` | `string?` | `null` | Optional comment or metadata to include in the generated `.proto` file. |
+
+### Constructors
+
+Convenience constructors for quick naming and versioning:
+
+- `[ProtoContract("MyName")]`: Sets the `Name` property.
+- `[ProtoContract(2)]`: Sets the `Version` property.
+
+### Enum Support
+
+`[ProtoContract]` can also be applied to enums to provide versioning or metadata for schema generation.
+
+```csharp
+[ProtoContract(Version = 1, Metadata = "Internal priority levels")]
+public enum Priority { Low, Medium, High }
+```
 
 ### Explicit fields mode
 
@@ -76,6 +94,11 @@ Applied to a property to override its protobuf metadata.
 | `IsPacked` | `bool?` | `null` (auto) | Control packed encoding for repeated scalar fields. `null` = auto-detect (proto3 default: packed). |
 | `IsDeprecated` | `bool` | `false` | Marks the field as deprecated in generated `.proto` schemas. Still serialized. |
 | `IsRequired` | `bool` | `false` | Encoding throws if the value is null or default. Library-level enforcement. |
+
+### Constructors
+
+- `[ProtoField(1)]`: Shorthand for `[ProtoField(FieldNumber = 1)]`.
+- `[ProtoField]`: Default constructor for auto-assigned field numbers.
 
 ```csharp
 [ProtoContract]

@@ -16,4 +16,14 @@ public sealed class ProtoServiceAttribute : Attribute
 
     /// <summary>The gRPC service name (used in the <c>/ServiceName/MethodName</c> route).</summary>
     public string ServiceName { get; }
+
+    /// <summary>
+    /// The API version for service schema generation. If > 0, placed in v{Version}/ directory.
+    /// </summary>
+    public int Version { get; set; }
+
+    /// <summary>
+    /// Descriptive metadata comment to include in the generated .proto service definition.
+    /// </summary>
+    public string? Metadata { get; set; }
 }

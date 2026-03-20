@@ -1,12 +1,29 @@
 namespace ProtobuffEncoder.Attributes;
 
 /// <summary>
-/// Marks a class for protobuf serialization. Properties are included by default
+/// Marks a class, struct, or enum for protobuf serialization. Properties are included by default
 /// with auto-assigned field numbers based on declaration order.
 /// </summary>
-[AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct, Inherited = true)]
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Enum, Inherited = true)]
 public sealed class ProtoContractAttribute : Attribute
 {
+    /// <summary>
+    /// Creates a ProtoContract with default settings.
+    /// </summary>
+    public ProtoContractAttribute() { }
+
+    /// <summary>
+    /// Creates a ProtoContract with the specified proto message name.
+    /// </summary>
+    /// <param name="name">The protobuf message / file name override.</param>
+    public ProtoContractAttribute(string name) => Name = name;
+
+    /// <summary>
+    /// Creates a ProtoContract with the specified API version for directory structure.
+    /// </summary>
+    /// <param name="version">The API version (outputs to v{version}/ directory).</param>
+    public ProtoContractAttribute(int version) => Version = version;
+
     /// <summary>
     /// When true, only properties explicitly marked with <see cref="ProtoFieldAttribute"/> are included.
     /// When false (default), all public properties are included automatically.
@@ -32,4 +49,21 @@ public sealed class ProtoContractAttribute : Attribute
     /// Default is true (proto3 behaviour).
     /// </summary>
     public bool SkipDefaults { get; set; } = true;
+
+    /// <summary>
+    /// The API version to use for generating the schema file directory structure.
+    /// If &gt; 0, the schema will be placed in a directory like v{Version}/.
+    /// </summary>
+    public int Version { get; set; }
+
+    /// <summary>
+    /// Overrides the generated protobuf message and file name.
+    /// If null, the C# class/struct name is used.
+    /// </summary>
+    public string? Name { get; set; }
+
+    /// <summary>
+    /// Useful descriptive comments to add to the generated .proto contract definition.
+    /// </summary>
+    public string? Metadata { get; set; }
 }

@@ -7,6 +7,17 @@ namespace ProtobuffEncoder.Attributes;
 public sealed class ProtoFieldAttribute : Attribute
 {
     /// <summary>
+    /// Creates a ProtoField with default (auto-assigned) settings.
+    /// </summary>
+    public ProtoFieldAttribute() { }
+
+    /// <summary>
+    /// Creates a ProtoField with the specified field number.
+    /// </summary>
+    /// <param name="fieldNumber">The 1-based protobuf field number.</param>
+    public ProtoFieldAttribute(int fieldNumber) => FieldNumber = fieldNumber;
+
+    /// <summary>
     /// The protobuf field number (1-based). When 0, auto-assigned based on declaration order.
     /// </summary>
     public int FieldNumber { get; set; }

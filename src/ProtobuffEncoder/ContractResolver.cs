@@ -324,14 +324,21 @@ internal static class ContractResolver
         return underlying.IsPrimitive || underlying.IsEnum
             || underlying == typeof(string) || underlying == typeof(byte[])
             || underlying == typeof(decimal) || underlying == typeof(Guid)
-            || underlying == typeof(DateTime) || underlying == typeof(DateTimeOffset);
+            || underlying == typeof(DateTime) || underlying == typeof(DateTimeOffset)
+            || underlying == typeof(TimeSpan) || underlying == typeof(DateOnly) || underlying == typeof(TimeOnly)
+            || underlying == typeof(Int128) || underlying == typeof(UInt128)
+            || underlying == typeof(nint) || underlying == typeof(nuint)
+            || underlying == typeof(Half) || underlying == typeof(System.Numerics.BigInteger)
+            || underlying == typeof(System.Numerics.Complex) || underlying == typeof(Version)
+            || underlying == typeof(Uri);
     }
 
     internal static WireType InferWireType(Type clrType)
     {
         var underlying = Nullable.GetUnderlyingType(clrType) ?? clrType;
 
-        if (underlying == typeof(double) || underlying == typeof(long) || underlying == typeof(ulong))
+        if (underlying == typeof(double) || underlying == typeof(long) || underlying == typeof(ulong)
+            || underlying == typeof(DateTime) || underlying == typeof(TimeSpan))
             return WireType.Fixed64;
 
         if (underlying == typeof(float))
@@ -340,10 +347,11 @@ internal static class ContractResolver
         if (underlying == typeof(int) || underlying == typeof(uint)
             || underlying == typeof(short) || underlying == typeof(ushort)
             || underlying == typeof(byte) || underlying == typeof(sbyte)
-            || underlying == typeof(bool) || underlying.IsEnum)
+            || underlying == typeof(bool) || underlying.IsEnum
+            || underlying == typeof(nint) || underlying == typeof(nuint))
             return WireType.Varint;
 
-        // strings, byte[], nested messages, collections -> length-delimited
+        // strings, byte[], Guid, decimal, Int128, BigInteger, etc. -> length-delimited
         return WireType.LengthDelimited;
     }
 

@@ -17,6 +17,7 @@ public sealed class GrpcStrategy : IProtobufTransportStrategy
     private bool _grpcAdded;
     private int? _httpPort;
     private int? _grpcPort;
+    private readonly List<int> _extraGrpcPorts = [];
 
     /// <summary>
     /// Configures Kestrel endpoints for serving both HTTP/1.1 (browser, REST) and
@@ -45,6 +46,41 @@ public sealed class GrpcStrategy : IProtobufTransportStrategy
     {
         _httpPort = httpPort;
         _grpcPort = grpcPort;
+        return this;
+    }
+
+    /// <summary>
+    /// Adds a general port that will exclusively handle HTTP/2 gRPC traffic, decoded automatically.
+    /// This makes it easy to bind multiple or arbitrary hardware ports to the gRPC services.
+    /// </summary>
+    public GrpcStrategy AddGrpcPort(int port)
+    {
+        _extraGrpcPorts.Add(port);
+        return this;
+    }
+
+    /// <summary>
+    /// Registers all classes in the given assembly that implement a <see cref="Attributes.ProtoServiceAttribute"/> interface.
+    /// Eliminates the need to manually call AddService&lt;T&gt;() for every service.
+    /// </summary>
+    /// <param name="assembly">The assembly to scan.</param>
+    /// <param name="autoMap">When true, endpoints are mapped automatically.</param>
+    public GrpcStrategy AddServiceAssembly(System.Reflection.Assembly assembly, bool autoMap = true)
+    {
+        var types = assembly.GetTypes()
+            .Where(t => t.IsClass && !t.IsAbstract && 
+                        (t.GetCustomAttributes(typeof(Attributes.ProtoServiceAttribute), true).Length > 0 ||
+                         t.GetInterfaces().Any(i => i.GetCustomAttributes(typeof(Attributes.ProtoServiceAttribute), true).Length > 0)))
+            .ToList();
+
+        foreach (var type in types)
+        {
+            // Call AddService<TService>() via reflection
+            var method = typeof(GrpcStrategy).GetMethod(nameof(AddService))!
+                .MakeGenericMethod(type);
+            method.Invoke(this, [autoMap]);
+        }
+
         return this;
     }
 
@@ -79,14 +115,20 @@ public sealed class GrpcStrategy : IProtobufTransportStrategy
             _grpcAdded = true;
         }
 
-        if (_httpPort.HasValue && _grpcPort.HasValue)
+        if (_httpPort.HasValue || _grpcPort.HasValue || _extraGrpcPorts.Count > 0)
         {
-            var httpPort = _httpPort.Value;
-            var grpcPort = _grpcPort.Value;
             services.Configure<KestrelServerOptions>(kestrel =>
             {
-                kestrel.ListenLocalhost(httpPort, o => o.Protocols = HttpProtocols.Http1);
-                kestrel.ListenLocalhost(grpcPort, o => o.Protocols = HttpProtocols.Http2);
+                if (_httpPort.HasValue)
+                    kestrel.ListenLocalhost(_httpPort.Value, o => o.Protocols = HttpProtocols.Http1);
+                
+                if (_grpcPort.HasValue)
+                    kestrel.ListenLocalhost(_grpcPort.Value, o => o.Protocols = HttpProtocols.Http2);
+
+                foreach (var port in _extraGrpcPorts)
+                {
+                    kestrel.ListenLocalhost(port, o => o.Protocols = HttpProtocols.Http2);
+                }
             });
         }
 

@@ -1,0 +1,63 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="b7542e9c-8415-4bca-bbe5-d3a2727b3ba2" name="MikevanNieuwburg@DARWIN-VIVO-01 2026-03-19 14:33:17" runUser="AzureAD\MikevanNieuwburg" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-03-19T14:33:17.2520137+01:00" queuing="2026-03-19T14:33:17.2520141+01:00" start="2026-03-19T14:33:16.3560309+01:00" finish="2026-03-19T14:33:17.2683976+01:00" />
+  <TestSettings name="default" id="113578d6-325a-448d-b04f-990d0e720e8c">
+    <Deployment runDeploymentRoot="MikevanNieuwburg_DARWIN-VIVO-01_2026-03-19_14_33_17" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="3abaefc8-af9d-4802-ae16-e7fb817680e1" testId="f3ecac13-1006-b631-2af4-729ed665346b" testName="ProtobuffEncoder.Tests.UnitTest1.Test1" computerName="DARWIN-VIVO-01" duration="00:00:00.0043077" startTime="2026-03-19T14:33:17.0594841+01:00" endTime="2026-03-19T14:33:17.0739059+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="3abaefc8-af9d-4802-ae16-e7fb817680e1" />
+    <UnitTestResult executionId="dfc63543-9761-416d-b303-d2a9dd32a812" testId="e1769000-2d0f-9239-5c34-c375d6f39cc2" testName="ProtobuffEncoder.Tests.SchemaGeneratorTests.GenerateAll_DetectsAndGeneratesService" computerName="DARWIN-VIVO-01" duration="00:00:00.0357744" startTime="2026-03-19T14:33:17.0622378+01:00" endTime="2026-03-19T14:33:17.1121710+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="dfc63543-9761-416d-b303-d2a9dd32a812">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Contains() Failure: Sub-string not found&#xD;
+String:    "syntax = "proto3";\r\n\r\npackage ProtobuffEn"···&#xD;
+Not found: "service MyTestService {"</Message>
+          <StackTrace>   at ProtobuffEncoder.Tests.SchemaGeneratorTests.GenerateAll_DetectsAndGeneratesService() in C:\Development\ProtobuffEncoder\tests\ProtobuffEncoder.Tests\ServiceGeneratorTests.cs:line 45&#xD;
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="ProtobuffEncoder.Tests.SchemaGeneratorTests.GenerateAll_DetectsAndGeneratesService" storage="c:\development\protobuffencoder\tests\protobuffencoder.tests\bin\debug\net10.0\protobuffencoder.tests.dll" id="e1769000-2d0f-9239-5c34-c375d6f39cc2">
+      <Execution id="dfc63543-9761-416d-b303-d2a9dd32a812" />
+      <TestMethod codeBase="C:\Development\ProtobuffEncoder\tests\ProtobuffEncoder.Tests\bin\Debug\net10.0\ProtobuffEncoder.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="ProtobuffEncoder.Tests.SchemaGeneratorTests" name="GenerateAll_DetectsAndGeneratesService" />
+    </UnitTest>
+    <UnitTest name="ProtobuffEncoder.Tests.UnitTest1.Test1" storage="c:\development\protobuffencoder\tests\protobuffencoder.tests\bin\debug\net10.0\protobuffencoder.tests.dll" id="f3ecac13-1006-b631-2af4-729ed665346b">
+      <Execution id="3abaefc8-af9d-4802-ae16-e7fb817680e1" />
+      <TestMethod codeBase="C:\Development\ProtobuffEncoder\tests\ProtobuffEncoder.Tests\bin\Debug\net10.0\ProtobuffEncoder.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="ProtobuffEncoder.Tests.UnitTest1" name="Test1" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="f3ecac13-1006-b631-2af4-729ed665346b" executionId="3abaefc8-af9d-4802-ae16-e7fb817680e1" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="e1769000-2d0f-9239-5c34-c375d6f39cc2" executionId="dfc63543-9761-416d-b303-d2a9dd32a812" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Failed">
+    <Counters total="2" executed="2" passed="1" failed="1" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v3.1.4+50e68bbb8b (64-bit .NET 10.0.5)&#xD;
+[xUnit.net 00:00:00.08]   Discovering: ProtobuffEncoder.Tests&#xD;
+[xUnit.net 00:00:00.13]   Discovered:  ProtobuffEncoder.Tests&#xD;
+[xUnit.net 00:00:00.15]   Starting:    ProtobuffEncoder.Tests&#xD;
+[xUnit.net 00:00:00.24]       Assert.Contains() Failure: Sub-string not found&#xD;
+[xUnit.net 00:00:00.24]       String:    "syntax = "proto3";\r\n\r\npackage ProtobuffEn"···&#xD;
+[xUnit.net 00:00:00.24]       Not found: "service MyTestService {"&#xD;
+[xUnit.net 00:00:00.24]       Stack Trace:&#xD;
+[xUnit.net 00:00:00.24]         C:\Development\ProtobuffEncoder\tests\ProtobuffEncoder.Tests\ServiceGeneratorTests.cs(45,0): at ProtobuffEncoder.Tests.SchemaGeneratorTests.GenerateAll_DetectsAndGeneratesService()&#xD;
+[xUnit.net 00:00:00.24]            at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)&#xD;
+[xUnit.net 00:00:00.24]            at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)&#xD;
+[xUnit.net 00:00:00.25]   Finished:    ProtobuffEncoder.Tests&#xD;
+</StdOut>
+    </Output>
+    <RunInfos>
+      <RunInfo computerName="DARWIN-VIVO-01" outcome="Error" timestamp="2026-03-19T14:33:17.1161266+01:00">
+        <Text>[xUnit.net 00:00:00.24]     ProtobuffEncoder.Tests.SchemaGeneratorTests.GenerateAll_DetectsAndGeneratesService [FAIL]</Text>
+      </RunInfo>
+    </RunInfos>
+  </ResultSummary>
+</TestRun>

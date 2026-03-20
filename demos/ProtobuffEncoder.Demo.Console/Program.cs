@@ -42,6 +42,7 @@ try
 
     await BasicOperationsShowcase.RunAsync(tracer, token, options);
     await StreamingShowcase.RunAsync(tracer, token, options);
+    await OrderAggregateShowcase.RunAsync(tracer, token, options);
     await DuplexTransportShowcase.RunAsync(tracer, token, options);
     await ValidatedTransportShowcase.RunAsync(tracer, token, options);
 

@@ -26,7 +26,14 @@ public sealed class RetryPolicy
     /// <summary>Calculates the delay for a given attempt number (0-based).</summary>
     internal TimeSpan GetDelay(int attempt)
     {
-        var delay = InitialDelay * Math.Pow(BackoffMultiplier, attempt);
-        return delay > MaxDelay ? MaxDelay : delay;
+        try
+        {
+            var delay = InitialDelay * Math.Pow(BackoffMultiplier, attempt);
+            return delay > MaxDelay ? MaxDelay : delay;
+        }
+        catch (OverflowException)
+        {
+            return MaxDelay;
+        }
     }
 }
