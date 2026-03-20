@@ -6,7 +6,7 @@ ProtobuffEncoder uses C# attributes to control how classes and properties are se
 
 Applied to a class or struct to opt it into protobuf serialization. Without this attribute (or `ImplicitFields` on a parent), a class will not be serialized.
 
-```csharp
+```C#
 [ProtoContract]
 public class Sensor
 {
@@ -37,14 +37,14 @@ Convenience constructors for quick naming and versioning:
 
 `[ProtoContract]` can also be applied to enums to provide versioning or metadata for schema generation.
 
-```csharp
+```C#
 [ProtoContract(Version = 1, Metadata = "Internal priority levels")]
 public enum Priority { Low, Medium, High }
 ```
 
 ### Explicit fields mode
 
-```csharp
+```C#
 [ProtoContract(ExplicitFields = true)]
 public class Sensor
 {
@@ -58,7 +58,7 @@ public class Sensor
 
 ### Base class fields
 
-```csharp
+```C#
 [ProtoContract(IncludeBaseFields = true)]
 public class AdminUser : User
 {
@@ -68,7 +68,7 @@ public class AdminUser : User
 
 ### Implicit nested serialization
 
-```csharp
+```C#
 [ProtoContract(ImplicitFields = true)]
 public class Order
 {
@@ -100,7 +100,7 @@ Applied to a property to override its protobuf metadata.
 - `[ProtoField(1)]`: Shorthand for `[ProtoField(FieldNumber = 1)]`.
 - `[ProtoField]`: Default constructor for auto-assigned field numbers.
 
-```csharp
+```C#
 [ProtoContract]
 public class Event
 {
@@ -121,7 +121,7 @@ public class Event
 
 Excludes a property from serialization entirely.
 
-```csharp
+```C#
 [ProtoContract]
 public class User
 {
@@ -143,7 +143,7 @@ Marks a `Dictionary<TKey, TValue>` property as a protobuf map field. Without thi
 | `KeyType` | `string?` | inferred | Override the key's proto type (e.g. `"string"`, `"int32"`). |
 | `ValueType` | `string?` | inferred | Override the value's proto type. |
 
-```csharp
+```C#
 [ProtoContract]
 public class UserProfile
 {
@@ -170,7 +170,7 @@ message UserProfile {
 
 Groups properties into a protobuf `oneof` union. At most one property in a group should have a non-default value. During encoding, only the first non-default property in the group is written.
 
-```csharp
+```C#
 [ProtoContract]
 public class Contact
 {
@@ -204,7 +204,7 @@ Declares known derived types on a base class for polymorphic serialization. Each
 | `fieldNumber` | `int` | Field number for the derived type's nested message. Must be unique and not collide with base fields. |
 | `derivedType` | `Type` | The derived CLR type. |
 
-```csharp
+```C#
 [ProtoContract]
 [ProtoInclude(10, typeof(Dog))]
 [ProtoInclude(11, typeof(Cat))]
@@ -230,7 +230,7 @@ public class Cat : Animal
 
 ## Full example combining all attributes
 
-```csharp
+```C#
 [ProtoContract(IncludeBaseFields = true)]
 [ProtoInclude(20, typeof(AdminProfile))]
 public class UserProfile

@@ -29,6 +29,9 @@
     <Project Path="demos/ProtobuffEncoder.Demo.Grpc.Server/ProtobuffEncoder.Demo.Grpc.Server.csproj" />
     <Project Path="demos/ProtobuffEncoder.Demo.Grpc.Client/ProtobuffEncoder.Demo.Grpc.Client.csproj" />
   </Folder>
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/ProtobuffEncoder.Benchmarks/ProtobuffEncoder.Benchmarks.csproj" />
+  </Folder>
   <Folder Name="/demos/" />
 
   <Folder Name="/demos/console/">
@@ -52,6 +55,10 @@
   <Folder Name="/docs/api/">
     <File Path="docs/api/aspnetcore.md" />
     <File Path="docs/api/tool.md" />
+  </Folder>
+  <Folder Name="/docs/benchmarks/">
+    <File Path="BenchmarkDotNet.Artifacts/results/ProtobuffEncoder.Benchmarks.CollectionBenchmarks-report-github.md" />
+    <File Path="BenchmarkDotNet.Artifacts/results/ProtobuffEncoder.Benchmarks.EncoderBenchmarks-report-github.md" />
   </Folder>
 
   <Folder Name="/docs/demos/">

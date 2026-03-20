@@ -2,7 +2,7 @@
 
 ## Encoding & Decoding
 
-```csharp
+```C#
 using ProtobuffEncoder;
 
 // Encode to byte[]
@@ -23,7 +23,7 @@ var result = await ProtobufEncoder.DecodeAsync<Person>(stream, cancellationToken
 
 By default, all public properties (except `[ProtoIgnore]`) are assigned incrementing field numbers starting at 1, based on declaration order. Explicitly assigned numbers are reserved first, and auto-assignment skips them to prevent collisions.
 
-```csharp
+```C#
 [ProtoContract]
 public class Example
 {
@@ -70,7 +70,7 @@ Any property whose type implements `IEnumerable<T>` (excluding `string` and `byt
 
 Supported collection types for decoding: `T[]`, `List<T>`, `IList<T>`, `ICollection<T>`, `IReadOnlyList<T>`, `HashSet<T>`, `ISet<T>`.
 
-```csharp
+```C#
 [ProtoContract]
 public class Metrics
 {
@@ -84,7 +84,7 @@ public class Metrics
 
 Nullable value types (`int?`, `double?`, `bool?`, etc.) are fully supported. When the value is `null`, the field is omitted from the output. On decode, the property retains its default (`null`).
 
-```csharp
+```C#
 [ProtoContract]
 public class Reading
 {
@@ -99,7 +99,7 @@ To send or receive multiple messages over a single stream, use length-delimited 
 
 ### Writing
 
-```csharp
+```C#
 using var stream = new MemoryStream();
 
 // Synchronous
@@ -112,7 +112,7 @@ await ProtobufEncoder.WriteDelimitedMessageAsync(person3, stream, cancellationTo
 
 ### Reading
 
-```csharp
+```C#
 stream.Position = 0;
 
 // Read one message (returns null at end of stream)
@@ -135,7 +135,7 @@ await foreach (var person in ProtobufEncoder.ReadDelimitedMessagesAsync<Person>(
 
 For hot paths, create a static message to eagerly resolve and cache all type metadata:
 
-```csharp
+```C#
 // Create once, reuse many times
 var message = ProtobufEncoder.CreateStaticMessage<Person>();
 
@@ -149,14 +149,14 @@ Person? next = message.ReadDelimited(stream);
 
 Standalone delegates:
 
-```csharp
+```C#
 Func<Person, byte[]> encode = ProtobufEncoder.CreateStaticEncoder<Person>();
 Func<byte[], Person> decode = ProtobufEncoder.CreateStaticDecoder<Person>();
 ```
 
 ## Full Example
 
-```csharp
+```C#
 using ProtobuffEncoder;
 using ProtobuffEncoder.Attributes;
 

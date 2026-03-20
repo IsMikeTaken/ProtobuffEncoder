@@ -8,7 +8,7 @@ no code generation tools.
 
 Decorate an interface with `[ProtoService]` and its methods with `[ProtoMethod]`:
 
-```csharp
+```C#
 using ProtobuffEncoder.Attributes;
 
 [ProtoService("Weather")]
@@ -43,7 +43,7 @@ on the server side and passes it through on the client side.
 
 ### 1. Implement the interface
 
-```csharp
+```C#
 public class WeatherGrpcServiceImpl : IWeatherGrpcService
 {
     public Task<WeatherResponse> GetForecast(WeatherRequest request)
@@ -73,7 +73,7 @@ public class WeatherGrpcServiceImpl : IWeatherGrpcService
 
 **With the unified setup:**
 
-```csharp
+```C#
 using ProtobuffEncoder.AspNetCore.Setup;
 
 builder.Services.AddProtobuffEncoder()
@@ -86,7 +86,7 @@ app.MapProtobufEndpoints();
 
 **Or standalone:**
 
-```csharp
+```C#
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 
 builder.WebHost.ConfigureKestrel(k =>
@@ -108,7 +108,7 @@ multiple transports.
 
 ### Create a typed client proxy
 
-```csharp
+```C#
 using Grpc.Net.Client;
 using ProtobuffEncoder.Grpc.Client;
 
@@ -122,7 +122,7 @@ builder.Services.AddProtobufGrpcClient<IWeatherGrpcService>("http://localhost:54
 
 When using DI, the client is registered as a Singleton and can be injected into your controllers or services:
 
-```csharp
+```C#
 public class MyController(IWeatherGrpcService weatherClient) : ControllerBase
 {
     [HttpGet]
@@ -140,14 +140,14 @@ serialization — the same interface you defined for the server.
 
 ### Unary call
 
-```csharp
+```C#
 var response = await client.GetForecast(new WeatherRequest { City = "Amsterdam", Days = 5 });
 Console.WriteLine($"{response.City}: {response.Forecasts.Count} days");
 ```
 
 ### Server streaming
 
-```csharp
+```C#
 await foreach (var response in client.StreamForecasts(
     new WeatherRequest { City = "Tokyo", Days = 7 }))
 {
@@ -157,7 +157,7 @@ await foreach (var response in client.StreamForecasts(
 
 ### Duplex streaming
 
-```csharp
+```C#
 async IAsyncEnumerable<NotificationMessage> GenerateMessages()
 {
     yield return new NotificationMessage { Source = "Client", Text = "Hello" };
@@ -177,7 +177,7 @@ await foreach (var reply in chatClient.Chat(GenerateMessages()))
 
 `ProtobufMarshaller<T>` bridges `ProtobufEncoder.Encode/Decode` into gRPC's `Marshaller<T>`:
 
-```csharp
+```C#
 public static Marshaller<T> Create<T>() where T : class
     => new(
         serializer: msg => ProtobufEncoder.Encode(msg),
@@ -232,7 +232,7 @@ Configures two Kestrel endpoints:
 | `httpPort` | HTTP/1.1 | Browser dashboard, REST APIs, health checks |
 | `grpcPort` | HTTP/2 | gRPC calls from clients |
 
-```csharp
+```C#
 builder.Services.AddProtobuffEncoder()
     .WithGrpc(grpc => grpc
         .UseKestrel(httpPort: 5400, grpcPort: 5401)
@@ -241,7 +241,7 @@ builder.Services.AddProtobuffEncoder()
 
 The gRPC client connects to the `grpcPort`:
 
-```csharp
+```C#
 var channel = GrpcChannel.ForAddress("http://localhost:5401");
 var client = channel.CreateProtobufClient<IWeatherGrpcService>();
 ```
@@ -252,7 +252,7 @@ When using HTTPS, Kestrel negotiates both HTTP/1.1 and HTTP/2 via ALPN on a sing
 No `UseKestrel()` call is needed — just configure HTTPS in `launchSettings.json` or Kestrel
 options:
 
-```csharp
+```C#
 // Both browser and gRPC connect to the same HTTPS endpoint
 var channel = GrpcChannel.ForAddress("https://localhost:7400");
 ```

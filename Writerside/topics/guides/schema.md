@@ -8,7 +8,7 @@ This enables the **shared contract** pattern: define types in C#, generate `.pro
 
 ### Programmatic
 
-```csharp
+```C#
 using ProtobuffEncoder.Schema;
 
 // Generate .proto content for a single type (includes all dependencies)
@@ -85,7 +85,7 @@ When a type references another type that belongs to a different `.proto` file, t
 
 Given these C# types:
 
-```csharp
+```C#
 [ProtoContract(Version = 1, Name = "Order")]
 public class Order
 {
@@ -173,7 +173,7 @@ The `[ProtoMethod]` attribute's `MethodType` maps to gRPC streaming keywords:
 
 Add documentation comments to the generated `.proto` file:
 
-```csharp
+```C#
 [ProtoService("OrderService", Metadata = "Handles order lifecycle")]
 public interface IOrderService { ... }
 ```
@@ -190,7 +190,7 @@ service OrderService {
 
 ### Simple message
 
-```csharp
+```C#
 [ProtoContract]
 public class WeatherRequest
 {
@@ -233,7 +233,7 @@ The generator handles:
 
 ## Parsing .proto Files
 
-```csharp
+```C#
 using ProtobuffEncoder.Schema;
 
 // Parse a single .proto file
@@ -254,7 +254,7 @@ A receiver with **no reference to your C# contract types** can decode messages u
 
 ### SchemaDecoder
 
-```csharp
+```C#
 using ProtobuffEncoder.Schema;
 
 // Load from a directory of .proto files
@@ -277,7 +277,7 @@ ProtoEnumDef? enumDef = decoder.GetEnum("NotificationLevel");
 
 The result of schema-based decoding is a `DecodedMessage` — a dictionary-like type with typed accessors.
 
-```csharp
+```C#
 DecodedMessage msg = decoder.Decode("WeatherRequest", bytes);
 
 // Typed access
@@ -308,7 +308,7 @@ The decoder handles:
 
 Build protobuf messages by field number — no C# types needed.
 
-```csharp
+```C#
 using ProtobuffEncoder.Schema;
 
 var writer = new ProtobufWriter();
@@ -358,7 +358,7 @@ The demo Receiver API has **zero compile-time dependency** on the Contracts proj
 
 ### Runtime decoding
 
-```csharp
+```C#
 // Startup: load schemas
 var protoDir = Path.Combine(AppContext.BaseDirectory, "protos");
 builder.Services.AddSingleton(_ => SchemaDecoder.FromDirectory(protoDir));

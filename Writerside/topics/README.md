@@ -26,7 +26,7 @@ A lightweight, attribute-driven .NET library that serializes and deserializes C#
 
 ## Quick Start
 
-```csharp
+```C#
 using ProtobuffEncoder;
 using ProtobuffEncoder.Attributes;
 
@@ -46,7 +46,7 @@ var person = ProtobufEncoder.Decode<Person>(bytes);
 
 ### ASP.NET Core Setup (All Transports)
 
-```csharp
+```C#
 using ProtobuffEncoder.AspNetCore.Setup;
 
 builder.Services.AddProtobuffEncoder(options =>

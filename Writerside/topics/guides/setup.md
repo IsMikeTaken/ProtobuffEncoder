@@ -5,7 +5,7 @@ to configure all transports (REST, WebSocket, gRPC) from a single entry point.
 
 ## Quick Start
 
-```csharp
+```C#
 // Program.cs
 using ProtobuffEncoder.AspNetCore.Setup;
 
@@ -24,7 +24,7 @@ That's the minimal setup — a single line that registers protobuf MVC formatter
 
 ## Full Setup (All Transports)
 
-```csharp
+```C#
 using ProtobuffEncoder.AspNetCore.Setup;
 using ProtobuffEncoder.Transport;
 
@@ -100,7 +100,7 @@ IProtobufTransportStrategy
 
 The fluent entry point returned by `AddProtobuffEncoder()`.
 
-```csharp
+```C#
 builder.Services.AddProtobuffEncoder(options => { ... })
     .WithRestFormatters()              // REST strategy
     .WithWebSocket(ws => { ... })      // WebSocket strategy
@@ -114,7 +114,7 @@ builder.Services.AddProtobuffEncoder(options => { ... })
 
 ### REST Formatters
 
-```csharp
+```C#
 builder.Services.AddProtobuffEncoder()
     .WithRestFormatters();
 ```
@@ -127,7 +127,7 @@ without calling `.WithRestFormatters()` explicitly.
 
 ### WebSocket
 
-```csharp
+```C#
 builder.Services.AddProtobuffEncoder()
     .WithWebSocket(ws => ws
         .AddEndpoint<NotificationMessage, NotificationMessage>()
@@ -140,7 +140,7 @@ via `app.MapProtobufWebSocket(...)` for full control over routes and lifecycle h
 
 ### gRPC
 
-```csharp
+```C#
 builder.Services.AddProtobuffEncoder()
     .WithGrpc(grpc => grpc
         .UseKestrel(httpPort: 5400, grpcPort: 5401)
@@ -175,7 +175,7 @@ Each `.AddService<T>()` call:
 
 Pass `autoMap: false` when you need per-service endpoint configuration:
 
-```csharp
+```C#
 .WithGrpc(grpc => grpc
     .UseKestrel(httpPort: 5400, grpcPort: 5401)
     .AddService<WeatherGrpcServiceImpl>(autoMap: false));
@@ -190,7 +190,7 @@ app.MapGrpcService<WeatherGrpcServiceImpl>();
 
 Implement `IProtobufTransportStrategy` to add your own transport:
 
-```csharp
+```C#
 public class MqttStrategy : IProtobufTransportStrategy
 {
     private readonly string _brokerUrl;
@@ -221,17 +221,17 @@ Each transport can still be registered independently using its own extension met
 The unified builder is optional — it provides convenience and consistency, not a hard dependency.
 
 **REST (standalone):**
-```csharp
+```C#
 builder.Services.AddControllers().AddProtobufFormatters();
 ```
 
 **WebSocket (standalone):**
-```csharp
+```C#
 builder.Services.AddProtobufWebSocketEndpoint<NotificationMessage, NotificationMessage>();
 ```
 
 **gRPC (standalone):**
-```csharp
+```C#
 // Configure Kestrel — HTTP/1.1 for browser, HTTP/2 for gRPC
 builder.WebHost.ConfigureKestrel(k =>
 {
@@ -250,7 +250,7 @@ app.MapGrpcService<WeatherGrpcServiceImpl>();
 
 Inject `ProtobufEncoderOptions` or `IOptions<ProtobufEncoderOptions>` anywhere:
 
-```csharp
+```C#
 public class MyService
 {
     private readonly ProtobufEncoderOptions _options;

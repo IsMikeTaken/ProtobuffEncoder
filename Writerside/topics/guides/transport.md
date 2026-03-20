@@ -2,11 +2,11 @@
 
 The transport layer provides typed, stream-based communication primitives built on top of length-delimited protobuf framing.
 
-## ProtobufSender\<T\>
+## ProtobufSender<>
 
 Sends protobuf-encoded messages over a stream with automatic length-delimited framing.
 
-```csharp
+```C#
 using ProtobuffEncoder.Transport;
 
 await using var sender = new ProtobufSender<Person>(networkStream);
@@ -20,11 +20,11 @@ await sender.SendManyAsync(people);
 await sender.SendManyAsync(asyncStream); // IAsyncEnumerable<T>
 ```
 
-## ProtobufReceiver\<T\>
+## ProtobufReceiver<>
 
 Receives protobuf-encoded messages from a stream.
 
-```csharp
+```C#
 await using var receiver = new ProtobufReceiver<Person>(networkStream);
 
 // Read one (returns null at end of stream)
@@ -47,7 +47,7 @@ await receiver.ListenAsync(async person =>
 
 Full bi-directional streaming over a single stream (or a pair of streams). Supports sending and receiving concurrently with thread-safe internal locking.
 
-```csharp
+```C#
 // Same type both directions
 await using var duplex = new ProtobufDuplexStream<Message>(networkStream);
 
@@ -58,7 +58,7 @@ await using var duplex = new ProtobufDuplexStream<Request, Response>(
 
 ### Send & Receive
 
-```csharp
+```C#
 await duplex.SendAsync(message);
 duplex.Send(message); // synchronous
 
@@ -73,14 +73,14 @@ await foreach (var msg in duplex.ReceiveAllAsync(cancellationToken))
 
 ### Request-Response
 
-```csharp
+```C#
 // Send a request and wait for a single response
 var response = await duplex.SendAndReceiveAsync(request);
 ```
 
 ### Concurrent Duplex
 
-```csharp
+```C#
 // Send and receive concurrently
 await duplex.RunDuplexAsync(
     outgoing: GenerateMessages(),
@@ -91,7 +91,7 @@ await duplex.RunDuplexAsync(
 
 ### Server-Side Processing
 
-```csharp
+```C#
 // Process incoming messages and send responses
 await duplex.ProcessAsync(async request =>
 {
@@ -104,11 +104,11 @@ await duplex.ProcessAsync(async request =>
 
 The validation layer adds message validation to any transport primitive.
 
-### ValidationPipeline\<T\>
+### ValidationPipeline<>
 
 Build validation rules using predicates, delegates, or custom `IMessageValidator<T>` implementations.
 
-```csharp
+```C#
 var pipeline = new ValidationPipeline<Person>();
 
 // Simple predicate rules
@@ -128,11 +128,11 @@ var result = pipeline.Validate(person); // returns ValidationResult
 pipeline.ValidateOrThrow(person);       // throws MessageValidationException
 ```
 
-### ValidatedProtobufSender\<T\>
+### ValidatedProtobufSender<>
 
 Validates messages before sending. Invalid messages throw `MessageValidationException` and are never written to the stream.
 
-```csharp
+```C#
 await using var sender = new ValidatedProtobufSender<Person>(stream);
 
 sender.Validation
@@ -143,11 +143,11 @@ await sender.SendAsync(validPerson);    // OK
 await sender.SendAsync(invalidPerson);  // throws MessageValidationException
 ```
 
-### ValidatedProtobufReceiver\<T\>
+### ValidatedProtobufReceiver<>
 
 Validates messages after deserialization with configurable behavior for invalid messages.
 
-```csharp
+```C#
 await using var receiver = new ValidatedProtobufReceiver<Person>(stream);
 
 receiver.Validation.Require(p => p.Age > 0, "Age required");
@@ -179,7 +179,7 @@ await foreach (var person in receiver.ReceiveAllAsync())
 
 Combines bi-directional streaming with validation on both send and receive sides.
 
-```csharp
+```C#
 await using var duplex = new ValidatedDuplexStream<Request, Response>(
     sendStream, receiveStream);
 
@@ -201,7 +201,7 @@ await duplex.RunDuplexAsync(outgoing, onReceived, cancellationToken);
 
 All transport types accept an `ownsStream` parameter (default: `true`). When `true`, disposing the transport also disposes the underlying stream.
 
-```csharp
+```C#
 // Transport owns the stream — disposes it on cleanup
 await using var sender = new ProtobufSender<T>(stream, ownsStream: true);
 

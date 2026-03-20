@@ -3,10 +3,20 @@
 <buildprofiles xsi:noNamespaceSchemaLocation="https://resources.jetbrains.com/writerside/1.0/build-profiles.xsd"
                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 
-    <variables></variables>
     <build-profile instance="l">
         <variables>
             <noindex-content>true</noindex-content>
+            <primary-color>dracula</primary-color>
+            <color-preset>soft</color-preset>
+            <!-- Header section  -->
+            <download-title>Github</download-title>
+            <download-page>https://github.com/IsMikeTaken/ProtobuffEncoder</download-page>
+            <showDownloadButton>true</showDownloadButton>
+            <!-- Header end -->
+            
+            <!-- Footer section  -->
+            
+            <!-- Footer end -->
         </variables>
     </build-profile>
 

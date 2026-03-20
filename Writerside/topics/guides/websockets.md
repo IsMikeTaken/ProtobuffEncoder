@@ -13,7 +13,7 @@ and broadcast.
 
 **With the unified setup:**
 
-```csharp
+```C#
 builder.Services.AddProtobuffEncoder()
     .WithWebSocket(ws => ws
         .AddEndpoint<NotificationMessage, NotificationMessage>()
@@ -22,14 +22,14 @@ builder.Services.AddProtobuffEncoder()
 
 **Or standalone:**
 
-```csharp
+```C#
 builder.Services.AddProtobufWebSocketEndpoint<NotificationMessage, NotificationMessage>();
 builder.Services.AddProtobufWebSocketEndpoint<WeatherResponse, WeatherRequest>();
 ```
 
 ### 2. Map endpoints
 
-```csharp
+```C#
 app.UseWebSockets();
 
 app.MapProtobufWebSocket<NotificationMessage, NotificationMessage>("/ws/chat", options =>
@@ -78,7 +78,7 @@ app.MapProtobufWebSocket<NotificationMessage, NotificationMessage>("/ws/chat", o
 
 ### Validation
 
-```csharp
+```C#
 app.MapProtobufWebSocket<NotificationMessage, NotificationMessage>("/ws/chat", options =>
 {
     options.ConfigureReceiveValidation = v =>
@@ -101,7 +101,7 @@ app.MapProtobufWebSocket<NotificationMessage, NotificationMessage>("/ws/chat", o
 
 Use the `WebSocketConnectionManager<TSend, TReceive>` to broadcast to all connected clients:
 
-```csharp
+```C#
 var chatManager = app.Services
     .GetRequiredService<WebSocketConnectionManager<NotificationMessage, NotificationMessage>>();
 
@@ -127,7 +127,7 @@ Each `ProtobufWebSocketConnection<TSend, TReceive>` exposes:
 
 ### Basic usage
 
-```csharp
+```C#
 using ProtobuffEncoder.WebSockets;
 
 await using var client = new ProtobufWebSocketClient<WeatherRequest, WeatherResponse>(
@@ -144,7 +144,7 @@ var response = await client.SendAndReceiveAsync(
 
 ### Retry policy
 
-```csharp
+```C#
 await using var client = new ProtobufWebSocketClient<NotificationMessage, NotificationMessage>(
     new ProtobufWebSocketClientOptions
     {
@@ -198,7 +198,7 @@ Built-in presets:
 
 ### Duplex streaming example
 
-```csharp
+```C#
 await client.ConnectAsync();
 
 // Concurrent send and receive

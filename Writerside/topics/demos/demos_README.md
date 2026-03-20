@@ -18,7 +18,7 @@ The solution includes several demo applications that showcase different features
 
 Demonstrates API-to-API protobuf communication where the Sender encodes C# objects to protobuf and the Receiver decodes using only `.proto` schemas.
 
-### Running
+### Running {id="running_1"}
 
 ```bash
 # Start the Receiver first (port 5100)
@@ -28,7 +28,7 @@ dotnet run --project demos/ProtobuffEncoder.Demo.Api.Receiver
 dotnet run --project demos/ProtobuffEncoder.Demo.Api.Sender
 ```
 
-### Browser Dashboards
+## Browser Dashboards
 
 **Sender** — `http://localhost:5200`
 - Weather request form (city, days, hourly wind toggle)
@@ -73,7 +73,7 @@ curl -X POST http://localhost:5200/api/send-notification \
 
 Demonstrates WebSocket-based bidirectional protobuf streaming using `ProtobufDuplexStream`.
 
-### Running
+### Running {id="running_2"}
 
 ```bash
 # Start the WebSocket server (port 5300)
@@ -83,7 +83,7 @@ dotnet run --project demos/ProtobuffEncoder.Demo.Bidirectional.Server
 dotnet run --project demos/ProtobuffEncoder.Demo.Bidirectional.Client
 ```
 
-### Browser Dashboard
+### Browser Dashboard {id="browser-dashboard_1"}
 
 Open `http://localhost:5300` for an interactive dashboard with:
 
@@ -110,7 +110,7 @@ Open `http://localhost:5300` for an interactive dashboard with:
 
 The JSON endpoints encode/decode through the protobuf library on every message to demonstrate the round-trip.
 
-### Console Client
+### Console Client {id="console-client_1"}
 
 The console client connects via WebSocket and runs two demos:
 
@@ -122,7 +122,7 @@ The console client connects via WebSocket and runs two demos:
 Demonstrates code-first gRPC using `[ProtoService]` and `[ProtoMethod]` attributes with the
 unified `AddProtobuffEncoder()` setup. No `.proto` files or code generation required.
 
-### Running
+### Running {id="running_3"}
 
 ```bash
 # Start the gRPC server (HTTP/1.1 on 5400, HTTP/2 on 5401)
@@ -163,7 +163,7 @@ Interactive menu with four demos:
 
 Demonstrates all core library features in a single console application.
 
-### Running
+### Running {id="running_4"}
 
 ```bash
 dotnet run --project demos/ProtobuffEncoder.Demo.Console

@@ -10,4 +10,8 @@
         <description>Created after removal of "Overview" from Locals</description>
         <accepts>Overview.html</accepts>
     </rule>
+    <rule id="7780ba33">
+        <description><![CDATA[Created after removal of "<HTTP-Sender-Receiver.md>" from Protobuff]]></description>
+        <accepts>HTTP-Sender-Receiver.html</accepts>
+    </rule>
 </rules>

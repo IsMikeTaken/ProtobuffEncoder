@@ -4,7 +4,7 @@ The `ProtobuffEncoder.AspNetCore` package provides everything needed for API-to-
 
 ## Setup
 
-```csharp
+```C#
 builder.Services.AddControllers().AddProtobufFormatters();
 ```
 
@@ -20,7 +20,7 @@ When formatters are registered, controller actions and minimal APIs can accept p
 
 ### Manual decoding
 
-```csharp
+```C#
 app.MapPost("/api/weather", async (HttpContext ctx) =>
 {
     using var ms = new MemoryStream();
@@ -37,7 +37,7 @@ app.MapPost("/api/weather", async (HttpContext ctx) =>
 
 ### HttpClient Extensions
 
-```csharp
+```C#
 using ProtobuffEncoder.AspNetCore;
 
 // POST with protobuf body, receive and deserialize protobuf response
@@ -55,7 +55,7 @@ var data = await httpClient.GetProtobufAsync<StatusResponse>("/api/status");
 
 For manual `HttpClient` usage:
 
-```csharp
+```C#
 using var content = new ProtobufHttpContent(myObject);
 // content.Headers.ContentType is "application/x-protobuf"
 var response = await httpClient.PostAsync("/api/endpoint", content);
@@ -63,7 +63,7 @@ var response = await httpClient.PostAsync("/api/endpoint", content);
 
 ### Media Type Constant
 
-```csharp
+```C#
 using ProtobuffEncoder.AspNetCore;
 
 string mediaType = ProtobufMediaType.Protobuf; // "application/x-protobuf"
@@ -86,7 +86,7 @@ src/
 
 ### Sender setup
 
-```csharp
+```C#
 builder.Services.AddHttpClient("ReceiverApi", client =>
 {
     client.BaseAddress = new Uri("http://localhost:5100");
