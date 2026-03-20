@@ -1,32 +1,35 @@
-﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE instance-profile
         SYSTEM "https://resources.jetbrains.com/writerside/1.0/product-profile.dtd">
 
 <instance-profile id="l"
                   name="Proto - Buffed" start-page="README.md">
     <toc-element topic="README.md"/>
-    <toc-element toc-title="Api">
-        <toc-element topic="tool.md"/>
-        <toc-element topic="aspnetcore.md"/>
+    <toc-element topic="getting_started.md"/>
+    <toc-element toc-title="Core">
+        <toc-element topic="attributes_reference.md"/>
+        <toc-element topic="serialization_deep_dive.md"/>
+        <toc-element topic="transport_layer.md"/>
+        <toc-element topic="validation_pipeline.md"/>
+    </toc-element>
+    <toc-element toc-title="Schema">
+        <toc-element topic="schema_generation.md"/>
+        <toc-element topic="schema_decoding.md"/>
+    </toc-element>
+    <toc-element toc-title="Integrations">
+        <toc-element topic="aspnetcore_integration.md"/>
+        <toc-element topic="grpc_integration.md"/>
+        <toc-element topic="websocket_integration.md"/>
+    </toc-element>
+    <toc-element toc-title="Tools">
+        <toc-element topic="cli_tool.md"/>
     </toc-element>
     <toc-element toc-title="Demos">
-        <toc-element topic="demos_README.md"/>
+        <toc-element topic="demos_overview.md"/>
     </toc-element>
-    <toc-element toc-title="Guides">
-        <toc-element topic="websockets.md"/>
-        <toc-element topic="transport.md"/>
-        <toc-element topic="setup.md"/>
-        <toc-element topic="serialization.md"/>
-        <toc-element topic="schema.md"/>
-        <toc-element topic="grpc.md"/>
-        <toc-element topic="attributes.md"/>
-    </toc-element>
-    <toc-element toc-title="Tests">
-        <toc-element topic="test_strategy.md"/>
-    </toc-element>
-    <toc-element toc-title="Benchmarks">
-        <toc-element topic="encoder-report-github.md"/>
-        <toc-element topic="collection-report-github.md"/>
+    <toc-element toc-title="Quality">
+        <toc-element topic="test_strategy_overview.md"/>
+        <toc-element topic="benchmarks_overview.md"/>
     </toc-element>
 
 </instance-profile>

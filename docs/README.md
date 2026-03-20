@@ -1,216 +1,153 @@
-# ProtobuffEncoder
+# Proto ~ Buffed
 
-A lightweight, attribute-driven .NET library that serializes and deserializes C# objects to [Protocol Buffer](https://protobuf.dev/programming-guides/encoding/) binary wire format — no `.proto` files or code generation required.
+**ProtobuffEncoder** is a high-performance, zero-dependency protobuf serialization framework for .NET 8, 9, and 10. It provides a complete pipeline from C# attribute-driven contracts to binary wire-format encoding, streaming transport, validation, ASP.NET Core integration, gRPC services, WebSocket real-time communication, and `.proto` schema generation -- all without requiring Google.Protobuf or `protoc`.
 
-## Features
+## Architecture Overview
 
-- **Attribute-based** — mark classes with `[ProtoContract]` and optionally override fields with `[ProtoField]`
-- **Auto-mapping** — public properties are included by default with auto-assigned, collision-free field numbers
-- **Complex types** — arrays, `List<T>`, `Dictionary<K,V>`, nullable value types, enums, nested messages, inheritance
-- **Advanced attributes** — `[ProtoMap]` for dictionaries, `[ProtoOneOf]` for unions, `[ProtoInclude]` for polymorphism, `[ProtoService]`/`[ProtoMethod]` for gRPC
-- **Flexible Attributes** — Shorthand constructors like `[ProtoField(1)]`, `[ProtoContract("Name")]`, and support for enums
-- **Versioning & Metadata** — `Version` and `Metadata` properties on contracts for schema organisation and documentation
-- **Packed encoding** — scalar collections use proto3 packed wire format
-- **Streaming** — length-delimited framing for multi-message streams
-- **Bi-directional** — `ProtobufDuplexStream<TSend, TReceive>` for full-duplex communication
-- **Validation** — `ValidationPipeline<T>` with configurable rules on send/receive
-- **Async** — full `async`/`await` and `IAsyncEnumerable<T>` support
-- **Static messages** — pre-compiled encode/decode delegates to eliminate reflection overhead
-- **Schema generation** — auto-generate versioned `.proto` files with cross-file imports, service definitions, and request/response wrappers
-- **Schema decoding** — decode protobuf binary using only `.proto` schemas, no C# types needed
-- **ASP.NET Core** — input/output formatters and `HttpClient` extensions
-- **WebSockets** — managed connections, broadcast, lifecycle hooks, and auto-reconnect
-- **gRPC** — code-first services with typed client proxies and simplified DI registration
-- **Unified setup** — single `AddProtobuffEncoder()` call with strategy pattern for all transports
-- **Multi-target** — supports .NET 10, .NET 9, and .NET 8
+```
+  C# Classes + Attributes
+         |
+    ContractResolver         (reflection-based descriptor caching)
+         |
+    ProtobufEncoder          (encode / decode / streaming)
+         |
+  +------+------+------+------+
+  |      |      |      |      |
+ REST   gRPC  WebSocket Schema  CLI Tool
+  |      |      |      |        |
+ ASP.NET Grpc  WS     .proto   protobuf-encoder
+ Core   Channel Client  Gen     (dotnet tool)
+```
+
+## Packages
+
+| Package | Description | Targets |
+|---------|-------------|---------|
+| `ProtobuffEncoder` | Core encoder, decoder, transport, validation, schema | net8.0, net9.0, net10.0 |
+| `ProtobuffEncoder.AspNetCore` | MVC formatters, HttpClient extensions, builder setup | net8.0, net9.0, net10.0 |
+| `ProtobuffEncoder.Grpc` | Code-first gRPC marshaller, client proxy, service discovery | net8.0, net9.0, net10.0 |
+| `ProtobuffEncoder.WebSockets` | Managed WebSocket client/server, connection manager, retry | net8.0, net9.0, net10.0 |
+| `ProtobuffEncoder.Contracts` | Example contracts and service interfaces | net8.0, net9.0, net10.0 |
+| `ProtobuffEncoder.Tool` | CLI tool for `.proto` generation and `.csproj` patching | net10.0 |
 
 ## Quick Start
 
-```csharp
-using ProtobuffEncoder;
-using ProtobuffEncoder.Attributes;
+### 1. Define a Contract
 
+```csharp
 [ProtoContract]
-public class Person
+public class WeatherRequest
 {
-    public string Name { get; set; } = "";
-    public int Age { get; set; }
+    [ProtoField(1)] public string City { get; set; } = "";
+    [ProtoField(2)] public int Days { get; set; }
 }
-
-// Encode
-byte[] bytes = ProtobufEncoder.Encode(new Person { Name = "Alice", Age = 30 });
-
-// Decode
-var person = ProtobufEncoder.Decode<Person>(bytes);
 ```
 
-### ASP.NET Core Setup (All Transports)
+### 2. Encode and Decode
 
 ```csharp
-using ProtobuffEncoder.AspNetCore.Setup;
-
-builder.Services.AddProtobuffEncoder(options =>
-{
-    options.EnableMvcFormatters = true;
-})
-.WithRestFormatters()
-.WithWebSocket(ws => ws
-    .AddEndpoint<NotificationMessage, NotificationMessage>())
-.WithGrpc(grpc => grpc
-    .UseKestrel(httpPort: 5400, grpcPort: 5401)
-    .AddService<WeatherGrpcServiceImpl>());
-
-var app = builder.Build();
-app.UseWebSockets();
-app.MapProtobufEndpoints();
-app.Run();
+var request = new WeatherRequest { City = "Amsterdam", Days = 5 };
+byte[] bytes = ProtobufEncoder.Encode(request);
+WeatherRequest decoded = ProtobufEncoder.Decode<WeatherRequest>(bytes);
 ```
 
----
+### 3. Stream Over Transport
+
+```csharp
+await using var sender = new ProtobufSender<WeatherRequest>(networkStream);
+await sender.SendAsync(request);
+```
+
+### 4. Generate .proto Schema
+
+```csharp
+string proto = ProtoSchemaGenerator.Generate(typeof(WeatherRequest));
+```
+
+## Supported Types
+
+| Category | Types |
+|----------|-------|
+| **Integers** | `byte`, `sbyte`, `short`, `ushort`, `int`, `uint`, `long`, `ulong`, `nint`, `nuint` |
+| **Floating point** | `float`, `double`, `Half`, `decimal` |
+| **Boolean** | `bool` |
+| **Text** | `string` |
+| **Binary** | `byte[]` |
+| **Date/Time** | `DateTime`, `DateTimeOffset`, `TimeSpan`, `DateOnly`, `TimeOnly` |
+| **Identifiers** | `Guid`, `Uri`, `Version` |
+| **Large numbers** | `Int128`, `UInt128`, `BigInteger`, `Complex` |
+| **Enums** | Any `enum` type |
+| **Collections** | `List<T>`, `T[]`, `IList<T>`, `ICollection<T>`, `HashSet<T>`, `ISet<T>` |
+| **Dictionaries** | `Dictionary<K,V>`, `IDictionary<K,V>`, `IReadOnlyDictionary<K,V>` |
+| **Nested messages** | Any class with `[ProtoContract]` or implicit nesting |
+| **Nullable** | `T?` for all value types |
+
+## Test Coverage
+
+**430+ tests** across 5 test projects using FIRST-U Pass/Fail testing patterns:
+
+| Test Project | Tests | Coverage Area |
+|-------------|-------|---------------|
+| ProtobuffEncoder.Tests | 200+ | Core encoder, decoder, streaming, validation, schema, attributes |
+| ProtobuffEncoder.AspNetCore.Tests | 41 | Formatters, HttpClient, setup, DI integration |
+| ProtobuffEncoder.Grpc.Tests | 34 | Marshaller, service discovery, client proxy, extensions |
+| ProtobuffEncoder.WebSockets.Tests | 117 | Client, server, connection manager, retry, stream |
+| ProtobuffEncoder.Tool.Tests | 12 | Project modifier, csproj patching |
+
+## Benchmarks
+
+Performance tested across .NET 8, 9, and 10 with **15 benchmark suites** covering:
+
+- Core encode/decode (small and large payloads)
+- Collection serialization (lists, maps)
+- Static message pre-compiled delegates
+- Streaming (length-delimited batches)
+- Duplex stream send/receive
+- Validation pipeline throughput
+- Schema generation and parsing
+- ProtobufWriter low-level API
+- Payload scaling (100B to 100KB)
+- Nested object depth (1-3 levels)
+- OneOf union encoding
+- Inheritance (ProtoInclude)
+- Async streaming
+- ContractResolver caching
+
+### EncoderBenchmarks (net10.0)
+
+```
+BenchmarkDotNet v0.15.8, Windows 11
+12th Gen Intel Core i9-12900H, .NET 10.0.5
+
+| Method       | Mean     | Gen0   | Allocated |
+|------------- |---------:|-------:|----------:|
+| Encode_Small | 602.6 ns | 0.0610 |     792 B |
+| Decode_Small | 529.1 ns | 0.0572 |     736 B |
+| Encode_Large | 999.0 ns | 0.5417 |    6832 B |
+| Decode_Large | 820.5 ns | 0.3052 |    3832 B |
+```
+
+### CollectionBenchmarks (net10.0)
+
+```
+| Method             | Mean     | Gen0   | Allocated |
+|------------------- |---------:|-------:|----------:|
+| Encode_Collections | 2.518 us | 0.4921 |   6.07 KB |
+| Decode_Collections | 4.039 us | 0.9460 |  11.67 KB |
+```
 
 ## Documentation
 
-### Getting Started
-
-| Guide | What you'll learn |
-|-------|-------------------|
-| [Setup & Configuration](guides/setup.md) | Unified `AddProtobuffEncoder()` builder, options pattern, strategy pattern, custom transports |
-| [Attributes](guides/attributes.md) | `[ProtoContract]`, `[ProtoField]`, `[ProtoIgnore]`, `[ProtoMap]`, `[ProtoOneOf]`, `[ProtoInclude]`, `[ProtoService]`, `[ProtoMethod]` |
-| [Serialization](guides/serialization.md) | Type mapping, field numbering, collections, nullable types, streaming, static messages |
-
-### Transport & Communication
-
-| Guide | What you'll learn |
-|-------|-------------------|
-| [Transport](guides/transport.md) | `ProtobufSender`, `ProtobufReceiver`, `ProtobufDuplexStream`, validation pipelines |
-| [WebSockets](guides/websockets.md) | `MapProtobufWebSocket`, connection management, broadcast, `ProtobufWebSocketClient`, retry policy |
-| [gRPC](guides/grpc.md) | `[ProtoService]`/`[ProtoMethod]`, server binding, `CreateProtobufClient<T>()`, duplex streaming |
-
-### Reference
-
-| Guide | What you'll learn |
-|-------|-------------------|
-| [ASP.NET Core](api/aspnetcore.md) | MVC formatters, `HttpClient` extensions, `ProtobufHttpContent` |
-| [Schema](guides/schema.md) | Proto schema generation, parsing, schema-based decoding, `ProtobufWriter` |
-| [CLI Tool](api/tool.md) | `ProtobuffEncoder.Tool` usage, MSBuild integration |
-| [Demos](demos/README.md) | Running all 7 demo applications with browser dashboards |
-
-### Recommended Reading Order
-
-If you're new to the library, follow this path:
-
-1. **[Setup](guides/setup.md)** — register services and choose your transports
-2. **[Attributes](guides/attributes.md)** — understand how C# types map to protobuf
-3. **[Serialization](guides/serialization.md)** — encoding, decoding, type mapping, and streaming
-4. **[Transport](guides/transport.md)** — sender, receiver, and duplex stream primitives
-5. Pick your transport:
-   - **[ASP.NET Core](api/aspnetcore.md)** for REST APIs
-   - **[WebSockets](guides/websockets.md)** for real-time bidirectional communication
-   - **[gRPC](guides/grpc.md)** for code-first gRPC services
-6. **[Demos](demos/README.md)** — run the interactive demos to see everything in action
-
----
-
-## Project Structure
-
-```
-ProtobuffEncoder/
-├── src/
-│   ├── ProtobuffEncoder/                        Core library
-│   │   ├── Attributes/                          [ProtoContract], [ProtoField], [ProtoService], [ProtoMethod], ...
-│   │   ├── Schema/                              Proto generation, parsing, decoding
-│   │   ├── Transport/                           Sender, receiver, duplex, validation
-│   │   └── build/                               MSBuild targets
-│   ├── ProtobuffEncoder.AspNetCore/             REST formatters, HttpClient, unified setup
-│   │   └── Setup/                               Options pattern, strategy pattern, builder
-│   ├── ProtobuffEncoder.WebSockets/             WebSocket framework
-│   ├── ProtobuffEncoder.Grpc/                   Code-first gRPC framework
-│   │   ├── Server/                              IServiceMethodProvider, service binding
-│   │   └── Client/                              DispatchProxy client factory
-│   └── ProtobuffEncoder.Contracts/              Shared contracts + service interfaces
-│       └── Services/                            IWeatherGrpcService, IChatGrpcService
-│
-├── tools/
-│   └── ProtobuffEncoder.Tool/                   CLI for .proto generation
-│
-├── demos/
-│   ├── Demo.Api.Sender/                         HTTP sender (port 5200)
-│   ├── Demo.Api.Receiver/                       Schema-only receiver (port 5100)
-│   ├── Demo.Bidirectional.Server/               WebSocket server (port 5300)
-│   ├── Demo.Bidirectional.Client/               WebSocket console client
-│   ├── Demo.Grpc.Server/                        gRPC server (port 5400)
-│   ├── Demo.Grpc.Client/                        gRPC console client
-│   ├── Demo.Console/                            Feature showcase
-│   └── Demo.SchemaGen/                          Schema generation showcase
-│
-└── docs/
-    ├── guides/                                  In-depth guides
-    │   ├── setup.md                             Unified setup & configuration
-    │   ├── attributes.md                        All attributes
-    │   ├── serialization.md                     Encoding, decoding, type mapping
-    │   ├── transport.md                         Stream primitives & validation
-    │   ├── websockets.md                        WebSocket framework
-    │   ├── grpc.md                              gRPC framework
-    │   └── schema.md                            Schema generation & decoding
-    ├── api/                                     API & tooling reference
-    │   ├── aspnetcore.md                        ASP.NET Core integration
-    │   └── tool.md                              CLI tool
-    └── demos/                                   Demo documentation
-        └── README.md                            Running the demos
-```
-
-## Performance & Benchmarking
-
-The project include a dedicated benchmark project using `BenchmarkDotNet` to ensure high performance and zero-regression across .NET versions.
-
-### Running Benchmarks
-```powershell
-dotnet run -c Release --project benchmarks/ProtobuffEncoder.Benchmarks/ProtobuffEncoder.Benchmarks.csproj
-```
-
-Typical performance on modern hardware (e.g., Core i9):
-- **Small Message (Encode/Decode)**: ~150-300ns
-- **Large Collections**: ~1-5μs depending on size
-
-## Testing & Quality
-
-Comprehensive test suite with **441+ tests** across 5 test projects using **FIRST-U Pass/Fail patterns**:
-
-| Project | Tests | Coverage |
-|---------|-------|----------|
-| Core Library | 231 | Encode/decode, attributes, collections, maps, oneof, inheritance, validation, streaming, schema generation, cross-file imports, service wiring, concurrency |
-| ASP.NET Core | 41 | Formatters, HttpClient extensions, setup builder, strategies (TestHost integration) |
-| gRPC | 34 | Marshaller, service discovery (all 4 method types), channel/DI extensions |
-| WebSockets | 123 | Stream, retry, connection manager, client lifecycle, endpoint integration |
-| Tool | 12 | ProjectModifier, duplicate prevention, batch operations |
-
-### Advanced Test Patterns
-- **Rollback**: Recovery after failed decodes and stream errors
-- **Deadlock-Resolution**: Concurrent encode/decode across types with timeout guards
-- **Loading-Test**: Scaling message counts (1 → 1000) and payload sizes (100B → 100KB)
-- **Resource-Stress-Test**: Memory pressure and rapid connect/disconnect
-- **Bit-Error-Simulation**: Random bytes fuzzing, truncated messages, malformed varints
-- **Component-Simulation**: Full pipeline tests with ASP.NET Core TestHost
-
-### Benchmarks (7 categories)
-Located in `benchmarks/ProtobuffEncoder.Benchmarks/`:
-- Core encode/decode, collections, static vs. dynamic, streaming, validation, schema generation, payload scaling
-
-See [test_strategy.md](guides/../test_strategy.md) for full details.
-
-## Supported .NET Versions
-
-| Package | net10.0 | net9.0 | net8.0 |
-|---------|---------|--------|--------|
-| ProtobuffEncoder | yes | yes | yes |
-| ProtobuffEncoder.AspNetCore | yes | yes | yes |
-| ProtobuffEncoder.WebSockets | yes | yes | yes |
-| ProtobuffEncoder.Grpc | yes | yes | yes |
-| ProtobuffEncoder.Contracts | yes | yes | yes |
-| ProtobuffEncoder.Tool | yes | yes | yes |
-
-Demo applications target net10.0.
-
-## License
-
-MIT
+| Topic | Description |
+|-------|-------------|
+| [Guides: Attributes](guides/attributes.md) | Complete attribute reference |
+| [Guides: Serialization](guides/serialization.md) | Wire format, type mapping |
+| [Guides: Transport](guides/transport.md) | Sender, Receiver, DuplexStream |
+| [Guides: Schema](guides/schema.md) | ProtoSchemaGenerator, imports, services |
+| [Guides: WebSockets](guides/websockets.md) | Client, server, retry |
+| [Guides: gRPC](guides/grpc.md) | Marshaller, client proxy |
+| [Guides: Setup](guides/setup.md) | ASP.NET Core builder |
+| [API: ASP.NET Core](api/aspnetcore.md) | Formatters, HttpClient |
+| [API: Tool](api/tool.md) | CLI tool reference |
+| [Testing](test_strategy.md) | FIRST-U patterns, test matrix |
+| [Demos](demos/README.md) | Demo project walkthroughs |

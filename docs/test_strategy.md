@@ -1,90 +1,97 @@
 # Test Strategy
 
-This document outlines the comprehensive testing strategy for the `ProtobuffEncoder` library and its ecosystem. We utilize a multi-layered approach following **F.I.R.S.T-U** principles and advanced testing patterns to ensure maximum reliability and performance.
+## Overview
 
-## F.I.R.S.T-U Principles
-- **Fast**: Tests are optimized to run in milliseconds, ensuring rapid feedback.
-- **Independent**: Each test is self-contained with no shared state or side effects.
-- **Repeatable**: Deterministic results across any environment (.NET 8/9/10).
-- **Self-validating**: Clear pass/fail results without manual inspection.
-- **Thorough**: Covers happy paths, boundaries, and extreme "break it" scenarios.
-- **Unit**: Focuses on individual components with strict mocking of dependencies.
+ProtobuffEncoder maintains **430+ tests** across 5 test projects, using FIRST-U Pass/Fail testing patterns for systematic coverage of all framework functionality.
 
-## Advanced Testing Patterns
+## FIRST-U Testing Patterns
 
-### Pass/Fail Patterns
-- **Simple-Test**: Validates core functionality, constructor defaults, and nominal flows.
-- **Code-Path**: Ensures branch coverage across complex logic (wire types, method types, formatters).
-- **Parameter-Range**: Tests extreme numeric values, string lengths, and scaling payloads.
+| Pattern | Description | Example |
+|---------|-------------|---------|
+| **Simple-Test** | Basic functionality verification | Encode a single field, verify bytes |
+| **Code-Path** | Exercise specific code branches | Nullable field, empty collection, enum |
+| **Boundary** | Edge cases and limits | Max int, empty string, zero-length array |
+| **Negative** | Invalid input handling | Null arguments, missing fields, bad wire data |
+| **Rollback** | Recovery after failure | Encode after failed decode, receiver after error |
+| **Service-Simulation** | Validation as boundary | Pipeline rejection, validated sender/receiver |
+| **Resource-Stress** | High volume scenarios | Many large messages, duplex high throughput |
+| **Loading-Test** | Scaling behavior | Parameterized message count/payload size |
+| **Deadlock-Resolution** | Concurrent safety | Parallel encode/decode, concurrent stream ops |
+| **Bit-Error-Simulation** | Corrupted data tolerance | All-zero bytes, random byte payloads |
+| **Process-State** | Stateful component testing | StaticMessage reuse, concurrent StaticMessage |
+| **Component-Simulation** | Full pipeline integration | Encode -> stream -> decode end-to-end |
 
-### Data & Simulation Patterns
-- **Simple-Data-I/O**: Verifies binary serialization round-trips, stream encoding, and formatter input/output.
-- **Constraint-Data**: Tests schema constraints, empty contracts, missing field behavior, and validation boundaries.
-- **Rollback**: Validates recovery after failed decodes, stream errors, and large allocations.
-- **Mock-Object**: Uses `FakeItEasy` and custom test doubles (e.g., `FakeWebSocket`) to simulate dependencies.
-- **Service-Simulation**: Tests validation pipelines as service input boundaries.
-- **Bit-Error-Simulation**: Injects malformed binary data, random bytes, and truncated messages.
-- **Component-Simulation**: Full pipeline round-trips with ASP.NET Core TestHost (HTTP + WebSocket).
+## Test Projects
 
-### Collection & Performance Patterns
-- **Collection-Order**: Ensures list, map, and strategy registration ordering is preserved.
-- **Collection-Indexing**: Verifies lookup by ID and direct element access.
-- **Collection-Constraint**: Tests uniqueness enforcement, empty collections, and duplicate prevention.
-- **Enumeration**: Validates snapshot semantics, async streams, and iterator cancellation.
-- **Bulk-Data-Stress-Test**: Stress-tests large payloads (10MB+) and 100k+ collection items.
-- **Performance-Test**: Execution-time assertions using `Stopwatch` for high-volume operations.
+### ProtobuffEncoder.Tests (200+ tests)
 
-### Process & Concurrency Patterns
-- **Process-Sequence**: Validates lifecycle hooks, multiple sequential operations, and fluent chaining.
-- **Process-State**: Tests connection states, dispose behavior, and state machine transitions.
-- **Process-Rule**: Validates input validation, service method discovery, and DI registration rules.
-- **Signalled**: Orchestrates multithreaded send/receive flows to detect race conditions.
-- **Deadlock-Resolution**: Verifies thread safety during concurrent encode/decode across types.
-- **Loading-Test**: Gradual capacity increase tests with scaling message counts and payload sizes.
-- **Resource-Stress-Test**: Memory pressure tests, rapid connect/disconnect, and allocation patterns.
+| Test File | Tests | Coverage |
+|-----------|-------|----------|
+| ProtobufEncoderTests.cs | 31 | All scalar types, encode/decode round-trip |
+| CollectionTests.cs | 13 | Lists, arrays, packed/unpacked encoding |
+| MapFieldTests.cs | 7 | Dictionary serialization, nested map values |
+| OneOfTests.cs | 5 | OneOf encoding, only-first semantics |
+| InheritanceTests.cs | 6 | ProtoInclude, base/derived field handling |
+| StreamingTests.cs | 12 | Delimited messages, async streams |
+| StaticMessageAndTransportTests.cs | 18 | StaticMessage, Sender, Receiver, DuplexStream |
+| ValidationTests.cs | 25 | Pipeline, behaviors, validated transport |
+| ContractResolverTests.cs | 26 | Field resolution, auto-numbering, explicit fields |
+| AttributeFlexibilityTests.cs | 20 | All attribute combinations |
+| ServiceGeneratorTests.cs | 33 | Schema generation, services, imports, versioning |
+| CommonTypesTests.cs | 3 | Guid, DateTime, TimeSpan |
+| AdvancedPatternTests.cs | 19 | Rollback, stress, deadlock, bit-error patterns |
+| InsanityTests.cs | 5 | Extreme edge cases |
+| ExtremeBreakerTests.cs | 3 | Boundary-breaking scenarios |
 
-## Test Suite Overview
+### ProtobuffEncoder.AspNetCore.Tests (41 tests)
 
-| Project | Tests | Key Areas |
-|---------|-------|-----------|
-| `ProtobuffEncoder.Tests` | 231 | Core encode/decode, attributes, collections, maps, oneof, inheritance, validation, streaming, schema generation, cross-file imports, service wiring, concurrency, stress |
-| `ProtobuffEncoder.AspNetCore.Tests` | 41 | Input/output formatters, HttpClient extensions (TestHost), setup builder, options, strategy registration |
-| `ProtobuffEncoder.Grpc.Tests` | 34 | Marshaller round-trips, service method discovery (all 4 types), channel extensions, DI registration |
-| `ProtobuffEncoder.WebSockets.Tests` | 123 | WebSocket stream, retry policy, connection manager, client lifecycle, endpoint integration (TestHost) |
-| `ProtobuffEncoder.Tool.Tests` | 12 | ProjectModifier csproj manipulation, duplicate prevention, subdirectory paths, batch operations |
-| **Total** | **441+** | |
+| Test File | Tests | Coverage |
+|-----------|-------|----------|
+| ProtobufInputFormatterTests.cs | 8 | Media type, CanReadType, decode, empty body |
+| ProtobufOutputFormatterTests.cs | 7 | Write, null object, content-length |
+| ProtobufHttpContentTests.cs | 6 | Headers, serialization, null guard |
+| HttpClientIntegrationTests.cs | 5 | POST round-trip, fire-and-forget, GET |
+| SetupTests.cs | 15 | Options defaults, Builder API, DI |
+
+### ProtobuffEncoder.Grpc.Tests (34 tests)
+
+| Test File | Tests | Coverage |
+|-----------|-------|----------|
+| ProtobufMarshallerTests.cs | 10 | Creation, round-trip, edge cases |
+| ServiceMethodDescriptorTests.cs | 14 | All 4 method types, interface-only |
+| GrpcExtensionsTests.cs | 10 | Client validation, DI registration |
+
+### ProtobuffEncoder.WebSockets.Tests (117 tests)
+
+| Test File | Tests | Coverage |
+|-----------|-------|----------|
+| WebSocketStreamTests.cs | 25 | Read/write, framing, close |
+| ProtobufWebSocketConnectionTests.cs | 18 | Send, receive, lifecycle |
+| WebSocketConnectionManagerTests.cs | 19 | Broadcast, filtered, concurrent |
+| ProtobufWebSocketClientTests.cs | 17 | Connect, send, receive, retry |
+| ProtobufWebSocketOptionsTests.cs | 17 | All option properties |
+| RetryPolicyTests.cs | 13 | Delay calculation, backoff |
+| EndpointIntegrationTests.cs | 8 | Full server-client round-trip |
+
+### ProtobuffEncoder.Tool.Tests (12 tests)
+
+| Test File | Tests | Coverage |
+|-----------|-------|----------|
+| ProjectModifierTests.cs | 12 | Append, dedup, batch |
+
+## Running Tests
+
+```bash
+# Run all tests
+dotnet test
+
+# Run specific project
+dotnet test tests/ProtobuffEncoder.Tests
+
+# Run with filter
+dotnet test --filter "FullyQualifiedName~Validation"
+```
 
 ## Benchmarks
 
-The benchmark suite (`benchmarks/ProtobuffEncoder.Benchmarks/`) measures performance across 7 categories:
-
-| Benchmark | Description |
-|-----------|-------------|
-| `EncoderBenchmarks` | Core encode/decode for small and large messages |
-| `CollectionBenchmarks` | Lists and dictionary/map encoding |
-| `StaticMessageBenchmarks` | Pre-compiled vs. dynamic encode/decode comparison |
-| `StreamingBenchmarks` | Delimited message write/read and sender/receiver round-trips |
-| `ValidationBenchmarks` | Pipeline validation with valid and invalid messages |
-| `SchemaGenerationBenchmarks` | .proto schema generation for various type complexities |
-| `PayloadScalingBenchmarks` | Encoding at 100B, 10KB, and 100KB payload sizes |
-
-Run benchmarks:
-```bash
-dotnet run -c Release --project benchmarks/ProtobuffEncoder.Benchmarks/
-```
-
-## How to Run Tests
-
-Run all tests:
-```bash
-dotnet test
-```
-
-Run a specific project:
-```bash
-dotnet test tests/ProtobuffEncoder.Tests/
-dotnet test tests/ProtobuffEncoder.AspNetCore.Tests/
-dotnet test tests/ProtobuffEncoder.Grpc.Tests/
-dotnet test tests/ProtobuffEncoder.WebSockets.Tests/
-dotnet test tests/ProtobuffEncoder.Tool.Tests/
-```
+See the [benchmark documentation](benchmarks/) for comprehensive performance testing across .NET 8, 9, and 10 with 15 benchmark suites covering all features.

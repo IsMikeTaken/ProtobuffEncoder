@@ -1,4 +1,7 @@
 using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Configs;
+using BenchmarkDotNet.Environments;
+using BenchmarkDotNet.Jobs;
 using BenchmarkDotNet.Running;
 using ProtobuffEncoder;
 using ProtobuffEncoder.Attributes;
@@ -8,11 +11,25 @@ using ProtobuffEncoder.Transport;
 namespace ProtobuffEncoder.Benchmarks;
 
 // ═══════════════════════════════════════════════════
-// Core Encode / Decode
+// Multi-TFM Configuration
 // ═══════════════════════════════════════════════════
 
+public class MultiTfmConfig : ManualConfig
+{
+    public MultiTfmConfig()
+    {
+        AddJob(Job.ShortRun.WithRuntime(CoreRuntime.Core80).WithId("net8.0"));
+        AddJob(Job.ShortRun.WithRuntime(CoreRuntime.Core90).WithId("net9.0"));
+        AddJob(Job.ShortRun.WithRuntime(CoreRuntime.CreateForNewVersion("net10.0", ".NET 10.0")).WithId("net10.0"));
+    }
+}
+
+// ═══════════════════════════════════════════════════
+// 1. Core Encode / Decode
+// ═══════════════════════════════════════════════════
+
+[Config(typeof(MultiTfmConfig))]
 [MemoryDiagnoser]
-[ShortRunJob]
 public class EncoderBenchmarks
 {
     private SimpleMessage _smallMessage = null!;
@@ -27,6 +44,10 @@ public class EncoderBenchmarks
         _largeMessage = new AllScalarsMessage
         {
             IntValue = 123,
+            LongValue = 9876543210L,
+            DoubleValue = 3.14159265,
+            FloatValue = 2.71828f,
+            BoolValue = true,
             StringValue = new string('A', 1000),
             ByteArrayValue = new byte[1000]
         };
@@ -48,11 +69,11 @@ public class EncoderBenchmarks
 }
 
 // ═══════════════════════════════════════════════════
-// Collections
+// 2. Collections (List + Map)
 // ═══════════════════════════════════════════════════
 
+[Config(typeof(MultiTfmConfig))]
 [MemoryDiagnoser]
-[ShortRunJob]
 public class CollectionBenchmarks
 {
     private ListMessage _listMessage = null!;
@@ -92,11 +113,11 @@ public class CollectionBenchmarks
 }
 
 // ═══════════════════════════════════════════════════
-// Static Message (pre-compiled delegates)
+// 3. Static Message (pre-compiled delegates)
 // ═══════════════════════════════════════════════════
 
+[Config(typeof(MultiTfmConfig))]
 [MemoryDiagnoser]
-[ShortRunJob]
 public class StaticMessageBenchmarks
 {
     private StaticMessage<SimpleMessage> _static = null!;
@@ -125,11 +146,11 @@ public class StaticMessageBenchmarks
 }
 
 // ═══════════════════════════════════════════════════
-// Streaming (delimited messages)
+// 4. Streaming (length-delimited messages)
 // ═══════════════════════════════════════════════════
 
+[Config(typeof(MultiTfmConfig))]
 [MemoryDiagnoser]
-[ShortRunJob]
 public class StreamingBenchmarks
 {
     private SimpleMessage _message = null!;
@@ -175,11 +196,56 @@ public class StreamingBenchmarks
 }
 
 // ═══════════════════════════════════════════════════
-// Validation pipeline
+// 5. Duplex Stream
 // ═══════════════════════════════════════════════════
 
+[Config(typeof(MultiTfmConfig))]
 [MemoryDiagnoser]
-[ShortRunJob]
+public class DuplexStreamBenchmarks
+{
+    private SimpleMessage _message = null!;
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        _message = new SimpleMessage { Id = 1, Name = "Duplex" };
+    }
+
+    [Benchmark]
+    public void DuplexStream_SendAndReceive()
+    {
+        var sendStream = new MemoryStream();
+        var receiveStream = new MemoryStream();
+
+        using var duplex = new ProtobufDuplexStream<SimpleMessage, SimpleMessage>(
+            sendStream, receiveStream, ownsStreams: false);
+        duplex.Send(_message);
+
+        // Read back from sendStream
+        sendStream.Position = 0;
+        using var reader = new ProtobufReceiver<SimpleMessage>(sendStream, ownsStream: false);
+        reader.Receive();
+    }
+
+    [Benchmark]
+    public void DuplexStream_SendMany_10()
+    {
+        var sendStream = new MemoryStream();
+        var receiveStream = new MemoryStream();
+        using var duplex = new ProtobufDuplexStream<SimpleMessage, SimpleMessage>(
+            sendStream, receiveStream, ownsStreams: false);
+
+        for (int i = 0; i < 10; i++)
+            duplex.Send(_message);
+    }
+}
+
+// ═══════════════════════════════════════════════════
+// 6. Validation Pipeline
+// ═══════════════════════════════════════════════════
+
+[Config(typeof(MultiTfmConfig))]
+[MemoryDiagnoser]
 public class ValidationBenchmarks
 {
     private ValidationPipeline<SimpleMessage> _pipeline = null!;
@@ -203,14 +269,23 @@ public class ValidationBenchmarks
 
     [Benchmark]
     public ValidationResult Validate_Invalid() => _pipeline.Validate(_invalidMessage);
+
+    [Benchmark]
+    public void ValidatedSender_Send()
+    {
+        using var ms = new MemoryStream();
+        using var sender = new ValidatedProtobufSender<SimpleMessage>(ms, ownsStream: false);
+        sender.Validation.Require(m => m.Id > 0, "Id required");
+        sender.Send(_validMessage);
+    }
 }
 
 // ═══════════════════════════════════════════════════
-// Schema generation
+// 7. Schema Generation
 // ═══════════════════════════════════════════════════
 
+[Config(typeof(MultiTfmConfig))]
 [MemoryDiagnoser]
-[ShortRunJob]
 public class SchemaGenerationBenchmarks
 {
     [Benchmark]
@@ -224,19 +299,107 @@ public class SchemaGenerationBenchmarks
     [Benchmark]
     public string Generate_AllScalars()
         => ProtoSchemaGenerator.Generate(typeof(AllScalarsMessage));
+
+    [Benchmark]
+    public string Generate_WithOneOf()
+        => ProtoSchemaGenerator.Generate(typeof(OneOfMessage));
+
+    [Benchmark]
+    public string Generate_WithMap()
+        => ProtoSchemaGenerator.Generate(typeof(MapMessage));
 }
 
 // ═══════════════════════════════════════════════════
-// Payload scaling
+// 8. Schema Parsing + SchemaDecoder
 // ═══════════════════════════════════════════════════
 
+[Config(typeof(MultiTfmConfig))]
 [MemoryDiagnoser]
-[ShortRunJob]
+public class SchemaParsingBenchmarks
+{
+    private string _protoContent = null!;
+    private SchemaDecoder _decoder = null!;
+    private byte[] _encodedMessage = null!;
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        _protoContent = ProtoSchemaGenerator.Generate(typeof(SimpleMessage));
+        _decoder = SchemaDecoder.FromProtoContent(_protoContent);
+        _encodedMessage = ProtobufEncoder.Encode(new SimpleMessage { Id = 42, Name = "parse-bench" });
+    }
+
+    [Benchmark]
+    public ProtoFile Parse_Proto()
+        => ProtoSchemaParser.Parse(_protoContent);
+
+    [Benchmark]
+    public DecodedMessage SchemaDecoder_Decode()
+        => _decoder.Decode("SimpleMessage", _encodedMessage);
+}
+
+// ═══════════════════════════════════════════════════
+// 9. ProtobufWriter (low-level)
+// ═══════════════════════════════════════════════════
+
+[Config(typeof(MultiTfmConfig))]
+[MemoryDiagnoser]
+public class ProtobufWriterBenchmarks
+{
+    [Benchmark]
+    public byte[] Writer_SimpleMessage()
+    {
+        var w = new ProtobufWriter();
+        w.WriteVarint(1, 42);
+        w.WriteString(2, "ProtobufWriter benchmark");
+        return w.ToByteArray();
+    }
+
+    [Benchmark]
+    public byte[] Writer_NestedMessage()
+    {
+        var inner = new ProtobufWriter();
+        inner.WriteVarint(1, 100);
+        inner.WriteString(2, "nested-detail");
+
+        var outer = new ProtobufWriter();
+        outer.WriteString(1, "outer-title");
+        outer.WriteMessage(2, inner);
+        return outer.ToByteArray();
+    }
+
+    [Benchmark]
+    public byte[] Writer_MapField()
+    {
+        var w = new ProtobufWriter();
+        w.WriteStringStringMap(1,
+            Enumerable.Range(0, 10).Select(i => new KeyValuePair<string, string>($"k{i}", $"v{i}")));
+        return w.ToByteArray();
+    }
+
+    [Benchmark]
+    public byte[] Writer_PackedVarints()
+    {
+        var w = new ProtobufWriter();
+        w.WritePackedVarints(1, Enumerable.Range(0, 100).Select(i => (long)i));
+        return w.ToByteArray();
+    }
+}
+
+// ═══════════════════════════════════════════════════
+// 10. Payload Scaling
+// ═══════════════════════════════════════════════════
+
+[Config(typeof(MultiTfmConfig))]
+[MemoryDiagnoser]
 public class PayloadScalingBenchmarks
 {
     private AllScalarsMessage _small = null!;
     private AllScalarsMessage _medium = null!;
     private AllScalarsMessage _large = null!;
+    private byte[] _smallBytes = null!;
+    private byte[] _mediumBytes = null!;
+    private byte[] _largeBytes = null!;
 
     [GlobalSetup]
     public void Setup()
@@ -244,6 +407,9 @@ public class PayloadScalingBenchmarks
         _small = new AllScalarsMessage { StringValue = new string('A', 100), ByteArrayValue = new byte[100] };
         _medium = new AllScalarsMessage { StringValue = new string('A', 10_000), ByteArrayValue = new byte[10_000] };
         _large = new AllScalarsMessage { StringValue = new string('A', 100_000), ByteArrayValue = new byte[100_000] };
+        _smallBytes = ProtobufEncoder.Encode(_small);
+        _mediumBytes = ProtobufEncoder.Encode(_medium);
+        _largeBytes = ProtobufEncoder.Encode(_large);
     }
 
     [Benchmark(Baseline = true)]
@@ -254,6 +420,195 @@ public class PayloadScalingBenchmarks
 
     [Benchmark]
     public byte[] Encode_100KB() => ProtobufEncoder.Encode(_large);
+
+    [Benchmark]
+    public AllScalarsMessage Decode_100B() => ProtobufEncoder.Decode<AllScalarsMessage>(_smallBytes);
+
+    [Benchmark]
+    public AllScalarsMessage Decode_10KB() => ProtobufEncoder.Decode<AllScalarsMessage>(_mediumBytes);
+
+    [Benchmark]
+    public AllScalarsMessage Decode_100KB() => ProtobufEncoder.Decode<AllScalarsMessage>(_largeBytes);
+}
+
+// ═══════════════════════════════════════════════════
+// 11. Nested / Complex Objects
+// ═══════════════════════════════════════════════════
+
+[Config(typeof(MultiTfmConfig))]
+[MemoryDiagnoser]
+public class NestedObjectBenchmarks
+{
+    private NestedMessage _shallow = null!;
+    private DeepNestedMessage _deep = null!;
+    private byte[] _shallowBytes = null!;
+    private byte[] _deepBytes = null!;
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        _shallow = new NestedMessage { Title = "shallow", Inner = new InnerMessage { Value = 42, Detail = "detail" } };
+        _deep = new DeepNestedMessage
+        {
+            Name = "root",
+            Level1 = new Level1Message
+            {
+                Value = 1,
+                Level2 = new Level2Message
+                {
+                    Value = 2,
+                    Level3 = new Level3Message { Value = 3, Data = "deep-leaf" }
+                }
+            }
+        };
+        _shallowBytes = ProtobufEncoder.Encode(_shallow);
+        _deepBytes = ProtobufEncoder.Encode(_deep);
+    }
+
+    [Benchmark]
+    public byte[] Encode_Shallow() => ProtobufEncoder.Encode(_shallow);
+
+    [Benchmark]
+    public NestedMessage Decode_Shallow() => ProtobufEncoder.Decode<NestedMessage>(_shallowBytes);
+
+    [Benchmark]
+    public byte[] Encode_Deep_3Levels() => ProtobufEncoder.Encode(_deep);
+
+    [Benchmark]
+    public DeepNestedMessage Decode_Deep_3Levels() => ProtobufEncoder.Decode<DeepNestedMessage>(_deepBytes);
+}
+
+// ═══════════════════════════════════════════════════
+// 12. OneOf Encoding
+// ═══════════════════════════════════════════════════
+
+[Config(typeof(MultiTfmConfig))]
+[MemoryDiagnoser]
+public class OneOfBenchmarks
+{
+    private OneOfMessage _withEmail = null!;
+    private OneOfMessage _withPhone = null!;
+    private byte[] _emailBytes = null!;
+    private byte[] _phoneBytes = null!;
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        _withEmail = new OneOfMessage { Id = 1, Email = "test@example.com" };
+        _withPhone = new OneOfMessage { Id = 2, Phone = "+31612345678" };
+        _emailBytes = ProtobufEncoder.Encode(_withEmail);
+        _phoneBytes = ProtobufEncoder.Encode(_withPhone);
+    }
+
+    [Benchmark]
+    public byte[] Encode_OneOf_Email() => ProtobufEncoder.Encode(_withEmail);
+
+    [Benchmark]
+    public byte[] Encode_OneOf_Phone() => ProtobufEncoder.Encode(_withPhone);
+
+    [Benchmark]
+    public OneOfMessage Decode_OneOf_Email() => ProtobufEncoder.Decode<OneOfMessage>(_emailBytes);
+
+    [Benchmark]
+    public OneOfMessage Decode_OneOf_Phone() => ProtobufEncoder.Decode<OneOfMessage>(_phoneBytes);
+}
+
+// ═══════════════════════════════════════════════════
+// 13. Inheritance (ProtoInclude)
+// ═══════════════════════════════════════════════════
+
+[Config(typeof(MultiTfmConfig))]
+[MemoryDiagnoser]
+public class InheritanceBenchmarks
+{
+    private DerivedAnimal _dog = null!;
+    private byte[] _dogBytes = null!;
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        _dog = new DerivedAnimal { Name = "Rex", Sound = "Woof", LegCount = 4 };
+        _dogBytes = ProtobufEncoder.Encode(_dog);
+    }
+
+    [Benchmark]
+    public byte[] Encode_DerivedType() => ProtobufEncoder.Encode(_dog);
+
+    [Benchmark]
+    public DerivedAnimal Decode_DerivedType() => ProtobufEncoder.Decode<DerivedAnimal>(_dogBytes);
+}
+
+// ═══════════════════════════════════════════════════
+// 14. Async Streaming
+// ═══════════════════════════════════════════════════
+
+[Config(typeof(MultiTfmConfig))]
+[MemoryDiagnoser]
+public class AsyncStreamingBenchmarks
+{
+    private SimpleMessage _message = null!;
+    private byte[] _encodedAsync = null!;
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        _message = new SimpleMessage { Id = 1, Name = "AsyncBench" };
+        _encodedAsync = ProtobufEncoder.Encode(_message);
+    }
+
+    [Benchmark]
+    public async Task EncodeAsync()
+    {
+        using var ms = new MemoryStream();
+        await ProtobufEncoder.EncodeAsync(_message, ms);
+    }
+
+    [Benchmark]
+    public async Task<SimpleMessage> DecodeAsync()
+    {
+        using var ms = new MemoryStream(_encodedAsync);
+        return await ProtobufEncoder.DecodeAsync<SimpleMessage>(ms);
+    }
+
+    [Benchmark]
+    public async Task WriteDelimitedAsync_50()
+    {
+        using var ms = new MemoryStream();
+        for (int i = 0; i < 50; i++)
+            await ProtobufEncoder.WriteDelimitedMessageAsync(_message, ms);
+    }
+}
+
+// ═══════════════════════════════════════════════════
+// 15. ContractResolver Caching
+// ═══════════════════════════════════════════════════
+
+[Config(typeof(MultiTfmConfig))]
+[MemoryDiagnoser]
+public class ContractResolverBenchmarks
+{
+    [Benchmark]
+    public byte[] FirstCall_NewType_Encode()
+    {
+        // ContractResolver caches after first call; this measures cached path
+        return ProtobufEncoder.Encode(new SimpleMessage { Id = 1, Name = "resolve" });
+    }
+
+    [Benchmark]
+    public byte[] CachedResolve_AllScalars()
+    {
+        return ProtobufEncoder.Encode(new AllScalarsMessage { IntValue = 1, StringValue = "test" });
+    }
+
+    [Benchmark]
+    public byte[] CachedResolve_Nested()
+    {
+        return ProtobufEncoder.Encode(new NestedMessage
+        {
+            Title = "t",
+            Inner = new InnerMessage { Value = 1, Detail = "d" }
+        });
+    }
 }
 
 // ═══════════════════════════════════════════════════
@@ -264,16 +619,27 @@ public class Program
 {
     public static void Main(string[] args)
     {
-        BenchmarkRunner.Run(new[]
+        var types = new[]
         {
             typeof(EncoderBenchmarks),
             typeof(CollectionBenchmarks),
             typeof(StaticMessageBenchmarks),
             typeof(StreamingBenchmarks),
+            typeof(DuplexStreamBenchmarks),
             typeof(ValidationBenchmarks),
             typeof(SchemaGenerationBenchmarks),
-            typeof(PayloadScalingBenchmarks)
-        });
+            typeof(SchemaParsingBenchmarks),
+            typeof(ProtobufWriterBenchmarks),
+            typeof(PayloadScalingBenchmarks),
+            typeof(NestedObjectBenchmarks),
+            typeof(OneOfBenchmarks),
+            typeof(InheritanceBenchmarks),
+            typeof(AsyncStreamingBenchmarks),
+            typeof(ContractResolverBenchmarks)
+        };
+
+        foreach (var type in types)
+            BenchmarkRunner.Run(type);
     }
 }
 
@@ -294,6 +660,10 @@ public class AllScalarsMessage
     [ProtoField(1)] public int IntValue { get; set; }
     [ProtoField(2)] public string StringValue { get; set; } = "";
     [ProtoField(3)] public byte[] ByteArrayValue { get; set; } = [];
+    [ProtoField(4)] public long LongValue { get; set; }
+    [ProtoField(5)] public double DoubleValue { get; set; }
+    [ProtoField(6)] public float FloatValue { get; set; }
+    [ProtoField(7)] public bool BoolValue { get; set; }
 }
 
 [ProtoContract]
@@ -322,4 +692,58 @@ public class InnerMessage
 {
     [ProtoField(1)] public int Value { get; set; }
     [ProtoField(2)] public string Detail { get; set; } = "";
+}
+
+[ProtoContract]
+public class DeepNestedMessage
+{
+    [ProtoField(1)] public string Name { get; set; } = "";
+    [ProtoField(2)] public Level1Message Level1 { get; set; } = new();
+}
+
+[ProtoContract]
+public class Level1Message
+{
+    [ProtoField(1)] public int Value { get; set; }
+    [ProtoField(2)] public Level2Message Level2 { get; set; } = new();
+}
+
+[ProtoContract]
+public class Level2Message
+{
+    [ProtoField(1)] public int Value { get; set; }
+    [ProtoField(2)] public Level3Message Level3 { get; set; } = new();
+}
+
+[ProtoContract]
+public class Level3Message
+{
+    [ProtoField(1)] public int Value { get; set; }
+    [ProtoField(2)] public string Data { get; set; } = "";
+}
+
+[ProtoContract]
+public class OneOfMessage
+{
+    [ProtoField(1)] public int Id { get; set; }
+
+    [ProtoOneOf("contact")]
+    [ProtoField(2)] public string? Email { get; set; }
+
+    [ProtoOneOf("contact")]
+    [ProtoField(3)] public string? Phone { get; set; }
+}
+
+[ProtoContract(IncludeBaseFields = true)]
+[ProtoInclude(10, typeof(DerivedAnimal))]
+public class BaseAnimal
+{
+    [ProtoField(1)] public string Name { get; set; } = "";
+    [ProtoField(2)] public string Sound { get; set; } = "";
+}
+
+[ProtoContract(IncludeBaseFields = true)]
+public class DerivedAnimal : BaseAnimal
+{
+    [ProtoField(3)] public int LegCount { get; set; }
 }
