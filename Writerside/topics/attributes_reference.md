@@ -22,6 +22,7 @@ public sealed class ProtoContractAttribute : Attribute
 | `Version` | `int` | `0` | API version; generates to `v{Version}/` subdirectory in schema output |
 | `Name` | `string?` | `null` | Override the protobuf message name and file name |
 | `Metadata` | `string?` | `null` | Comment added to the generated `.proto` definition |
+| `FieldNumbering` | `FieldNumbering` | not set | Controls auto-assigned field numbering strategy: `DeclarationOrder`, `Alphabetical`, or `TypeThenAlphabetical`. See [Auto-Discovery](auto_discovery.md) |
 | `DefaultEncoding` | `string?` | `null` | Sets the default text encoding for all string fields (e.g. "utf-8", "utf-16", "utf-32", "ascii"). Supports emoji with Unicode encodings |
 
 ### Examples
@@ -74,6 +75,16 @@ public class ChatMessage
     [ProtoField(1)] public string User { get; set; } = "";
     [ProtoField(2)] public string Content { get; set; } = ""; // uses utf-16
     [ProtoField(3, Encoding = "ascii")] public string Channel { get; set; } = ""; // ascii override
+}
+```
+
+```C#
+// Alphabetical field numbering — deterministic regardless of declaration order
+[ProtoContract(FieldNumbering = FieldNumbering.Alphabetical)]
+public class StableDto
+{
+    public string Zebra { get; set; } = "";  // field 2 (alphabetical)
+    public string Apple { get; set; } = "";  // field 1 (alphabetical)
 }
 ```
 

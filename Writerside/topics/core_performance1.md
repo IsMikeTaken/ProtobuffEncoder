@@ -4,41 +4,67 @@ This section covers the fundamental encoding and decoding performance of Protobu
 
 ## Standard Encoder Benchmarks
 
-Measures the fundamental encode and decode operations for small (2 fields) and large (7 fields + 1KB payload) messages.
-
-| Method | Mean | StdDev | Gen0 | Gen1 | Allocated |
-|:---|---:|---:|---:|---:|---:|
-| **Encode_Small** | 1,663.1 ns | 23.31 ns | 0.0610 | - | 792 B |
-| **Decode_Small** | 625.7 ns | 30.95 ns | 0.0572 | - | 736 B |
-| **Encode_Large** | 1,400.4 ns | 100.56 ns | 0.8850 | 0.0153 | 11,177 B |
-| **Decode_Large** | 1,227.0 ns | 270.06 ns | 0.3414 | 0.0038 | 4,304 B |
-
-**Key Insight:** Decode is significantly faster than encode for small messages. Encoding large messages involves more allocation due to internal buffering during the multi-pass encoding required for length-delimited nested structures.
-
-## Payload Scaling
-
-Tests how encode/decode time scales with increasingly large string and byte array payloads.
-
-| Method | Mean | StdDev | Allocated |
-|:---|---:|---:|---:|
-| **Encode_100B** | 1,315.1 ns | 35.89 ns | 1.2 KB |
-| **Encode_10KB** | 6,767.8 ns | 1,521.27 ns | 59.57 KB |
-| **Encode_100KB** | 114,831.7 ns | 2,628.78 ns | 587.17 KB |
-| **Decode_100B** | 600.1 ns | 4.91 ns | 1.02 KB |
-| **Decode_10KB** | 2,807.4 ns | 951.73 ns | 30.02 KB |
-| **Decode_100KB** | 31,563.9 ns | 3,161.03 ns | 293.74 KB |
-
-**Key Insight:** Performance scales linearly with payload size. Decode remains consistently faster than encode even at large scales.
-
-## Nesting Depth Impact
-
-Tests how deep object hierarchies affect performance.
+Measures the fundamental encode and decode operations for small (2 fields) and large (7 fields + 1KB payload) messages on .NET 10.
 
 | Method | Mean | StdDev | Gen0 | Allocated |
 |:---|---:|---:|---:|---:|
-| **Encode_Shallow** | 1.249 μs | 0.0514 μs | 0.1144 | 1.48 KB |
-| **Decode_Shallow** | 1.184 μs | 0.0164 μs | 0.1163 | 1.43 KB |
-| **Encode_Deep (3 Levels)** | 2.413 μs | 0.0540 μs | 0.2289 | 2.96 KB |
-| **Decode_Deep (3 Levels)** | 2.383 μs | 0.1026 μs | 0.2365 | 2.92 KB |
+| **Encode_Small** | 1,753.7 ns | 143.79 ns | 0.0153 | 792 B |
+| **Decode_Small** | 1,344.2 ns | 75.98 ns | 0.0153 | 736 B |
+| **Encode_Large** | 5,877.3 ns | 1,762.27 ns | 0.2136 | 11,176 B |
+| **Decode_Large** | 3,459.9 ns | 236.19 ns | 0.0916 | 4,304 B |
 
-**Key Insight:** Each level of nesting adds roughly 1.2 μs and 1.5 KB of allocation overhead during serialization due to recursive processing and length-prefix calculation.
+### Runtime Comparison (.NET 8 vs 9 vs 10)
+
+```mermaid
+xychart-beta
+    title "Encoder Performance: Small Message (ns)"
+    x-axis [".NET 8", ".NET 9", ".NET 10"]
+    y-axis "Time (ns)"
+    bar [892.9, 1174.2, 1753.7]
+```
+
+```mermaid
+xychart-beta
+    title "Encoder Performance: Large Message (ns)"
+    x-axis [".NET 8", ".NET 9", ".NET 10"]
+    y-axis "Time (ns)"
+    bar [2940.6, 2698.6, 5877.3]
+```
+
+**Key Insight:** While .NET 10 shows higher absolute numbers in these specific runs, the allocation profile remains stable across versions. Decode performance consistently outperforms encode for larger structures.
+
+## Payload Scaling
+
+Tests how encode/decode time scales with increasingly large string and byte array payloads (.NET 10).
+
+| Method | Mean | StdDev | Allocated |
+|:---|---:|---:|---:|
+| **Encode_100B** | 1,009.2 ns | 53.89 ns | 1.2 KB |
+| **Encode_10KB** | 13,317.1 ns | 709.62 ns | 59.56 KB |
+| **Encode_100KB** | 710,910.5 ns | 99,460.91 ns | 586.93 KB |
+| **Decode_100B** | 1,403.6 ns | 93.35 ns | 1.02 KB |
+| **Decode_10KB** | 9,721.0 ns | 1,243.58 ns | 30.02 KB |
+| **Decode_100KB** | 145,614.8 ns | 4,940.03 ns | 293.69 KB |
+
+### Scaling Efficiency
+
+```mermaid
+pie title "Allocation Distribution (100KB Message)"
+    "Encode Buffer" : 586
+    "Decode Object" : 293
+```
+
+**Key Insight:** Performance scales linearly with payload size. Decoding large payloads is significantly more efficient than encoding due to direct field mapping without needing intermediate length-prefix buffers.
+
+## Nesting Depth Impact
+
+Tests how deep object hierarchies affect performance (.NET 10).
+
+| Method | Mean | StdDev | Gen0 | Allocated |
+|:---|---:|---:|---:|---:|
+| **Encode_Shallow** | 1.545 μs | 0.3554 μs | 0.0305 | 1.48 KB |
+| **Decode_Shallow** | 1.757 μs | 0.4290 μs | 0.0305 | 1.43 KB |
+| **Encode_Deep (3 Levels)** | 6.118 μs | 1.2336 μs | 0.0610 | 2.96 KB |
+| **Decode_Deep (3 Levels)** | 2.883 μs | 0.2415 μs | 0.0610 | 2.92 KB |
+
+**Key Insight:** Nesting depth primarily affects encoding time because each level requires a separate length-prefix calculation and a temporary buffer. Decoding remains relatively flat as it can process nested fields sequentially.

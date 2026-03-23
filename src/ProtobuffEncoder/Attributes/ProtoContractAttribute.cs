@@ -68,6 +68,25 @@ public sealed class ProtoContractAttribute : Attribute
     public string? Metadata { get; set; }
 
     /// <summary>
+    /// Controls how field numbers are auto-assigned to properties without explicit
+    /// <c>[ProtoField(N)]</c> numbers. When not set, uses the global default from
+    /// <see cref="ProtoRegistry.Options"/>. Properties with explicit field numbers
+    /// are never reordered.
+    /// </summary>
+    public FieldNumbering FieldNumbering
+    {
+        get => _fieldNumbering;
+        set { _fieldNumbering = value; HasFieldNumbering = true; }
+    }
+
+    /// <summary>
+    /// Returns true when <see cref="FieldNumbering"/> has been explicitly set on this attribute.
+    /// </summary>
+    public bool HasFieldNumbering { get; private set; }
+
+    private FieldNumbering _fieldNumbering;
+
+    /// <summary>
     /// Sets the default text encoding for all string fields in this contract.
     /// Accepts encoding names such as "utf-8", "utf-16", "utf-32", "ascii", "latin-1",
     /// or any name recognized by <see cref="System.Text.Encoding.GetEncoding(string)"/>.
