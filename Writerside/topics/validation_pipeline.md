@@ -19,7 +19,7 @@ public sealed class ValidationPipeline<T>
 | `ValidateOrThrow(T)` | Run all validators, throw on failure |
 | `HasValidators` | Whether any validators are registered |
 
-### Example
+### Example {id="pipeline-example"}
 
 ```C#
 var pipeline = new ValidationPipeline<OrderMessage>();
@@ -67,7 +67,7 @@ public interface IMessageValidator<in T>
 }
 ```
 
-### Example
+### Example {id="validated-transport-example"}
 
 ```C#
 public class OrderTotalValidator : IMessageValidator<OrderMessage>

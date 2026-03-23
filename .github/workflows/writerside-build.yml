@@ -2,7 +2,10 @@ name: Build WriterSide Docs
 
 on:
   push:
-    branches: [master]
+    # Triggers on all branches EXCEPT master and develop
+    branches-ignore: 
+      - master
+      - develop
     paths:
       - 'Writerside/**'
   pull_request:
@@ -38,4 +41,5 @@ jobs:
           path: |
             artifacts/${{ env.ARTIFACT }}
             artifacts/report.json
-          retention-days: 7
+          retention-days: 1
+        

@@ -11,7 +11,7 @@ public sealed class ProtobufSender<T> : IAsyncDisposable, IDisposable
     where T : class, new()
 ```
 
-### API
+### API {id="sender-api"}
 
 | Method | Description |
 |--------|-------------|
@@ -20,7 +20,7 @@ public sealed class ProtobufSender<T> : IAsyncDisposable, IDisposable
 | `SendManyAsync(IEnumerable<T>, CancellationToken)` | Send batch |
 | `SendManyAsync(IAsyncEnumerable<T>, CancellationToken)` | Send async stream |
 
-### Example
+### Example {id="sender-example"}
 
 ```C#
 await using var sender = new ProtobufSender<OrderMessage>(networkStream);
@@ -44,7 +44,7 @@ public sealed class ProtobufReceiver<T> : IAsyncDisposable, IDisposable
     where T : class, new()
 ```
 
-### API
+### API {id="receiver-api"}
 
 | Method | Description |
 |--------|-------------|
@@ -54,7 +54,7 @@ public sealed class ProtobufReceiver<T> : IAsyncDisposable, IDisposable
 | `ListenAsync(Func<T, Task>, CancellationToken)` | Invoke handler per message |
 | `ListenAsync(Action<T>, CancellationToken)` | Invoke sync handler per message |
 
-### Example
+### Example {id="receiver-example"}
 
 ```C#
 await using var receiver = new ProtobufReceiver<OrderMessage>(networkStream);
@@ -88,7 +88,7 @@ new ProtobufDuplexStream<TSend, TReceive>(duplexStream, ownsStream: true)
 new ProtobufDuplexStream<TSend, TReceive>(sendStream, receiveStream, ownsStreams: true)
 ```
 
-### API
+### API {id="duplex-api"}
 
 | Method | Description |
 |--------|-------------|
@@ -150,7 +150,7 @@ Sends single values and dynamic messages over a stream without requiring a `[Pro
 public sealed class ProtobufValueSender : IAsyncDisposable, IDisposable
 ```
 
-### API
+### API {id="value-sender-api"}
 
 | Method | Description |
 |--------|-------------|
@@ -168,7 +168,7 @@ public sealed class ProtobufValueSender : IAsyncDisposable, IDisposable
 | `SendManyAsync(IAsyncEnumerable<string>, CancellationToken)` | Stream strings |
 | `SendManyAsync(IAsyncEnumerable<ProtoMessage>, CancellationToken)` | Stream messages |
 
-### Example
+### Example {id="value-sender-example"}
 
 ```C#
 await using var sender = new ProtobufValueSender(networkStream, ProtoEncoding.UTF8);
@@ -191,7 +191,7 @@ Receives single values and dynamic messages from a stream.
 public sealed class ProtobufValueReceiver : IAsyncDisposable, IDisposable
 ```
 
-### API
+### API {id="value-receiver-api"}
 
 | Method | Description |
 |--------|-------------|
@@ -211,7 +211,7 @@ public sealed class ProtobufValueReceiver : IAsyncDisposable, IDisposable
 | `ListenAsync(Func<string, Task>, CancellationToken)` | Callback per string |
 | `ListenAsync(Func<ProtoMessage, Task>, CancellationToken)` | Callback per message |
 
-### Example
+### Example {id="value-receiver-example"}
 
 ```C#
 await using var receiver = new ProtobufValueReceiver(networkStream, ProtoEncoding.UTF8);

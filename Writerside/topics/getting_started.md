@@ -101,7 +101,7 @@ Console.WriteLine(proto);
 
 Output:
 
-```Protobuf
+```
 syntax = "proto3";
 
 package MyApp.Models;

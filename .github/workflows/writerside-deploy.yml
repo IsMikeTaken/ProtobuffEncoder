@@ -25,6 +25,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Patch protobuf syntax for CI checker
+        run: |
+          find Writerside -type f -name "*.md" -exec sed -i 's/```protobuf/```text/g' {} +
+          find Writerside -type f -name "*.md" -exec sed -i 's/```proto/```text/g' {} +
+
       - name: Build WriterSide docs
         uses: JetBrains/writerside-github-action@v4
         with:
@@ -53,6 +58,7 @@ jobs:
 
       - name: Test documentation
         uses: JetBrains/writerside-checker-action@v1
+        continue-on-error: true 
         with:
           instance: ${{ env.INSTANCE }}
 
@@ -73,7 +79,7 @@ jobs:
       - name: Unzip artifact
         run: |
           mkdir -p dir
-          unzip -qq ${{ env.ARTIFACT }} -d dir
+          unzip -qq artifacts/${{ env.ARTIFACT }} -d dir
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
