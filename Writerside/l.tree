@@ -5,11 +5,13 @@
 <instance-profile id="l"
                   name="Proto - Buffed" start-page="README.md">
     <toc-element topic="README.md"/>
+    <toc-element topic="changelog.md"/>
     <toc-element topic="getting_started.md"/>
     <toc-element toc-title="Core">
         <toc-element topic="attributes_reference.md"/>
         <toc-element topic="serialization_deep_dive.md"/>
         <toc-element topic="value_encoding.md"/>
+        <toc-element topic="auto_discovery.md"/>
         <toc-element topic="transport_layer.md"/>
         <toc-element topic="validation_pipeline.md"/>
     </toc-element>

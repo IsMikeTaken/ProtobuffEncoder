@@ -22,6 +22,10 @@ obj/
 *.snupkg
 packages/
 
+# Benchmark Artifacts
+BenchmarkDotNet.Artifacts/
+artifacts/
+
 # Others
 *.log
 *.tmp

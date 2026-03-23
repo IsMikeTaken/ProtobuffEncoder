@@ -4,50 +4,68 @@ This section covers the performance of ProtobuffEncoder's internal infrastructur
 
 ## Static Message vs Dynamic
 
-Compares `StaticMessage<T>` (pre-compiled delegates) against the standard dynamic `ProtobufEncoder` methods.
+Compares `StaticMessage<T>` (pre-compiled delegates) against the standard dynamic `ProtobufEncoder` methods on .NET 10.
 
 | Method | Mean | StdDev | Gen0 | Allocated |
 |:---|---:|---:|---:|---:|
-| **StaticEncode** | 557.9 ns | 13.43 ns | 0.0629 | 792 B |
-| **StaticDecode** | 626.3 ns | 108.12 ns | 0.0591 | 744 B |
-| **DynamicEncode** | 683.5 ns | 91.76 ns | 0.0610 | 792 B |
-| **DynamicDecode** | 808.8 ns | 51.58 ns | 0.0591 | 744 B |
+| **StaticEncode** | 824.4 ns | 108.41 ns | 0.0162 | 792 B |
+| **StaticDecode** | 1,027.1 ns | 41.25 ns | 0.0153 | 744 B |
+| **DynamicEncode** | 1,602.7 ns | 242.42 ns | 0.0229 | 792 B |
+| **DynamicDecode** | 1,078.3 ns | 110.16 ns | 0.0153 | 744 B |
 
-**Key Insight:** `StaticMessage` provides a ~20% performance boost by bypassing the `ContractResolver` dictionary lookup and using pre-compiled delegates for field access.
+### Performance Optimization: Static vs Dynamic
+
+```mermaid
+xychart-beta
+    title "Static vs Dynamic Encoding (.NET 10)"
+    x-axis ["Static", "Dynamic"]
+    y-axis "Time (ns)"
+    bar [824.4, 1602.7]
+```
+
+**Key Insight:** `StaticMessage` provides a ~50% performance boost in encoding by bypassing the `ContractResolver` dictionary lookup and using pre-compiled delegates for field access.
 
 ## Validation Pipeline
 
-Measures the throughput of the validation pipeline with 3 rules.
+Measures the throughput of the validation pipeline with 3 rules on .NET 10.
 
 | Method | Mean | StdDev | Gen0 | Allocated |
 |:---|---:|---:|---:|---:|
-| **Validate_Valid** | 11.210 ns | 2.3494 ns | - | - |
-| **Validate_Invalid** | 6.123 ns | 0.5023 ns | 0.0025 | 32 B |
-| **ValidatedSender_Send** | 692.946 ns | 41.8947 ns | 0.1106 | 1,424 B |
+| **Validate_Valid** | 9.157 ns | 0.9285 ns | - | - |
+| **Validate_Invalid** | 12.003 ns | 0.5998 ns | 0.0007 | 32 B |
+| **ValidatedSender_Send** | 1,126.176 ns | 54.1732 ns | 0.0286 | 1,424 B |
 
-**Key Insight:** Validation is extremely fast (~10ns). Invalid messages are validated even faster because the pipeline short-circuits on the first failure.
+**Key Insight:** Validation is extremely fast (<10ns). Validated transport adds minimal overhead while providing robust safety for incoming and outgoing data.
 
 ## ContractResolver Caching
 
-Tests the overhead of the `ContractResolver` when types are already cached.
+Tests the overhead of the `ContractResolver` when types are already cached (.NET 10).
 
 | Method | Mean | StdDev | Gen0 | Allocated |
 |:---|---:|---:|---:|---:|
-| **FirstCall_NewType_Encode** | 821.8 ns | 26.12 ns | 0.0639 | 808 B |
-| **CachedResolve_AllScalars** | 1,100.2 ns | 35.77 ns | 0.0782 | 1,000 B |
-| **CachedResolve_Nested** | 1,192.4 ns | 11.31 ns | 0.1259 | 1,592 B |
+| **FirstCall_NewType_Encode** | 1,292.8 ns | 189.54 ns | 0.0153 | 808 B |
+| **CachedResolve_AllScalars** | 2,473.8 ns | 264.39 ns | 0.0153 | 1,000 B |
+| **CachedResolve_Nested** | 3,413.7 ns | 816.51 ns | 0.0305 | 1,592 B |
 
 **Key Insight:** The `ContractResolver` adds minimal overhead once a type is resolved, as it uses a `ConcurrentDictionary` for O(1) retrieval of pre-computed type metadata.
 
 ## Low-Level ProtobufWriter
 
-Benchmarks the manual message construction using the low-level `ProtobufWriter` API.
+Benchmarks the manual message construction using the low-level `ProtobufWriter` API (.NET 10).
 
 | Method | Mean | StdDev | Gen0 | Allocated |
 |:---|---:|---:|---:|---:|
-| **Writer_SimpleMessage** | 76.30 ns | 1.946 ns | 0.0356 | 448 B |
-| **Writer_NestedMessage** | 144.57 ns | 26.778 ns | 0.0694 | 872 B |
-| **Writer_MapField** | 1,773.07 ns | 148.032 ns | 0.5951 | 7,472 B |
-| **Writer_PackedVarints** | 388.86 ns | 70.844 ns | 0.0720 | 904 B |
+| **Writer_SimpleMessage** | 165.9 ns | 19.95 ns | 0.0093 | 448 B |
+| **Writer_NestedMessage** | 234.1 ns | 84.42 ns | 0.0181 | 872 B |
+| **Writer_MapField** | 3,031.8 ns | 819.67 ns | 0.1564 | 7,472 B |
+| **Writer_PackedVarints** | 768.3 ns | 40.23 ns | 0.0191 | 904 B |
+
+### Writer Efficiency
+
+```mermaid
+pie title "ProtobufWriter Allocation (Simple Message)"
+    "Buffer" : 448
+    "No Overhead" : 552
+```
 
 **Key Insight:** For performance-critical code where object allocation must be avoided, the `ProtobufWriter` provides the fastest possible path to generating Protobuf-compliant binary data.

@@ -1,8 +1,12 @@
 using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Columns;
 using BenchmarkDotNet.Configs;
+using BenchmarkDotNet.Diagnosers;
 using BenchmarkDotNet.Environments;
+using BenchmarkDotNet.Exporters;
 using BenchmarkDotNet.Jobs;
 using BenchmarkDotNet.Running;
+using BenchmarkDotNet.Validators;
 using ProtobuffEncoder.Attributes;
 using ProtobuffEncoder.Schema;
 using ProtobuffEncoder.Transport;
@@ -13,56 +17,72 @@ namespace ProtobuffEncoder.Benchmarks;
 // Multi-TFM Configuration
 // ═══════════════════════════════════════════════════
 
-using BenchmarkDotNet.Columns;
-using BenchmarkDotNet.Configs;
-using BenchmarkDotNet.Diagnosers;
-using BenchmarkDotNet.Environments;
-using BenchmarkDotNet.Exporters;
-using BenchmarkDotNet.Jobs;
-using BenchmarkDotNet.Validators;
 
 public class BenchmarkConfig : ManualConfig
 {
     public BenchmarkConfig()
     {
-        // 1. The Baseline Job (Statistical Rigor & Enterprise Environment)
-        var baseJob = Job.Default
-            .WithMaxRelativeError(0.01) // Strict 1% error margin
-            .WithMinIterationCount(15)  // Ensure enough data points for statistical validity
-            .WithMaxIterationCount(100) // Put a cap on execution time
-            .WithWarmupCount(5)         // Give the JIT enough time to optimize hot paths
-            .WithGcServer(true)         // Force Server GC (Standard for enterprise web/api apps)
-            .WithGcConcurrent(true);    // Background GC enabled
+        // Add the base loggers and providers so the CLI still prints output
+        AddLogger(DefaultConfig.Instance.GetLoggers().ToArray());
+        AddColumnProvider(DefaultConfig.Instance.GetColumnProviders().ToArray());
 
-        // 2. Runtimes & Platforms (With corrected IDs)
-        // .NET 10
+        // FIX: Explicitly set the artifacts output directory
+        string solutionRoot = GetSolutionRoot();
+        ArtifactsPath = Path.Combine(solutionRoot, "artifacts");
+
+        // 1. The Baseline Job
+        var baseJob = Job.ShortRun
+            .WithMaxRelativeError(0.01)
+            .WithMinIterationCount(20)
+            .WithMaxIterationCount(50)
+            .WithWarmupCount(5)
+            .WithGcServer(true)
+            .WithGcConcurrent(true);
+
+        // 2. Runtimes
         AddJob(baseJob.WithRuntime(CoreRuntime.Core10_0).WithPlatform(Platform.X64).WithId("x64.Net10"));
-        AddJob(baseJob.WithRuntime(CoreRuntime.Core10_0).WithPlatform(Platform.X86).WithId("x86.Net10"));
-
-        // .NET 9
         AddJob(baseJob.WithRuntime(CoreRuntime.Core90).WithPlatform(Platform.X64).WithId("x64.Net9"));
-        AddJob(baseJob.WithRuntime(CoreRuntime.Core90).WithPlatform(Platform.X86).WithId("x86.Net9"));
-
-        // .NET 8 (Current LTS)
         AddJob(baseJob.WithRuntime(CoreRuntime.Core80).WithPlatform(Platform.X64).WithId("x64.Net8"));
-        AddJob(baseJob.WithRuntime(CoreRuntime.Core80).WithPlatform(Platform.X86).WithId("x86.Net8"));
 
         // 3. Enterprise Diagnosers
-        AddDiagnoser(MemoryDiagnoser.Default);     // Non-negotiable: Tracks byte allocations & GC collections
-        AddDiagnoser(ThreadingDiagnoser.Default);  // Crucial: Tracks lock contentions in concurrent code
+        AddDiagnoser(MemoryDiagnoser.Default);
+        AddDiagnoser(ThreadingDiagnoser.Default);
+        AddDiagnoser(ExceptionDiagnoser.Default);
 
         // 4. Statistical Columns for the Report
         AddColumn(StatisticColumn.Median);
         AddColumn(StatisticColumn.Min);
         AddColumn(StatisticColumn.Max);
-        AddColumn(RankColumn.Arabic); // Easily rank the fastest to slowest setups
+        AddColumn(StatisticColumn.OperationsPerSecond);
+        AddColumn(BaselineRatioColumn.RatioMean);
+        AddColumn(BaselineRatioColumn.RatioStdDev);
+        AddColumn(RankColumn.Arabic);
 
         // 5. Exporters (Artifact Generation)
         AddExporter(MarkdownExporter.GitHub);
-        AddExporter(HtmlExporter.Default); // Excellent for attaching to Jira tickets or CI/CD dashboards
+        AddExporter(AsciiDocExporter.Default);
+        AddExporter(HtmlExporter.Default);
 
         // 6. Safeguards
-        AddValidator(JitOptimizationsValidator.FailOnError); // Refuses to run if you accidentally leave it in Debug mode
+        AddValidator(JitOptimizationsValidator.FailOnError);
+        AddValidator(RuntimeValidator.DontFailOnError);
+    }
+    private static string GetSolutionRoot()
+    {
+        var currentDirectory = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
+
+        while (currentDirectory != null)
+        {
+            // Look for a .sln file or the .git folder to identify the root
+            if (currentDirectory.GetFiles("*.sln").Any() || currentDirectory.GetDirectories(".git").Any())
+            {
+                return currentDirectory.FullName;
+            }
+            currentDirectory = currentDirectory.Parent;
+        }
+
+        // Fallback just in case it runs somewhere weird
+        return AppDomain.CurrentDomain.BaseDirectory;
     }
 }
 
@@ -680,8 +700,8 @@ public class Program
             typeof(ContractResolverBenchmarks)
         };
 
-        foreach (var type in types)
-            BenchmarkRunner.Run(type);
+        var config = new BenchmarkConfig();
+        BenchmarkSwitcher.FromTypes(types).RunAll(config);
     }
 }
 

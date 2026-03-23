@@ -106,6 +106,7 @@ Performance tested across .NET 8, 9, and 10 with **15 benchmark suites**. See th
 |-------|-------------|
 | [Attributes Reference](guides/attributes.md) | All 8 attributes with properties and examples |
 | [Serialization Deep Dive](guides/serialization.md) | Wire format, type mapping, encoding steps |
+| [Auto-Discovery](guides/auto_discovery.md) | ProtoRegistry, field numbering strategies, assembly scanning |
 | [Value Encoding](guides/value_encoding.md) | ProtoEncoding, ProtoValue, ProtoMessage, emoji support |
 | [Transport Layer](guides/transport.md) | Sender, Receiver, DuplexStream, ValueSender/Receiver |
 | [Validation Pipeline](guides/validation.md) | ValidationPipeline, validated transport |

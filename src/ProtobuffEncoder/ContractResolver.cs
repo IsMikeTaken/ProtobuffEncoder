@@ -18,7 +18,16 @@ internal static class ContractResolver
 
     public static FieldDescriptor[] Resolve(Type type)
     {
-        return Cache.GetOrAdd(type, static t => ResolveCore(t, implicitMode: false));
+        return Cache.GetOrAdd(type, static t =>
+        {
+            // Auto-discovery: if the type isn't a contract but is registered or auto-discover is on
+            if (t.GetCustomAttribute<ProtoContractAttribute>() is null
+                && (ProtoRegistry.IsRegistered(t) || ProtoRegistry.Options.AutoDiscover))
+            {
+                return ResolveCore(t, implicitMode: true);
+            }
+            return ResolveCore(t, implicitMode: false);
+        });
     }
 
     /// <summary>
@@ -77,6 +86,10 @@ internal static class ContractResolver
             if (attr?.FieldNumber is > 0)
                 reservedNumbers.Add(attr.FieldNumber);
         }
+
+        // Apply field numbering strategy: reorder the auto-assigned properties
+        var fieldNumbering = ProtoRegistry.GetFieldNumbering(type);
+        properties = ApplyFieldNumberingOrder(properties, fieldNumbering, explicitFields);
 
         // Pass 2: build descriptors, auto-assigning numbers that skip reserved ones
         var descriptors = new List<FieldDescriptor>();
@@ -242,6 +255,90 @@ internal static class ContractResolver
 
         return result.ToArray();
     }
+
+    #region Field numbering
+
+    /// <summary>
+    /// Reorders properties based on the field numbering strategy. Properties with explicit
+    /// [ProtoField(N)] numbers keep their assigned numbers regardless of ordering.
+    /// Only auto-assigned properties are affected by the reordering.
+    /// </summary>
+    private static PropertyInfo[] ApplyFieldNumberingOrder(PropertyInfo[] properties, FieldNumbering strategy, bool explicitFields)
+    {
+        if (strategy == FieldNumbering.DeclarationOrder)
+            return properties;
+
+        // Separate explicitly-numbered properties from auto-assigned ones
+        var explicitlyNumbered = new List<PropertyInfo>();
+        var autoAssigned = new List<PropertyInfo>();
+
+        foreach (var prop in properties)
+        {
+            if (prop.GetCustomAttribute<ProtoIgnoreAttribute>() is not null)
+                continue;
+
+            var fieldAttr = prop.GetCustomAttribute<ProtoFieldAttribute>();
+
+            if (explicitFields && fieldAttr is null && prop.GetCustomAttribute<ProtoMapAttribute>() is null)
+                continue;
+
+            if (fieldAttr?.FieldNumber is > 0)
+                explicitlyNumbered.Add(prop);
+            else
+                autoAssigned.Add(prop);
+        }
+
+        // Sort only the auto-assigned properties
+        PropertyInfo[] sorted = strategy switch
+        {
+            FieldNumbering.Alphabetical => autoAssigned.OrderBy(p => p.Name, StringComparer.Ordinal).ToArray(),
+            FieldNumbering.TypeThenAlphabetical => autoAssigned
+                .OrderBy(p => GetTypeCategory(p.PropertyType))
+                .ThenBy(p => p.Name, StringComparer.Ordinal)
+                .ToArray(),
+            _ => autoAssigned.ToArray()
+        };
+
+        // Rebuild the full list: keep original positions for explicitly-numbered,
+        // replace auto-assigned positions with sorted order
+        var result = new List<PropertyInfo>();
+        int sortedIndex = 0;
+        foreach (var prop in properties)
+        {
+            if (explicitlyNumbered.Contains(prop))
+            {
+                result.Add(prop);
+            }
+            else if (sortedIndex < sorted.Length && autoAssigned.Contains(prop))
+            {
+                result.Add(sorted[sortedIndex++]);
+            }
+            else
+            {
+                result.Add(prop); // ignored/excluded properties pass through
+            }
+        }
+
+        return result.ToArray();
+    }
+
+    /// <summary>
+    /// Returns a sort key for type-based grouping: 0 = scalars, 1 = collections, 2 = messages.
+    /// </summary>
+    private static int GetTypeCategory(Type type)
+    {
+        var underlying = Nullable.GetUnderlyingType(type) ?? type;
+
+        if (IsScalarType(underlying))
+            return 0;
+
+        if (IsCollectionType(underlying, out _) || IsDictionaryType(underlying, out _, out _))
+            return 1;
+
+        return 2; // nested message
+    }
+
+    #endregion
 
     #region Type detection helpers
 
