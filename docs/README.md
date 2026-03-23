@@ -28,7 +28,7 @@
 | `ProtobuffEncoder.Grpc` | Code-first gRPC marshaller, client proxy, service discovery | net8.0, net9.0, net10.0 |
 | `ProtobuffEncoder.WebSockets` | Managed WebSocket client/server, connection manager, retry | net8.0, net9.0, net10.0 |
 | `ProtobuffEncoder.Contracts` | Example contracts and service interfaces | net8.0, net9.0, net10.0 |
-| `ProtobuffEncoder.Tool` | CLI tool for `.proto` generation and `.csproj` patching | net10.0 |
+| `ProtobuffEncoder.Tool` | CLI tool for `.proto` generation and `.csproj` patching | net8.0, net9.0, net10.0 |
 
 ## Quick Start
 
@@ -96,58 +96,38 @@ string proto = ProtoSchemaGenerator.Generate(typeof(WeatherRequest));
 
 ## Benchmarks
 
-Performance tested across .NET 8, 9, and 10 with **15 benchmark suites** covering:
-
-- Core encode/decode (small and large payloads)
-- Collection serialization (lists, maps)
-- Static message pre-compiled delegates
-- Streaming (length-delimited batches)
-- Duplex stream send/receive
-- Validation pipeline throughput
-- Schema generation and parsing
-- ProtobufWriter low-level API
-- Payload scaling (100B to 100KB)
-- Nested object depth (1-3 levels)
-- OneOf union encoding
-- Inheritance (ProtoInclude)
-- Async streaming
-- ContractResolver caching
-
-### EncoderBenchmarks (net10.0)
-
-```
-BenchmarkDotNet v0.15.8, Windows 11
-12th Gen Intel Core i9-12900H, .NET 10.0.5
-
-| Method       | Mean     | Gen0   | Allocated |
-|------------- |---------:|-------:|----------:|
-| Encode_Small | 602.6 ns | 0.0610 |     792 B |
-| Decode_Small | 529.1 ns | 0.0572 |     736 B |
-| Encode_Large | 999.0 ns | 0.5417 |    6832 B |
-| Decode_Large | 820.5 ns | 0.3052 |    3832 B |
-```
-
-### CollectionBenchmarks (net10.0)
-
-```
-| Method             | Mean     | Gen0   | Allocated |
-|------------------- |---------:|-------:|----------:|
-| Encode_Collections | 2.518 us | 0.4921 |   6.07 KB |
-| Decode_Collections | 4.039 us | 0.9460 |  11.67 KB |
-```
+Performance tested across .NET 8, 9, and 10 with **15 benchmark suites**. See the [benchmark documentation](benchmarks/README.md) for full results.
 
 ## Documentation
 
+### Core
+
 | Topic | Description |
 |-------|-------------|
-| [Guides: Attributes](guides/attributes.md) | Complete attribute reference |
-| [Guides: Serialization](guides/serialization.md) | Wire format, type mapping |
-| [Guides: Transport](guides/transport.md) | Sender, Receiver, DuplexStream |
-| [Guides: Schema](guides/schema.md) | ProtoSchemaGenerator, imports, services |
-| [Guides: WebSockets](guides/websockets.md) | Client, server, retry |
-| [Guides: gRPC](guides/grpc.md) | Marshaller, client proxy |
-| [Guides: Setup](guides/setup.md) | ASP.NET Core builder |
-| [API: ASP.NET Core](api/aspnetcore.md) | Formatters, HttpClient |
-| [API: Tool](api/tool.md) | CLI tool reference |
-| [Testing](test_strategy.md) | FIRST-U patterns, test matrix |
+| [Attributes Reference](guides/attributes.md) | All 8 attributes with properties and examples |
+| [Serialization Deep Dive](guides/serialization.md) | Wire format, type mapping, encoding steps |
+| [Transport Layer](guides/transport.md) | Sender, Receiver, DuplexStream |
+| [Validation Pipeline](guides/validation.md) | ValidationPipeline, validated transport |
+
+### Schema
+
+| Topic | Description |
+|-------|-------------|
+| [Schema Generation](guides/schema.md) | ProtoSchemaGenerator, imports, services |
+| [Schema Decoding](guides/schema_decoding.md) | ProtoSchemaParser, SchemaDecoder, ProtobufWriter |
+
+### Integrations
+
+| Topic | Description |
+|-------|-------------|
+| [ASP.NET Core](guides/setup.md) | Builder pattern, REST formatters, HttpClient |
+| [gRPC](guides/grpc.md) | Marshaller, client proxy, service discovery |
+| [WebSockets](guides/websockets.md) | Client, server, connection manager, retry |
+
+### Tools & Quality
+
+| Topic | Description |
+|-------|-------------|
+| [CLI Tool](api/tool.md) | Schema generation, csproj patching |
+| [Test Strategy](test_strategy.md) | FIRST-U patterns, 430+ tests |
 | [Demos](demos/README.md) | Demo project walkthroughs |

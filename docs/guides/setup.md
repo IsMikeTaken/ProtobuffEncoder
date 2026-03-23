@@ -1,285 +1,194 @@
-# Setup & Configuration
+# ASP.NET Core Integration
 
-ProtobuffEncoder provides a unified setup API based on the **Options pattern** and **Strategy pattern**
-to configure all transports (REST, WebSocket, gRPC) from a single entry point.
+The `ProtobuffEncoder.AspNetCore` package provides REST API formatters, HttpClient extensions, and a fluent builder for configuring all transport strategies (REST, WebSocket, gRPC).
 
-## Quick Start
-
-```csharp
-// Program.cs
-using ProtobuffEncoder.AspNetCore.Setup;
-
-var builder = WebApplication.CreateBuilder(args);
-
-builder.Services.AddProtobuffEncoder()
-    .WithRestFormatters();
-
-var app = builder.Build();
-app.Run();
-```
-
-That's the minimal setup — a single line that registers protobuf MVC formatters for REST APIs.
-
----
-
-## Full Setup (All Transports)
+## Setup with Builder Pattern
 
 ```csharp
-using ProtobuffEncoder.AspNetCore.Setup;
-using ProtobuffEncoder.Transport;
-
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddProtobuffEncoder(options =>
 {
-    options.DefaultInvalidMessageBehavior = InvalidMessageBehavior.Skip;
     options.EnableMvcFormatters = true;
-    options.OnGlobalValidationFailure = (message, result) =>
-        Console.WriteLine($"Validation failed: {result.ErrorMessage}");
+    options.DefaultInvalidMessageBehavior = InvalidMessageBehavior.Skip;
 })
 .WithRestFormatters()
 .WithWebSocket(ws => ws
-    .AddEndpoint<NotificationMessage, NotificationMessage>()
-    .AddEndpoint<WeatherResponse, WeatherRequest>())
+    .AddEndpoint<NotificationMessage, NotificationMessage>())
 .WithGrpc(grpc => grpc
-    .UseKestrel(httpPort: 5400, grpcPort: 5401)
-    .AddService<WeatherGrpcServiceImpl>()
-    .AddService<ChatGrpcServiceImpl>());
+    .AddService<WeatherGrpcServiceImpl>());
 
 var app = builder.Build();
-
-app.UseWebSockets();
-app.UseDefaultFiles();
-app.UseStaticFiles();
-
-// Maps all auto-mapped endpoints (gRPC services registered with autoMap: true)
-app.MapProtobufEndpoints();
-
-// WebSocket endpoints are still mapped explicitly for full control over routes/options
-app.MapProtobufWebSocket<NotificationMessage, NotificationMessage>("/ws/chat", options =>
-{
-    options.OnMessage = async (conn, msg) => await conn.SendAsync(reply);
-});
-
-app.Run();
 ```
 
----
-
-## Architecture
-
-### Options Pattern — `ProtobufEncoderOptions`
-
-Central configuration injected via `IOptions<ProtobufEncoderOptions>`.
+## ProtobufEncoderOptions
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `DefaultInvalidMessageBehavior` | `InvalidMessageBehavior` | `Skip` | Default validation failure behavior across all transports |
-| `EnableMvcFormatters` | `bool` | `false` | Auto-register `application/x-protobuf` MVC formatters |
-| `OnGlobalValidationFailure` | `Action<object, ValidationResult>?` | `null` | Centralized validation failure callback for logging/telemetry |
+| `EnableMvcFormatters` | `bool` | `false` | Enable `application/x-protobuf` MVC formatters |
+| `DefaultInvalidMessageBehavior` | `InvalidMessageBehavior` | `Skip` | Default validation failure behavior |
+| `OnGlobalValidationFailure` | `Action<object, ValidationResult>?` | `null` | Centralized validation failure callback |
 
-### Strategy Pattern — `IProtobufTransportStrategy`
+## ProtobufEncoderBuilder
 
-Each transport is a strategy that encapsulates its own DI registration and endpoint mapping.
+Fluent builder returned by `AddProtobuffEncoder()`:
 
-```
-IProtobufTransportStrategy
-├── ConfigureServices(IServiceCollection, ProtobufEncoderOptions)
-└── ConfigureEndpoints(IEndpointRouteBuilder, ProtobufEncoderOptions)
-```
+| Method | Description |
+|--------|-------------|
+| `WithRestFormatters()` | Add MVC input/output formatters for `application/x-protobuf` |
+| `WithWebSocket(Action<WebSocketStrategy>)` | Configure WebSocket endpoints |
+| `WithGrpc(Action<GrpcStrategy>)` | Configure gRPC services |
+| `AddTransport(IProtobufTransportStrategy)` | Register a custom transport strategy |
+| `MapEndpoints(IEndpointRouteBuilder)` | Map all registered endpoints in the pipeline |
+| `Strategies` | Inspect registered strategies |
 
-**Built-in strategies:**
+## Transport Strategies
 
-| Strategy | Builder Method | Registers |
-|----------|---------------|-----------|
-| `RestFormatterStrategy` | `.WithRestFormatters()` | MVC input/output formatters for `application/x-protobuf` |
-| `WebSocketStrategy` | `.WithWebSocket(ws => ...)` | `WebSocketConnectionManager<TSend,TReceive>` singletons |
-| `GrpcStrategy` | `.WithGrpc(grpc => ...)` | gRPC infrastructure + `IServiceMethodProvider<T>` per service |
-
-### Builder — `ProtobufEncoderBuilder`
-
-The fluent entry point returned by `AddProtobuffEncoder()`.
+The builder uses the strategy pattern. Each transport implements `IProtobufTransportStrategy`:
 
 ```csharp
-builder.Services.AddProtobuffEncoder(options => { ... })
-    .WithRestFormatters()              // REST strategy
-    .WithWebSocket(ws => { ... })      // WebSocket strategy
-    .WithGrpc(grpc => { ... })         // gRPC strategy
-    .AddTransport(new MyStrategy());   // Custom strategy
-```
-
----
-
-## Transport-Specific Details
-
-### REST Formatters
-
-```csharp
-builder.Services.AddProtobuffEncoder()
-    .WithRestFormatters();
-```
-
-Registers `ProtobufInputFormatter` and `ProtobufOutputFormatter` so ASP.NET Core controllers
-automatically serialize/deserialize `application/x-protobuf` request and response bodies.
-
-Alternatively, set `options.EnableMvcFormatters = true` in the options callback to auto-register
-without calling `.WithRestFormatters()` explicitly.
-
-### WebSocket
-
-```csharp
-builder.Services.AddProtobuffEncoder()
-    .WithWebSocket(ws => ws
-        .AddEndpoint<NotificationMessage, NotificationMessage>()
-        .AddEndpoint<WeatherResponse, WeatherRequest>());
-```
-
-Each `.AddEndpoint<TSend, TReceive>()` registers a `WebSocketConnectionManager<TSend, TReceive>`
-singleton for connection tracking and broadcast support. Endpoints are still mapped explicitly
-via `app.MapProtobufWebSocket(...)` for full control over routes and lifecycle hooks.
-
-### gRPC
-
-```csharp
-builder.Services.AddProtobuffEncoder()
-    .WithGrpc(grpc => grpc
-        .UseKestrel(httpPort: 5400, grpcPort: 5401)
-        .AddService<WeatherGrpcServiceImpl>()
-        .AddService<ChatGrpcServiceImpl>());
-
-// In the app pipeline:
-app.MapProtobufEndpoints(); // auto-maps all gRPC services
-```
-
-#### `UseKestrel(httpPort, grpcPort)`
-
-Configures two Kestrel endpoints because HTTP/2 cannot be negotiated over cleartext (no ALPN).
-The `httpPort` listens with HTTP/1.1 for browser dashboards and REST APIs. The `grpcPort`
-listens with HTTP/2 for gRPC calls.
-
-| Port | Protocol | Purpose |
-|------|----------|---------|
-| `httpPort` | HTTP/1.1 | Browser dashboard, REST, health checks |
-| `grpcPort` | HTTP/2 | gRPC calls |
-
-When using HTTPS, both protocols are negotiated via ALPN on a single port and `UseKestrel()`
-is not needed.
-
-#### `AddService<T>(autoMap)`
-
-Each `.AddService<T>()` call:
-1. Registers `AddGrpc()` (once)
-2. Registers the service as scoped
-3. Registers `IServiceMethodProvider<T>` for attribute-based method discovery
-4. Auto-maps the gRPC endpoint (set `autoMap: false` to map manually)
-
-Pass `autoMap: false` when you need per-service endpoint configuration:
-
-```csharp
-.WithGrpc(grpc => grpc
-    .UseKestrel(httpPort: 5400, grpcPort: 5401)
-    .AddService<WeatherGrpcServiceImpl>(autoMap: false));
-
-// Later, map manually:
-app.MapGrpcService<WeatherGrpcServiceImpl>();
-```
-
----
-
-## Custom Transport Strategy
-
-Implement `IProtobufTransportStrategy` to add your own transport:
-
-```csharp
-public class MqttStrategy : IProtobufTransportStrategy
+public interface IProtobufTransportStrategy
 {
-    private readonly string _brokerUrl;
-
-    public MqttStrategy(string brokerUrl) => _brokerUrl = brokerUrl;
-
-    public void ConfigureServices(IServiceCollection services, ProtobufEncoderOptions options)
-    {
-        services.AddSingleton(new MqttProtobufClient(_brokerUrl));
-    }
-
-    public void ConfigureEndpoints(IEndpointRouteBuilder endpoints, ProtobufEncoderOptions options)
-    {
-        // Map MQTT-specific endpoints if needed
-    }
+    void ConfigureServices(IServiceCollection services, ProtobufEncoderOptions options);
+    void ConfigureEndpoints(IEndpointRouteBuilder endpoints, ProtobufEncoderOptions options);
 }
-
-// Registration:
-builder.Services.AddProtobuffEncoder()
-    .AddTransport(new MqttStrategy("mqtt://broker:1883"));
 ```
 
----
+Built-in strategies:
 
-## Without the Unified Setup
+| Strategy | Description |
+|----------|-------------|
+| `RestFormatterStrategy` | Adds `ProtobufInputFormatter` and `ProtobufOutputFormatter` to MVC |
+| `WebSocketStrategy` | Registers connection managers and WebSocket endpoints |
+| `GrpcStrategy` | Registers gRPC services with protobuf marshalling |
 
-Each transport can still be registered independently using its own extension methods.
-The unified builder is optional — it provides convenience and consistency, not a hard dependency.
+## REST Formatters
 
-**REST (standalone):**
+### ProtobufInputFormatter
+
+Reads `application/x-protobuf` request bodies and deserializes them:
+
 ```csharp
-builder.Services.AddControllers().AddProtobufFormatters();
-```
-
-**WebSocket (standalone):**
-```csharp
-builder.Services.AddProtobufWebSocketEndpoint<NotificationMessage, NotificationMessage>();
-```
-
-**gRPC (standalone):**
-```csharp
-// Configure Kestrel — HTTP/1.1 for browser, HTTP/2 for gRPC
-builder.WebHost.ConfigureKestrel(k =>
+// Automatically used by MVC when client sends Content-Type: application/x-protobuf
+[HttpPost("/api/orders")]
+public IActionResult CreateOrder([FromBody] OrderMessage order)
 {
-    k.ListenLocalhost(5400, o => o.Protocols = HttpProtocols.Http1);
-    k.ListenLocalhost(5401, o => o.Protocols = HttpProtocols.Http2);
-});
-
-builder.Services.AddGrpc();
-builder.Services.AddProtobufGrpcService<WeatherGrpcServiceImpl>();
-app.MapGrpcService<WeatherGrpcServiceImpl>();
+    // order is deserialized from protobuf binary
+    return Ok();
+}
 ```
 
----
+Requirements:
+- The model type must have a parameterless constructor
+- Request body is read fully into memory, then decoded
 
-## Accessing Options at Runtime
+### ProtobufOutputFormatter
 
-Inject `ProtobufEncoderOptions` or `IOptions<ProtobufEncoderOptions>` anywhere:
+Writes `application/x-protobuf` response bodies:
 
 ```csharp
-public class MyService
+[HttpGet("/api/orders/{id}")]
+public OrderMessage GetOrder(int id)
 {
-    private readonly ProtobufEncoderOptions _options;
+    // When client sends Accept: application/x-protobuf,
+    // the response is serialized as protobuf binary
+    return new OrderMessage { OrderId = id, Total = 99.99 };
+}
+```
 
-    public MyService(ProtobufEncoderOptions options)
-    {
-        _options = options;
-    }
+The formatter sets `Content-Length` automatically.
 
-    public void ProcessMessage<T>(T message)
+### Media Type
+
+```csharp
+public static class ProtobufMediaType
+{
+    public const string Protobuf = "application/x-protobuf";
+}
+```
+
+## ProtobufHttpContent
+
+`HttpContent` implementation for sending protobuf bodies with `HttpClient`:
+
+```csharp
+var content = new ProtobufHttpContent(orderMessage);
+// Content-Type is automatically set to application/x-protobuf
+// Content-Length is computed from the serialized bytes
+```
+
+## HttpClient Extensions
+
+Convenience methods for sending and receiving protobuf messages:
+
+### PostProtobufAsync (with response)
+
+```csharp
+var response = await httpClient.PostProtobufAsync<OrderRequest, OrderResponse>(
+    "/api/orders",
+    new OrderRequest { OrderId = 1 });
+// response is a deserialized OrderResponse
+```
+
+### PostProtobufAsync (fire-and-forget)
+
+```csharp
+var httpResponse = await httpClient.PostProtobufAsync(
+    "/api/notifications",
+    new NotificationMessage { Text = "Hello" });
+// Returns HttpResponseMessage, no deserialization
+```
+
+### GetProtobufAsync
+
+```csharp
+var status = await httpClient.GetProtobufAsync<StatusResponse>("/api/status");
+// Sends Accept: application/x-protobuf, deserializes response
+```
+
+## Complete Server Example
+
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddControllers();
+builder.Services.AddProtobuffEncoder(options =>
+{
+    options.EnableMvcFormatters = true;
+})
+.WithRestFormatters();
+
+var app = builder.Build();
+app.MapControllers();
+app.Run();
+```
+
+```csharp
+[ApiController]
+[Route("api/[controller]")]
+public class WeatherController : ControllerBase
+{
+    [HttpPost("forecast")]
+    public WeatherResponse GetForecast([FromBody] WeatherRequest request)
     {
-        // Use global validation behavior
-        if (_options.DefaultInvalidMessageBehavior == InvalidMessageBehavior.Throw)
-            throw new InvalidOperationException("...");
+        return new WeatherResponse
+        {
+            City = request.City,
+            Temperature = 22.5,
+            Description = "Sunny"
+        };
     }
 }
 ```
 
----
+## Complete Client Example
 
-## Project References
+```csharp
+var client = new HttpClient { BaseAddress = new Uri("http://localhost:5000") };
 
-| Your project needs... | Add reference to |
-|----------------------|-----------------|
-| REST formatters only | `ProtobuffEncoder.AspNetCore` |
-| WebSocket transport | `ProtobuffEncoder.WebSockets` (pulled in by AspNetCore) |
-| gRPC transport | `ProtobuffEncoder.Grpc` (pulled in by AspNetCore) |
-| Core encoding only | `ProtobuffEncoder` |
-| Shared contracts | `ProtobuffEncoder.Contracts` |
+var response = await client.PostProtobufAsync<WeatherRequest, WeatherResponse>(
+    "api/weather/forecast",
+    new WeatherRequest { City = "Amsterdam", Days = 5 });
 
-When you reference `ProtobuffEncoder.AspNetCore`, all transport libraries are transitively
-available — the unified setup builder can configure any combination.
+Console.WriteLine($"{response.City}: {response.Temperature}C, {response.Description}");
+```

@@ -1,208 +1,221 @@
-# Attributes
+# Attributes Reference
 
-ProtobuffEncoder uses C# attributes to control how classes and properties are serialized to protobuf binary format.
+ProtobuffEncoder uses .NET attributes to define protobuf contracts without `.proto` files. All attributes are in the `ProtobuffEncoder.Attributes` namespace.
 
-## `[ProtoContract]`
+## ProtoContract
 
-Applied to a class or struct to opt it into protobuf serialization. Without this attribute (or `ImplicitFields` on a parent), a class will not be serialized.
+Marks a class, struct, or enum for protobuf serialization.
 
 ```csharp
-[ProtoContract]
-public class Sensor
-{
-    public int Id { get; set; }
-    public string Name { get; set; } = "";
-}
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Enum)]
+public sealed class ProtoContractAttribute : Attribute
 ```
 
 ### Properties
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `ExplicitFields` | `bool` | `false` | When `true`, only properties marked with `[ProtoField]` are included. When `false`, all public properties are auto-included. |
-| `IncludeBaseFields` | `bool` | `false` | When `true`, base class properties are included in serialization (walked up the inheritance chain). |
-| `ImplicitFields` | `bool` | `false` | When `true`, nested object properties whose types lack `[ProtoContract]` are implicitly treated as contracts and auto-serialized. |
-| `SkipDefaults` | `bool` | `true` | When `true`, fields holding their type's default value are skipped (proto3 behavior). Individual fields can override via `ProtoField.WriteDefault`. |
-| `Version` | `int` | `0` | Specifies the version of the contract for schema generation (e.g., outputs to `v1/` directory). |
-| `Metadata` | `string?` | `null` | Optional comment or metadata to include in the generated `.proto` file. |
+| `ExplicitFields` | `bool` | `false` | When `true`, only `[ProtoField]`-decorated properties are serialized |
+| `IncludeBaseFields` | `bool` | `false` | When `true`, base class properties are included in serialization |
+| `ImplicitFields` | `bool` | `false` | When `true`, nested types without `[ProtoContract]` are auto-serialized |
+| `SkipDefaults` | `bool` | `true` | When `true`, default-valued fields are omitted (proto3 behavior) |
+| `Version` | `int` | `0` | API version; generates to `v{Version}/` subdirectory in schema output |
+| `Name` | `string?` | `null` | Override the protobuf message name and file name |
+| `Metadata` | `string?` | `null` | Comment added to the generated `.proto` definition |
 
-### Constructors
-
-Convenience constructors for quick naming and versioning:
-
-- `[ProtoContract("MyName")]`: Sets the `Name` property.
-- `[ProtoContract(2)]`: Sets the `Version` property.
-
-### Enum Support
-
-`[ProtoContract]` can also be applied to enums to provide versioning or metadata for schema generation.
+### Examples
 
 ```csharp
-[ProtoContract(Version = 1, Metadata = "Internal priority levels")]
-public enum Priority { Low, Medium, High }
+// Basic contract - all public properties included automatically
+[ProtoContract]
+public class SimpleMessage
+{
+    [ProtoField(1)] public int Id { get; set; }
+    [ProtoField(2)] public string Name { get; set; } = "";
+}
+
+// Explicit fields only
+[ProtoContract(ExplicitFields = true)]
+public class StrictMessage
+{
+    [ProtoField(1)] public int Id { get; set; }
+    public string NotSerialized { get; set; } = ""; // excluded
+}
+
+// Versioned with custom name
+[ProtoContract(Version = 1, Name = "Order")]
+public class OrderV1
+{
+    [ProtoField(1)] public string OrderId { get; set; } = "";
+}
+
+// Implicit nested types
+[ProtoContract(ImplicitFields = true)]
+public class AutoMessage
+{
+    [ProtoField(1)] public string Name { get; set; } = "";
+    [ProtoField(2)] public Address Address { get; set; } = new(); // no [ProtoContract] needed
+}
+
+// Include base class fields
+[ProtoContract(IncludeBaseFields = true)]
+public class DerivedMessage : BaseMessage
+{
+    [ProtoField(3)] public string Extra { get; set; } = "";
+}
 ```
 
-### Explicit fields mode
+## ProtoField
+
+Overrides protobuf field metadata for a property.
 
 ```csharp
-[ProtoContract(ExplicitFields = true)]
-public class Sensor
+[AttributeUsage(AttributeTargets.Property)]
+public sealed class ProtoFieldAttribute : Attribute
+```
+
+### Properties
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `FieldNumber` | `int` | `0` | 1-based field number. `0` = auto-assigned by declaration order |
+| `Name` | `string?` | `null` | Override field name in generated schema |
+| `WireType` | `WireType?` | `null` | Force specific wire type (normally inferred from CLR type) |
+| `WriteDefault` | `bool` | `false` | Write field even when value is the type's default |
+| `IsPacked` | `bool?` | `null` | Control packed encoding for repeated scalar fields |
+| `IsDeprecated` | `bool` | `false` | Marks field as `[deprecated = true]` in schema |
+| `IsRequired` | `bool` | `false` | Throws if field is null/default during encoding |
+
+### Examples
+
+```csharp
+[ProtoContract]
+public class DetailedMessage
 {
-    [ProtoField(FieldNumber = 1)]
+    [ProtoField(1, IsRequired = true)]
     public int Id { get; set; }
 
-    // Not serialized — no [ProtoField] and ExplicitFields is true
-    public string DebugInfo { get; set; } = "";
+    [ProtoField(2, Name = "display_name")]
+    public string DisplayName { get; set; } = "";
+
+    [ProtoField(3, WriteDefault = true)]
+    public int Count { get; set; } // written even when 0
+
+    [ProtoField(4, IsDeprecated = true)]
+    public string? LegacyField { get; set; }
+
+    [ProtoField(5, IsPacked = false)]
+    public List<int> UnpackedNumbers { get; set; } = [];
 }
 ```
 
-### Base class fields
+## ProtoMap
+
+Marks a `Dictionary<K,V>` property as a protobuf map field.
 
 ```csharp
-[ProtoContract(IncludeBaseFields = true)]
-public class AdminUser : User
-{
-    public string Department { get; set; } = "";
-}
+[AttributeUsage(AttributeTargets.Property)]
+public sealed class ProtoMapAttribute : Attribute
 ```
 
-### Implicit nested serialization
-
-```csharp
-[ProtoContract(ImplicitFields = true)]
-public class Order
-{
-    public string Id { get; set; } = "";
-
-    // Serialized even though ShippingInfo has no [ProtoContract]
-    public ShippingInfo Shipping { get; set; } = new();
-}
-```
-
----
-
-## `[ProtoField]`
-
-Applied to a property to override its protobuf metadata.
+### Properties
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `FieldNumber` | `int` | auto-assigned | The protobuf field number (1-based). When 0, auto-assigned. |
-| `Name` | `string?` | property name | Override the field name used in the `.proto` schema. |
-| `WireType` | `WireType?` | inferred | Force a specific wire type. |
-| `WriteDefault` | `bool` | `false` | Write the field even when it holds the default value. |
-| `IsPacked` | `bool?` | `null` (auto) | Control packed encoding for repeated scalar fields. `null` = auto-detect (proto3 default: packed). |
-| `IsDeprecated` | `bool` | `false` | Marks the field as deprecated in generated `.proto` schemas. Still serialized. |
-| `IsRequired` | `bool` | `false` | Encoding throws if the value is null or default. Library-level enforcement. |
+| `KeyType` | `string?` | `null` | Override key's proto type name |
+| `ValueType` | `string?` | `null` | Override value's proto type name |
 
-### Constructors
-
-- `[ProtoField(1)]`: Shorthand for `[ProtoField(FieldNumber = 1)]`.
-- `[ProtoField]`: Default constructor for auto-assigned field numbers.
+### Example
 
 ```csharp
 [ProtoContract]
-public class Event
-{
-    [ProtoField(FieldNumber = 10, Name = "event_name", WriteDefault = true)]
-    public string Name { get; set; } = "";
-
-    [ProtoField(IsRequired = true)]
-    public string Source { get; set; } = "";
-
-    [ProtoField(IsDeprecated = true)]
-    public string LegacyId { get; set; } = "";
-}
-```
-
----
-
-## `[ProtoIgnore]`
-
-Excludes a property from serialization entirely.
-
-```csharp
-[ProtoContract]
-public class User
-{
-    public string Name { get; set; } = "";
-
-    [ProtoIgnore]
-    public string PasswordHash { get; set; } = "";
-}
-```
-
----
-
-## `[ProtoMap]`
-
-Marks a `Dictionary<TKey, TValue>` property as a protobuf map field. Without this attribute, dictionaries are not serialized.
-
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `KeyType` | `string?` | inferred | Override the key's proto type (e.g. `"string"`, `"int32"`). |
-| `ValueType` | `string?` | inferred | Override the value's proto type. |
-
-```csharp
-[ProtoContract]
-public class UserProfile
+public class ConfigMessage
 {
     [ProtoMap]
-    public Dictionary<string, string> Preferences { get; set; } = new();
+    [ProtoField(1)]
+    public Dictionary<string, string> Settings { get; set; } = new();
 
     [ProtoMap]
-    public Dictionary<string, Address> Addresses { get; set; } = new();
+    [ProtoField(2)]
+    public Dictionary<int, string> Labels { get; set; } = new();
 }
 ```
 
-Generated `.proto` output:
+Generated schema:
 
-```proto
-message UserProfile {
-  map<string, string> Preferences = 1;
-  map<string, Address> Addresses = 2;
+```protobuf
+message ConfigMessage {
+  map<string, string> Settings = 1;
+  map<int32, string> Labels = 2;
 }
 ```
 
----
+## ProtoOneOf
 
-## `[ProtoOneOf]`
+Groups properties into a protobuf `oneof` union. At most one property in the group should have a non-default value.
 
-Groups properties into a protobuf `oneof` union. At most one property in a group should have a non-default value. During encoding, only the first non-default property in the group is written.
+```csharp
+[AttributeUsage(AttributeTargets.Property)]
+public sealed class ProtoOneOfAttribute : Attribute
+```
+
+### Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `GroupName` | `string` | Name of the oneof group |
+
+### Example
 
 ```csharp
 [ProtoContract]
-public class Contact
+public class ContactInfo
 {
-    [ProtoOneOf("primary_contact")]
-    public string? Email { get; set; }
+    [ProtoField(1)] public string Name { get; set; } = "";
 
-    [ProtoOneOf("primary_contact")]
-    public string? Phone { get; set; }
+    [ProtoOneOf("contact")]
+    [ProtoField(2)] public string? Email { get; set; }
+
+    [ProtoOneOf("contact")]
+    [ProtoField(3)] public string? Phone { get; set; }
+
+    [ProtoOneOf("contact")]
+    [ProtoField(4)] public string? Address { get; set; }
 }
 ```
 
-Generated `.proto` output:
+Generated schema:
 
-```proto
-message Contact {
-  oneof primary_contact {
-    string Email = 1;
-    string Phone = 2;
+```protobuf
+message ContactInfo {
+  string Name = 1;
+  oneof contact {
+    string Email = 2;
+    string Phone = 3;
+    string Address = 4;
   }
 }
 ```
 
----
+During encoding, only the **first non-default** property in the group is written.
 
-## `[ProtoInclude]`
+## ProtoInclude
 
-Declares known derived types on a base class for polymorphic serialization. Each derived type is encoded as a nested message at the specified field number.
+Declares a known derived type for polymorphic serialization.
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `fieldNumber` | `int` | Field number for the derived type's nested message. Must be unique and not collide with base fields. |
-| `derivedType` | `Type` | The derived CLR type. |
+```csharp
+[AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
+public sealed class ProtoIncludeAttribute : Attribute
+```
+
+### Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `FieldNumber` | `int` | Field number for the derived type's nested message |
+| `DerivedType` | `Type` | The derived CLR type |
+
+### Example
 
 ```csharp
 [ProtoContract]
@@ -210,59 +223,105 @@ Declares known derived types on a base class for polymorphic serialization. Each
 [ProtoInclude(11, typeof(Cat))]
 public class Animal
 {
-    public string Name { get; set; } = "";
+    [ProtoField(1)] public string Name { get; set; } = "";
 }
 
 [ProtoContract(IncludeBaseFields = true)]
 public class Dog : Animal
 {
-    public string Breed { get; set; } = "";
+    [ProtoField(2)] public string Breed { get; set; } = "";
 }
 
 [ProtoContract(IncludeBaseFields = true)]
 public class Cat : Animal
 {
-    public bool IsIndoor { get; set; }
+    [ProtoField(2)] public bool IsIndoor { get; set; }
 }
 ```
 
----
+The derived type's fields are encoded as a nested message at the specified field number.
 
-## Full example combining all attributes
+## ProtoIgnore
+
+Excludes a property from serialization.
 
 ```csharp
-[ProtoContract(IncludeBaseFields = true)]
-[ProtoInclude(20, typeof(AdminProfile))]
+[AttributeUsage(AttributeTargets.Property)]
+public sealed class ProtoIgnoreAttribute : Attribute
+```
+
+### Example
+
+```csharp
+[ProtoContract]
 public class UserProfile
 {
-    public string DisplayName { get; set; } = "";
-
-    [ProtoField(IsRequired = true)]
-    public string Email { get; set; } = "";
-
-    public int Age { get; set; }
-
-    public Address? PrimaryAddress { get; set; }
-
-    [ProtoMap]
-    public Dictionary<string, string> Preferences { get; set; } = new();
-
-    [ProtoOneOf("primary_contact")]
-    public string? PhoneNumber { get; set; }
-
-    [ProtoOneOf("primary_contact")]
-    public string? SlackHandle { get; set; }
-
-    [ProtoField(IsDeprecated = true)]
-    public string LegacyId { get; set; } = "";
-
-    [ProtoIgnore]
-    public string InternalNote { get; set; } = "";
-}
-
-[ProtoContract(IncludeBaseFields = true)]
-public class AdminProfile : UserProfile
-{
-    public string Department { get; set; } = "";
+    [ProtoField(1)] public int Id { get; set; }
+    [ProtoField(2)] public string Name { get; set; } = "";
+    [ProtoIgnore] public string PasswordHash { get; set; } = ""; // never serialized
 }
 ```
+
+## ProtoService
+
+Marks an interface as a gRPC service definition for code-first service generation.
+
+```csharp
+[AttributeUsage(AttributeTargets.Interface)]
+public sealed class ProtoServiceAttribute : Attribute
+```
+
+### Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `ServiceName` | `string` | Name of the gRPC service |
+| `Version` | `int` | API version for schema output directory |
+| `Metadata` | `string?` | Comment for generated `.proto` |
+
+## ProtoMethod
+
+Marks a method on a `[ProtoService]` interface as an RPC method.
+
+```csharp
+[AttributeUsage(AttributeTargets.Method)]
+public sealed class ProtoMethodAttribute : Attribute
+```
+
+### Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `MethodType` | `ProtoMethodType` | `Unary`, `ServerStreaming`, `ClientStreaming`, or `DuplexStreaming` |
+| `Name` | `string?` | Override RPC method name |
+
+### Example
+
+```csharp
+[ProtoService("WeatherService")]
+public interface IWeatherService
+{
+    [ProtoMethod(ProtoMethodType.Unary)]
+    Task<WeatherResponse> GetForecast(WeatherRequest request);
+
+    [ProtoMethod(ProtoMethodType.ServerStreaming)]
+    IAsyncEnumerable<WeatherUpdate> StreamUpdates(WeatherRequest request, CancellationToken ct);
+
+    [ProtoMethod(ProtoMethodType.ClientStreaming)]
+    Task<WeatherSummary> UploadReadings(IAsyncEnumerable<SensorReading> readings, CancellationToken ct);
+
+    [ProtoMethod(ProtoMethodType.DuplexStreaming)]
+    IAsyncEnumerable<Alert> Monitor(IAsyncEnumerable<SensorReading> readings, CancellationToken ct);
+}
+```
+
+## Wire Types
+
+The `WireType` enum controls how values are encoded on the wire:
+
+| WireType | Value | Used For |
+|----------|-------|----------|
+| `Varint` | 0 | `int`, `uint`, `long`, `ulong`, `bool`, `enum`, `byte`, `short` |
+| `Fixed64` | 1 | `double`, `long`, `ulong`, `DateTime`, `TimeSpan` |
+| `LengthDelimited` | 2 | `string`, `byte[]`, nested messages, `decimal`, `Guid`, `BigInteger` |
+| `Fixed32` | 5 | `float`, `int` (when forced), `uint` |

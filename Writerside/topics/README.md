@@ -28,7 +28,7 @@
 | `ProtobuffEncoder.Grpc` | Code-first gRPC marshaller, client proxy, service discovery | net8.0, net9.0, net10.0 |
 | `ProtobuffEncoder.WebSockets` | Managed WebSocket client/server, connection manager, retry | net8.0, net9.0, net10.0 |
 | `ProtobuffEncoder.Contracts` | Example contracts and service interfaces | net8.0, net9.0, net10.0 |
-| `ProtobuffEncoder.Tool` | CLI tool for `.proto` generation and `.csproj` patching | net10.0 |
+| `ProtobuffEncoder.Tool` | CLI tool for `.proto` generation and `.csproj` patching | net8.0, net9.0, net10.0 |
 
 ## Quick Start
 
@@ -99,42 +99,38 @@ string proto = ProtoSchemaGenerator.Generate(typeof(WeatherRequest));
 | ProtobuffEncoder.WebSockets.Tests | 117 | Client, server, connection manager, retry, stream |
 | ProtobuffEncoder.Tool.Tests | 12 | Project modifier, csproj patching |
 
-## Benchmarks
+## Documentation
 
-Performance tested across .NET 8, 9, and 10 with 15 benchmark suites covering:
+### Core
 
-- Core encode/decode (small and large payloads)
-- Collection serialization (lists, maps)
-- Static message pre-compiled delegates
-- Streaming (length-delimited batches)
-- Duplex stream send/receive
-- Validation pipeline throughput
-- Schema generation and parsing
-- ProtobufWriter low-level API
-- Payload scaling (100B to 100KB)
-- Nested object depth (1-3 levels)
-- OneOf union encoding
-- Inheritance (ProtoInclude)
-- Async streaming
-- ContractResolver caching
+| Topic | Description |
+|-------|-------------|
+| [Getting Started](getting_started.md) | Installation, first contract, encode/decode |
+| [Attributes Reference](attributes_reference.md) | All 8 attributes with properties and examples |
+| [Serialization Deep Dive](serialization_deep_dive.md) | Wire format, type mapping, encoding steps |
+| [Transport Layer](transport_layer.md) | Sender, Receiver, DuplexStream |
+| [Validation Pipeline](validation_pipeline.md) | ValidationPipeline, validated transport |
 
-See the [Benchmarks](benchmarks_overview.md) section for full results.
+### Schema
 
-## Documentation Map
-
-| Section | Description |
-|---------|-------------|
-| [Getting Started](getting_started.md) | Installation, first contract, first encode/decode |
-| [Attributes](attributes_reference.md) | Complete attribute reference |
-| [Serialization](serialization_deep_dive.md) | Wire format, encoding rules, type mapping |
-| [Transport](transport_layer.md) | Sender, Receiver, DuplexStream, validated transport |
-| [Validation](validation_pipeline.md) | Pipeline, rules, behaviors, custom validators |
-| [Schema Generation](schema_generation.md) | ProtoSchemaGenerator, imports, services, versioning |
+| Topic | Description |
+|-------|-------------|
+| [Schema Generation](schema_generation.md) | ProtoSchemaGenerator, imports, services |
 | [Schema Decoding](schema_decoding.md) | ProtoSchemaParser, SchemaDecoder, ProtobufWriter |
-| [ASP.NET Core](aspnetcore_integration.md) | Formatters, HttpClient, builder, strategies |
+
+### Integrations
+
+| Topic | Description |
+|-------|-------------|
+| [ASP.NET Core](aspnetcore_integration.md) | Builder pattern, REST formatters, HttpClient |
 | [gRPC](grpc_integration.md) | Marshaller, client proxy, service discovery |
 | [WebSockets](websocket_integration.md) | Client, server, connection manager, retry |
-| [CLI Tool](cli_tool.md) | dotnet tool usage, .proto generation, csproj patching |
-| [Demos](demos_overview.md) | Demo project walkthroughs |
-| [Test Strategy](test_strategy_overview.md) | FIRST-U patterns, coverage analysis |
+
+### Tools & Quality
+
+| Topic | Description |
+|-------|-------------|
+| [CLI Tool](cli_tool.md) | Schema generation, csproj patching |
+| [Test Strategy](test_strategy_overview.md) | FIRST-U patterns, 430+ tests |
 | [Benchmarks](benchmarks_overview.md) | Performance results across .NET 8/9/10 |
+| [Demos](demos_overview.md) | Demo project walkthroughs |

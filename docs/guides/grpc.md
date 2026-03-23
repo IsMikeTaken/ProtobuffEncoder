@@ -1,47 +1,58 @@
 # gRPC Integration
 
-ProtobuffEncoder provides code-first gRPC support — define services as C# interfaces with attributes,
-and the framework handles marshalling, method discovery, and client proxy generation. No `.proto` files,
-no code generation tools.
+The `ProtobuffEncoder.Grpc` package enables code-first gRPC services and clients using `[ProtoService]` interfaces, without `.proto` files or code generation. It bridges ProtobuffEncoder into the gRPC pipeline via custom marshallers.
 
-## Defining a Service Contract
+## ProtobufMarshaller
 
-Decorate an interface with `[ProtoService]` and its methods with `[ProtoMethod]`:
+Creates gRPC `Marshaller<T>` instances that use `ProtobufEncoder` for serialization:
+
+```csharp
+using ProtobuffEncoder.Grpc;
+
+Marshaller<WeatherRequest> marshaller = ProtobufMarshaller.Create<WeatherRequest>();
+// Uses ProtobufEncoder.Encode for serialization
+// Uses ProtobufEncoder.Decode for deserialization
+```
+
+This is the foundation that all other gRPC components build on.
+
+## Defining a Service
+
+Use `[ProtoService]` on an interface and `[ProtoMethod]` on each RPC method:
 
 ```csharp
 using ProtobuffEncoder.Attributes;
 
-[ProtoService("Weather")]
+[ProtoService("WeatherService")]
 public interface IWeatherGrpcService
 {
     [ProtoMethod(ProtoMethodType.Unary)]
     Task<WeatherResponse> GetForecast(WeatherRequest request);
 
     [ProtoMethod(ProtoMethodType.ServerStreaming)]
-    IAsyncEnumerable<WeatherResponse> StreamForecasts(
-        WeatherRequest request, CancellationToken ct = default);
+    IAsyncEnumerable<WeatherUpdate> StreamUpdates(
+        WeatherRequest request, CancellationToken ct);
+
+    [ProtoMethod(ProtoMethodType.ClientStreaming)]
+    Task<WeatherSummary> UploadReadings(
+        IAsyncEnumerable<SensorReading> readings, CancellationToken ct);
+
+    [ProtoMethod(ProtoMethodType.DuplexStreaming)]
+    IAsyncEnumerable<Alert> Monitor(
+        IAsyncEnumerable<SensorReading> readings, CancellationToken ct);
 }
 ```
 
-Place service interfaces in a shared contracts project so both server and client reference the same types.
+### Method Signatures
 
-## Method Signature Patterns
+| Method Type | Parameter | Return Type |
+|------------|-----------|-------------|
+| `Unary` | `TRequest` | `Task<TResponse>` |
+| `ServerStreaming` | `TRequest` + optional `CancellationToken` | `IAsyncEnumerable<TResponse>` |
+| `ClientStreaming` | `IAsyncEnumerable<TRequest>` + optional `CancellationToken` | `Task<TResponse>` |
+| `DuplexStreaming` | `IAsyncEnumerable<TRequest>` + optional `CancellationToken` | `IAsyncEnumerable<TResponse>` |
 
-Each `ProtoMethodType` expects a specific C# method signature:
-
-| Type | Return | First Parameter | Example |
-|------|--------|-----------------|---------|
-| `Unary` | `Task<TResponse>` | `TRequest` | `Task<WeatherResponse> Get(WeatherRequest request)` |
-| `ServerStreaming` | `IAsyncEnumerable<TResponse>` | `TRequest` | `IAsyncEnumerable<WeatherResponse> Stream(WeatherRequest request, CancellationToken ct)` |
-| `ClientStreaming` | `Task<TResponse>` | `IAsyncEnumerable<TRequest>` | `Task<AckResponse> Upload(IAsyncEnumerable<DataChunk> stream, CancellationToken ct)` |
-| `DuplexStreaming` | `IAsyncEnumerable<TResponse>` | `IAsyncEnumerable<TRequest>` | `IAsyncEnumerable<NotificationMessage> Chat(IAsyncEnumerable<NotificationMessage> messages, CancellationToken ct)` |
-
-A trailing `CancellationToken` parameter is always optional. The framework extracts it from `ServerCallContext`
-on the server side and passes it through on the client side.
-
-## Server Setup
-
-### 1. Implement the interface
+## Implementing a Service
 
 ```csharp
 public class WeatherGrpcServiceImpl : IWeatherGrpcService
@@ -51,208 +62,143 @@ public class WeatherGrpcServiceImpl : IWeatherGrpcService
         return Task.FromResult(new WeatherResponse
         {
             City = request.City,
-            Forecasts = BuildForecasts(request.Days)
+            Temperature = 22.5,
+            Description = "Sunny"
         });
     }
 
-    public async IAsyncEnumerable<WeatherResponse> StreamForecasts(
+    public async IAsyncEnumerable<WeatherUpdate> StreamUpdates(
         WeatherRequest request,
-        [EnumeratorCancellation] CancellationToken ct = default)
+        [EnumeratorCancellation] CancellationToken ct)
     {
-        for (int i = 0; i < request.Days; i++)
+        while (!ct.IsCancellationRequested)
         {
-            ct.ThrowIfCancellationRequested();
-            await Task.Delay(500, ct);
-            yield return new WeatherResponse { City = request.City, Forecasts = [BuildDay(i)] };
+            yield return new WeatherUpdate { Temperature = Random.Shared.Next(15, 30) };
+            await Task.Delay(1000, ct);
         }
     }
+
+    // ... other methods
 }
 ```
 
-### 2. Register and map
+## Server Registration
 
-**With the unified setup:**
+### With Builder Pattern
 
 ```csharp
-using ProtobuffEncoder.AspNetCore.Setup;
-
 builder.Services.AddProtobuffEncoder()
     .WithGrpc(grpc => grpc
-        .UseKestrel(httpPort: 5400, grpcPort: 5401)
-        .AddService<WeatherGrpcServiceImpl>());
-
-app.MapProtobufEndpoints();
+        .AddService<WeatherGrpcServiceImpl>()
+        .AddService<ChatGrpcServiceImpl>());
 ```
 
-**Or standalone:**
+### Direct Registration
 
 ```csharp
-using Microsoft.AspNetCore.Server.Kestrel.Core;
-
-builder.WebHost.ConfigureKestrel(k =>
-{
-    k.ListenLocalhost(5400, o => o.Protocols = HttpProtocols.Http1);
-    k.ListenLocalhost(5401, o => o.Protocols = HttpProtocols.Http2);
-});
-
 builder.Services.AddGrpc();
 builder.Services.AddProtobufGrpcService<WeatherGrpcServiceImpl>();
-
-app.MapGrpcService<WeatherGrpcServiceImpl>();
 ```
 
-Both approaches produce the same result. The unified setup is more concise when registering
-multiple transports.
+## Client Proxy
 
-## Client Setup
+The `ProtobufGrpcClientProxy` creates a `DispatchProxy`-based runtime implementation of any `[ProtoService]` interface.
 
-### Create a typed client proxy
+### Creating a Client
 
 ```csharp
 using Grpc.Net.Client;
 using ProtobuffEncoder.Grpc.Client;
 
-// Direct creation
-var channel = GrpcChannel.ForAddress("http://localhost:5401");
+var channel = GrpcChannel.ForAddress("http://localhost:5400");
 var client = channel.CreateProtobufClient<IWeatherGrpcService>();
 
-// Or via Dependency Injection (recommended)
-builder.Services.AddProtobufGrpcClient<IWeatherGrpcService>("http://localhost:5401");
+// Use like a normal interface
+var response = await client.GetForecast(new WeatherRequest { City = "Amsterdam" });
 ```
 
-When using DI, the client is registered as a Singleton and can be injected into your controllers or services:
+### Client Proxy Features
+
+- **Runtime proxy generation** via `DispatchProxy`
+- **Pre-built handlers** at initialization time (dictionary lookup on invoke, no reflection)
+- **All four method types** supported
+- **Automatic marshalling** via `ProtobufMarshaller`
+- **CancellationToken** support (extracted from method arguments)
+- **No code generation** required
+
+### DI Registration
 
 ```csharp
-public class MyController(IWeatherGrpcService weatherClient) : ControllerBase
-{
-    [HttpGet]
-    public async Task<IActionResult> Get()
-    {
-        var forecast = await weatherClient.GetForecast(new WeatherRequest { City = "Amsterdam" });
-        return Ok(forecast);
-    }
-}
+builder.Services.AddProtobufGrpcClient<IWeatherGrpcService>(
+    channel => GrpcChannel.ForAddress("http://localhost:5400"));
 ```
 
-`CreateProtobufClient<T>()` returns a `DispatchProxy` that implements your service interface.
-Every method call is dispatched through the gRPC channel using `ProtobufMarshaller` for
-serialization — the same interface you defined for the server.
+## ServiceMethodDescriptor
 
-### Unary call
+Internal class that discovers gRPC methods from `[ProtoService]` interfaces via reflection.
 
-```csharp
-var response = await client.GetForecast(new WeatherRequest { City = "Amsterdam", Days = 5 });
-Console.WriteLine($"{response.City}: {response.Forecasts.Count} days");
-```
+### Discovery Modes
 
-### Server streaming
+| Mode | Use Case |
+|------|----------|
+| `Discover(Type serviceType)` | From an implementation type (server-side) |
+| `Discover(Type interfaceType, isInterfaceOnly: true)` | From an interface only (client-side) |
 
-```csharp
-await foreach (var response in client.StreamForecasts(
-    new WeatherRequest { City = "Tokyo", Days = 7 }))
-{
-    Console.WriteLine($"Day: {response.Forecasts[0].Date}");
-}
-```
+### Discovered Properties
 
-### Duplex streaming
+| Property | Description |
+|----------|-------------|
+| `ServiceName` | From `[ProtoService("name")]` |
+| `MethodName` | From `[ProtoMethod(Name = "...")]` or method name |
+| `MethodType` | `Unary`, `ServerStreaming`, `ClientStreaming`, `DuplexStreaming` |
+| `RequestType` | Extracted from method parameter |
+| `ResponseType` | Extracted from method return type |
+| `InterfaceMethod` | The `MethodInfo` on the interface |
+| `ImplementationMethod` | The `MethodInfo` on the implementation class |
+| `HasCancellationToken` | Whether the method accepts `CancellationToken` |
 
-```csharp
-async IAsyncEnumerable<NotificationMessage> GenerateMessages()
-{
-    yield return new NotificationMessage { Source = "Client", Text = "Hello" };
-    await Task.Delay(500);
-    yield return new NotificationMessage { Source = "Client", Text = "/ping" };
-}
+## Validation
 
-await foreach (var reply in chatClient.Chat(GenerateMessages()))
-{
-    Console.WriteLine($"[{reply.Level}] {reply.Source}: {reply.Text}");
-}
-```
+`CreateProtobufClient<T>()` validates:
 
-## How It Works
+- `T` must be an interface
+- `T` must be decorated with `[ProtoService]`
 
-### Serialization
+Both checks throw `ArgumentException` with descriptive messages if violated.
 
-`ProtobufMarshaller<T>` bridges `ProtobufEncoder.Encode/Decode` into gRPC's `Marshaller<T>`:
+## Complete Example
+
+### Server
 
 ```csharp
-public static Marshaller<T> Create<T>() where T : class
-    => new(
-        serializer: msg => ProtobufEncoder.Encode(msg),
-        deserializer: bytes => (T)ProtobufEncoder.Decode(typeof(T), bytes));
-```
+var builder = WebApplication.CreateBuilder(args);
 
-Messages are serialized using the same attribute-driven encoder as all other transports.
-
-### Server method discovery
-
-`ProtobufGrpcServiceMethodProvider<TService>` implements ASP.NET Core's `IServiceMethodProvider<T>`:
-
-1. Scans `TService` for interfaces decorated with `[ProtoService]`
-2. Uses `GetInterfaceMap()` to find the implementation methods
-3. Extracts `TRequest`/`TResponse` from method signatures
-4. Creates `Method<TRequest, TResponse>` descriptors with `ProtobufMarshaller`
-5. Binds handler delegates that adapt between user-friendly signatures and gRPC handler delegates
-
-### Client proxy generation
-
-`ProtobufGrpcClientProxy` uses `DispatchProxy` to create runtime interface implementations:
-
-1. At initialization, reflects on the interface to build a handler per method
-2. Each handler creates a `Method<TRequest, TResponse>` descriptor (cached)
-3. `Invoke()` dispatches to the pre-built handler via dictionary lookup
-4. Streaming handlers manage `IAsyncStreamReader`/`IServerStreamWriter` adapters automatically
-
-## gRPC Routes
-
-gRPC methods are exposed at `/{ServiceName}/{MethodName}`:
-
-| Service | Method | Route |
-|---------|--------|-------|
-| `[ProtoService("Weather")]` | `GetForecast` | `/Weather/GetForecast` |
-| `[ProtoService("Weather")]` | `StreamForecasts` | `/Weather/StreamForecasts` |
-| `[ProtoService("Chat")]` | `Chat` | `/Chat/Chat` |
-| `[ProtoService("Chat")]` | `SendNotification` | `/Chat/SendNotification` |
-
-Override the method name with `[ProtoMethod(ProtoMethodType.Unary, Name = "CustomName")]`.
-
-## HTTP Protocol Configuration
-
-gRPC requires HTTP/2. Without TLS, Kestrel cannot negotiate HTTP/2 via ALPN — so HTTP/1.1
-(browser) and HTTP/2 (gRPC) must be served on **separate ports**.
-
-### `UseKestrel(httpPort, grpcPort)`
-
-Configures two Kestrel endpoints:
-
-| Port | Protocol | Purpose |
-|------|----------|---------|
-| `httpPort` | HTTP/1.1 | Browser dashboard, REST APIs, health checks |
-| `grpcPort` | HTTP/2 | gRPC calls from clients |
-
-```csharp
+builder.Services.AddGrpc();
 builder.Services.AddProtobuffEncoder()
-    .WithGrpc(grpc => grpc
-        .UseKestrel(httpPort: 5400, grpcPort: 5401)
-        .AddService<WeatherGrpcServiceImpl>());
+    .WithGrpc(grpc => grpc.AddService<WeatherGrpcServiceImpl>());
+
+var app = builder.Build();
+app.MapGrpcService<WeatherGrpcServiceImpl>();
+app.Run();
 ```
 
-The gRPC client connects to the `grpcPort`:
+### Client
 
 ```csharp
-var channel = GrpcChannel.ForAddress("http://localhost:5401");
+var channel = GrpcChannel.ForAddress("http://localhost:5400");
 var client = channel.CreateProtobufClient<IWeatherGrpcService>();
-```
 
-### With HTTPS (single port)
+// Unary
+var forecast = await client.GetForecast(new WeatherRequest { City = "Amsterdam" });
 
-When using HTTPS, Kestrel negotiates both HTTP/1.1 and HTTP/2 via ALPN on a single port.
-No `UseKestrel()` call is needed — just configure HTTPS in `launchSettings.json` or Kestrel
-options:
+// Server streaming
+await foreach (var update in client.StreamUpdates(request, ct))
+    Console.WriteLine($"Temp: {update.Temperature}");
 
-```csharp
-// Both browser and gRPC connect to the same HTTPS endpoint
-var channel = GrpcChannel.ForAddress("https://localhost:7400");
+// Client streaming
+var summary = await client.UploadReadings(GenerateReadingsAsync(), ct);
+
+// Duplex streaming
+await foreach (var alert in client.Monitor(GenerateReadingsAsync(), ct))
+    Console.WriteLine($"Alert: {alert.Message}");
 ```

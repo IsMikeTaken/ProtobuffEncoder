@@ -1,0 +1,41 @@
+name: Build WriterSide Docs
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'Writerside/**'
+  pull_request:
+    branches: [master]
+    paths:
+      - 'Writerside/**'
+  workflow_dispatch:
+
+env:
+  INSTANCE: Writerside/l
+  ARTIFACT: webHelpL2-all.zip
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build WriterSide docs
+        uses: JetBrains/writerside-github-action@v4
+        with:
+          instance: ${{ env.INSTANCE }}
+          artifact: ${{ env.ARTIFACT }}
+
+      - name: Upload documentation artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: docs
+          path: |
+            artifacts/${{ env.ARTIFACT }}
+            artifacts/report.json
+          retention-days: 7

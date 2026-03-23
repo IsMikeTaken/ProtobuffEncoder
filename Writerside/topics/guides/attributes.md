@@ -157,7 +157,7 @@ public class UserProfile
 
 Generated `.proto` output:
 
-```proto
+```protobuf
 message UserProfile {
   map<string, string> Preferences = 1;
   map<string, Address> Addresses = 2;
@@ -184,7 +184,7 @@ public class Contact
 
 Generated `.proto` output:
 
-```proto
+```protobuf
 message Contact {
   oneof primary_contact {
     string Email = 1;

@@ -1,220 +1,168 @@
-# Serialization
+# Serialization Deep Dive
 
-## Encoding & Decoding
+## How Encoding Works
 
-```csharp
-using ProtobuffEncoder;
+`ProtobufEncoder.Encode()` follows these steps:
 
-// Encode to byte[]
-byte[] bytes = ProtobufEncoder.Encode(person);
-
-// Decode from byte[]
-var person = ProtobufEncoder.Decode<Person>(bytes);
-
-// Encode to stream
-ProtobufEncoder.Encode(person, stream);
-await ProtobufEncoder.EncodeAsync(person, stream, cancellationToken);
-
-// Decode from stream
-var result = await ProtobufEncoder.DecodeAsync<Person>(stream, cancellationToken);
-```
-
-## Field Numbering
-
-By default, all public properties (except `[ProtoIgnore]`) are assigned incrementing field numbers starting at 1, based on declaration order. Explicitly assigned numbers are reserved first, and auto-assignment skips them to prevent collisions.
-
-```csharp
-[ProtoContract]
-public class Example
-{
-    public string A { get; set; } = "";          // auto -> field 1
-
-    [ProtoField(FieldNumber = 5)]
-    public string B { get; set; } = "";          // explicit -> field 5
-
-    public int C { get; set; }                   // auto -> field 2
-    public int D { get; set; }                   // auto -> field 3
-}
-```
-
-The two-pass algorithm:
-1. **Pass 1** — collect all explicitly assigned field numbers into a reserved set
-2. **Pass 2** — auto-assign starting from 1, skipping any reserved numbers
-
-This guarantees no collisions regardless of how explicit and auto-assigned fields are interleaved.
+1. **Resolve descriptors** -- `ContractResolver.Resolve(type)` uses reflection to discover `[ProtoField]` properties, caching the result for future calls
+2. **Validate required fields** -- Any field with `IsRequired = true` must have a non-default value
+3. **Handle oneOf groups** -- Only the first non-default property in each group is written
+4. **Encode each field** -- Tag (field number + wire type) followed by the value:
+   - **Varint** fields: variable-length integer encoding
+   - **Fixed32/Fixed64**: raw 4 or 8 byte little-endian
+   - **LengthDelimited**: varint length prefix + payload bytes
+5. **Handle ProtoInclude** -- Derived type fields encoded as nested messages at the include field number
 
 ## Type Mapping
 
-| CLR Type | Wire Type | Notes |
-|----------|-----------|-------|
-| `bool`, `byte`, `sbyte` | Varint | |
-| `short`, `ushort`, `int`, `uint` | Varint | |
-| `enum` | Varint | Underlying integer value |
-| `long`, `ulong` | Fixed64 | |
-| `double` | Fixed64 | |
-| `float` | Fixed32 | |
-| `string` | LengthDelimited | UTF-8 encoded |
-| `byte[]` | LengthDelimited | Raw bytes |
-| `T?` (nullable value type) | Same as `T` | Null values are skipped |
-| Nested `[ProtoContract]` object | LengthDelimited | Recursively encoded |
-| `T[]`, `List<T>`, collections | LengthDelimited | See Collections below |
-| `Dictionary<K,V>` with `[ProtoMap]` | LengthDelimited | Map entry messages |
+### CLR to Proto Type Mapping
 
-## Collections
+| CLR Type | Proto Type | Wire Type | Notes |
+|----------|-----------|-----------|-------|
+| `bool` | `bool` | Varint | 0 or 1 |
+| `byte`, `sbyte` | `uint32` / `int32` | Varint | |
+| `short`, `ushort` | `int32` / `uint32` | Varint | |
+| `int` | `int32` | Varint | |
+| `uint` | `uint32` | Varint | |
+| `long` | `int64` | Fixed64 | |
+| `ulong` | `uint64` | Fixed64 | |
+| `nint`, `nuint` | `int32` / `uint32` | Varint | |
+| `float` | `float` | Fixed32 | |
+| `double` | `double` | Fixed64 | |
+| `string` | `string` | LengthDelimited | UTF-8 |
+| `byte[]` | `bytes` | LengthDelimited | |
+| `DateTime` | Fixed64 | Fixed64 | Stored as `Ticks` |
+| `TimeSpan` | Fixed64 | Fixed64 | Stored as `Ticks` |
+| `DateTimeOffset` | bytes (16) | LengthDelimited | 8 bytes ticks + 8 bytes offset |
+| `DateOnly` | bytes (4) | LengthDelimited | `DayNumber` as int32 |
+| `TimeOnly` | bytes (8) | LengthDelimited | `Ticks` as int64 |
+| `Guid` | bytes (16) | LengthDelimited | `ToByteArray()` |
+| `decimal` | string | LengthDelimited | Invariant culture string |
+| `Version` | string | LengthDelimited | `ToString()` |
+| `Uri` | string | LengthDelimited | `AbsoluteUri` |
+| `Int128` | bytes (16) | LengthDelimited | Little-endian |
+| `UInt128` | bytes (16) | LengthDelimited | Little-endian |
+| `Half` | bytes (2) | LengthDelimited | `BitConverter` |
+| `BigInteger` | bytes | LengthDelimited | `ToByteArray()` |
+| `Complex` | bytes (16) | LengthDelimited | 8 bytes real + 8 bytes imaginary |
+| `enum` | varint | Varint | `Convert.ToUInt64()` |
 
-Any property whose type implements `IEnumerable<T>` (excluding `string` and `byte[]`) is treated as a **repeated field**.
+### Collection Encoding
 
-**Packed encoding** is used for scalar element types (`int`, `double`, `bool`, `enum`, etc.) — all values are concatenated into a single length-delimited blob, matching proto3 packed repeated fields.
+**Packed repeated fields** (proto3 default for scalar types):
 
-**Non-packed** (one tag per element) is used for `string`, `byte[]`, and nested message element types.
+```
+[tag: field_number << 3 | 2] [varint: total_length] [value1] [value2] [value3]...
+```
 
-Supported collection types for decoding: `T[]`, `List<T>`, `IList<T>`, `ICollection<T>`, `IReadOnlyList<T>`, `HashSet<T>`, `ISet<T>`.
+**Non-packed repeated fields** (strings, bytes, nested messages):
 
-```csharp
-[ProtoContract]
-public class Metrics
-{
-    public List<string> Labels { get; set; } = [];     // repeated, non-packed
-    public int[] Values { get; set; } = [];             // repeated, packed
-    public List<DataPoint> Points { get; set; } = [];   // repeated nested messages
+```
+[tag] [length] [value1]
+[tag] [length] [value2]
+...
+```
+
+### Map Field Encoding
+
+Each map entry is a length-delimited message with `key = field 1` and `value = field 2`:
+
+```
+[tag: field_number << 3 | 2] [length] {
+  [tag: 1 << 3 | key_wire] [key_value]
+  [tag: 2 << 3 | val_wire] [val_value]
 }
 ```
 
-## Nullable Types
-
-Nullable value types (`int?`, `double?`, `bool?`, etc.) are fully supported. When the value is `null`, the field is omitted from the output. On decode, the property retains its default (`null`).
+## Encode API
 
 ```csharp
-[ProtoContract]
-public class Reading
-{
-    public double? Temperature { get; set; }   // omitted when null
-    public int? SensorId { get; set; }
-}
+// Sync - returns byte array
+byte[] bytes = ProtobufEncoder.Encode(instance);
+
+// Sync - writes to stream
+ProtobufEncoder.Encode(instance, outputStream);
+
+// Async - writes to stream
+await ProtobufEncoder.EncodeAsync(instance, outputStream, cancellationToken);
+
+// Length-delimited (for streaming multiple messages)
+ProtobufEncoder.WriteDelimitedMessage(instance, stream);
+await ProtobufEncoder.WriteDelimitedMessageAsync(instance, stream, ct);
 ```
 
-## Streaming (Delimited Messages)
-
-To send or receive multiple messages over a single stream, use length-delimited encoding. Each message is prefixed with a varint-encoded byte length.
-
-### Writing
+## Decode API
 
 ```csharp
-using var stream = new MemoryStream();
+// Sync - from byte array/span
+T result = ProtobufEncoder.Decode<T>(bytes);
+object result = ProtobufEncoder.Decode(typeof(T), bytes);
 
-// Synchronous
-ProtobufEncoder.WriteDelimitedMessage(person1, stream);
-ProtobufEncoder.WriteDelimitedMessage(person2, stream);
+// Async - from stream (reads all remaining bytes)
+T result = await ProtobufEncoder.DecodeAsync<T>(stream, ct);
 
-// Asynchronous
-await ProtobufEncoder.WriteDelimitedMessageAsync(person3, stream, cancellationToken);
+// Length-delimited (single message, returns null at EOF)
+T? msg = ProtobufEncoder.ReadDelimitedMessage<T>(stream);
+
+// Length-delimited (all messages as IEnumerable)
+foreach (var msg in ProtobufEncoder.ReadDelimitedMessages<T>(stream))
+    Process(msg);
+
+// Length-delimited (async enumerable)
+await foreach (var msg in ProtobufEncoder.ReadDelimitedMessagesAsync<T>(stream, ct))
+    Process(msg);
 ```
 
-### Reading
+## Static Messages
 
-```csharp
-stream.Position = 0;
-
-// Read one message (returns null at end of stream)
-var msg = ProtobufEncoder.ReadDelimitedMessage<Person>(stream);
-
-// Read all messages as IEnumerable<T>
-foreach (var person in ProtobufEncoder.ReadDelimitedMessages<Person>(stream))
-{
-    Console.WriteLine(person.Name);
-}
-
-// Async streaming with IAsyncEnumerable<T>
-await foreach (var person in ProtobufEncoder.ReadDelimitedMessagesAsync<Person>(stream))
-{
-    Console.WriteLine(person.Name);
-}
-```
-
-## Static Messages (Pre-compiled)
-
-For hot paths, create a static message to eagerly resolve and cache all type metadata:
+Pre-compiled message handlers that cache reflection lookups at creation time:
 
 ```csharp
 // Create once, reuse many times
-var message = ProtobufEncoder.CreateStaticMessage<Person>();
+StaticMessage<T> msg = ProtobufEncoder.CreateStaticMessage<T>();
 
-byte[] bytes = message.Encode(person);
-Person decoded = message.Decode(bytes);
-
-// Also supports delimited streaming
-message.WriteDelimited(person, stream);
-Person? next = message.ReadDelimited(stream);
+// Or create individual delegates
+Func<T, byte[]> encoder = ProtobufEncoder.CreateStaticEncoder<T>();
+Func<byte[], T> decoder = ProtobufEncoder.CreateStaticDecoder<T>();
 ```
 
-Standalone delegates:
+### StaticMessage API
 
-```csharp
-Func<Person, byte[]> encode = ProtobufEncoder.CreateStaticEncoder<Person>();
-Func<byte[], Person> decode = ProtobufEncoder.CreateStaticDecoder<Person>();
-```
+| Method | Description |
+|--------|-------------|
+| `Encode(T instance)` | Encode to `byte[]` |
+| `Decode(byte[] data)` | Decode from `byte[]` |
+| `WriteDelimited(T instance, Stream output)` | Write length-delimited to stream |
+| `WriteDelimitedAsync(T instance, Stream output, CancellationToken)` | Async write |
+| `ReadDelimited(Stream input)` | Read single length-delimited message |
 
-## Full Example
+## ContractResolver
 
-```csharp
-using ProtobuffEncoder;
-using ProtobuffEncoder.Attributes;
+The `ContractResolver` is an internal static class that:
 
-public enum ContactType { Unknown, Personal, Work }
+1. Uses `ConcurrentDictionary` for thread-safe caching
+2. Resolves `FieldDescriptor[]` for any type on first access
+3. Supports both explicit (`[ProtoContract]`) and implicit mode
+4. Handles inheritance chain walking when `IncludeBaseFields = true`
+5. Auto-assigns field numbers that skip reserved numbers (from `[ProtoInclude]`)
+6. Detects collection types, dictionary types, and scalar types
 
-[ProtoContract]
-public class Person
-{
-    public string Name { get; set; } = "";
+## Default Value Handling
 
-    [ProtoField(FieldNumber = 10, Name = "email_address")]
-    public string Email { get; set; } = "";
+Proto3 semantics: fields with default values are **not** written by default.
 
-    public int Age { get; set; }
-    public double? Score { get; set; }
-    public ContactType Type { get; set; }
-    public List<string> Tags { get; set; } = [];
-    public int[] LuckyNumbers { get; set; } = [];
-    public Address? HomeAddress { get; set; }
-    public List<PhoneNumber> PhoneNumbers { get; set; } = [];
+| Type | Default Value |
+|------|--------------|
+| Numeric types | `0` |
+| `bool` | `false` |
+| `string` | `""` or `null` |
+| `byte[]` | empty array |
+| Collections | empty collection |
+| Dictionaries | empty dictionary |
+| Nullable types | `null` |
 
-    [ProtoIgnore]
-    public string InternalNotes { get; set; } = "";
-}
+Override with `[ProtoField(WriteDefault = true)]` to always write a field.
 
-[ProtoContract]
-public class Address
-{
-    public string Street { get; set; } = "";
-    public string City { get; set; } = "";
-    public int ZipCode { get; set; }
-}
+## Unknown Fields
 
-[ProtoContract]
-public class PhoneNumber
-{
-    public string Number { get; set; } = "";
-    public ContactType Type { get; set; }
-}
-
-// Usage
-var person = new Person
-{
-    Name = "Alice",
-    Email = "alice@example.com",
-    Age = 30,
-    Score = 98.5,
-    Type = ContactType.Work,
-    Tags = ["developer", "lead"],
-    LuckyNumbers = [7, 13, 42],
-    HomeAddress = new Address { Street = "123 Main St", City = "Springfield", ZipCode = 62701 },
-    PhoneNumbers =
-    [
-        new PhoneNumber { Number = "+1-555-0100", Type = ContactType.Work },
-        new PhoneNumber { Number = "+1-555-0101", Type = ContactType.Personal }
-    ]
-};
-
-byte[] encoded = ProtobufEncoder.Encode(person);
-var decoded = ProtobufEncoder.Decode<Person>(encoded);
-```
+Unknown field numbers in incoming data are **silently skipped** during decoding. This provides forward compatibility -- newer message versions with extra fields can be decoded by older code.

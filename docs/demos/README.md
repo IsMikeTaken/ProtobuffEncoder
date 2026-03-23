@@ -1,184 +1,120 @@
-# Demo Applications
+# Demo Projects
 
-The solution includes several demo applications that showcase different features of the ProtobuffEncoder library. Each web demo includes an interactive browser dashboard.
+The solution includes several demo projects showcasing different transport patterns and integration scenarios.
 
-## Overview
+## Solution Structure
 
-| Demo | Type | Port | Description |
-|------|------|------|-------------|
-| Demo.Api.Sender | Web API | 5200 | HTTP sender with interactive request builder |
-| Demo.Api.Receiver | Web API | 5100 | Schema-only receiver with proto schema explorer |
-| Demo.Bidirectional.Server | Web API | 5300 | WebSocket server with real-time streaming dashboard |
-| Demo.Bidirectional.Client | Console | - | WebSocket client for bidirectional streaming |
-| Demo.Grpc.Server | Web API | 5400 / 5401 | Code-first gRPC server (no .proto files) |
-| Demo.Grpc.Client | Console | - | gRPC client with typed proxy (connects to 5401) |
-| Demo.Console | Console | - | Feature showcase (encoding, streaming, validation) |
-
-## HTTP Sender & Receiver
-
-Demonstrates API-to-API protobuf communication where the Sender encodes C# objects to protobuf and the Receiver decodes using only `.proto` schemas.
-
-### Running
-
-```bash
-# Start the Receiver first (port 5100)
-dotnet run --project demos/ProtobuffEncoder.Demo.Api.Receiver
-
-# Start the Sender (port 5200)
-dotnet run --project demos/ProtobuffEncoder.Demo.Api.Sender
+```
+demos/
+├── console/
+│   └── ProtobuffEncoder.Demo.Console          # Basic encode/decode/streaming
+├── web/
+│   ├── ProtobuffEncoder.Demo.Api.Sender       # REST API client (HttpClient)
+│   ├── ProtobuffEncoder.Demo.Api.Receiver     # REST API server (ASP.NET Core)
+│   ├── ProtobuffEncoder.Demo.Grpc.Server      # gRPC server
+│   ├── ProtobuffEncoder.Demo.Grpc.Client      # gRPC client
+│   ├── ProtobuffEncoder.Demo.Bidirectional.Server  # WebSocket server
+│   ├── ProtobuffEncoder.Demo.Bidirectional.Client  # WebSocket client
+│   └── ProtobuffEncoder.Demo.SchemaGen        # Schema generation demo
 ```
 
-### Browser Dashboards
+## Console Demo
 
-**Sender** — `http://localhost:5200`
-- Weather request form (city, days, hourly wind toggle)
-- Notification form (source, text, level, tags)
-- Visual message flow diagram showing each step of the protobuf round-trip
-- Results panel with timing and response data
+Demonstrates core library features without networking:
 
-**Receiver** — `http://localhost:5100`
-- Schema explorer sidebar listing all loaded messages and enums
-- Click any message to see its field table (number, name, type, label)
-- Click any enum to see its values and numbers
-- Overview page with syntax-highlighted `.proto` source
+- Encode and decode messages with all scalar types
+- Collection and map serialization
+- OneOf union encoding
+- Length-delimited streaming over MemoryStream
+- StaticMessage pre-compiled encode/decode
+- Validation pipeline
 
-### API Endpoints
+## REST API Demo (Sender + Receiver)
 
-**Sender** (`http://localhost:5200`):
-- `GET /api/send-weather?city=Amsterdam&days=3&includeHourly=true` — sends a weather request to the Receiver via protobuf, returns JSON
-- `POST /api/send-notification` — forwards a JSON notification to the Receiver as protobuf
-- `GET /health` — health check
+**Receiver** (server):
+- ASP.NET Core with protobuf MVC formatters
+- Echo endpoint at `POST /api/echo`
+- Accepts `application/x-protobuf` requests
+- Returns protobuf-encoded responses
 
-**Receiver** (`http://localhost:5100`):
-- `POST /api/weather` — accepts protobuf `WeatherRequest`, returns protobuf `WeatherResponse`
-- `POST /api/notifications` — accepts protobuf `NotificationMessage`, returns protobuf `AckResponse`
-- `GET /api/schema` — lists registered messages and enums
-- `GET /api/schema/{name}` — message field table or enum values
-- `GET /api/proto-source` — raw `.proto` file content
-- `GET /health` — health check
+**Sender** (client):
+- Uses `HttpClient.PostProtobufAsync<TReq, TRes>()` extension
+- Sends protobuf-encoded weather requests
+- Deserializes protobuf responses
 
-### Testing with curl
+## gRPC Demo (Server + Client)
 
-```bash
-# Weather request via Sender
-curl "http://localhost:5200/api/send-weather?city=Amsterdam&days=3"
+**Server**:
+- Hosts `WeatherGrpcServiceImpl` implementing `IWeatherGrpcService`
+- Registered via `AddProtobufGrpcService<T>()`
+- No `.proto` files -- code-first with `[ProtoService]`
 
-# Notification via Sender
-curl -X POST http://localhost:5200/api/send-notification \
-  -H "Content-Type: application/json" \
-  -d '{"source":"CLI","text":"CPU high","level":"Warning","tags":["infra"]}'
-```
+**Client**:
+- Creates typed client via `channel.CreateProtobufClient<IWeatherGrpcService>()`
+- Demonstrates unary, server streaming, and duplex patterns
 
-## Bidirectional Streaming
+## Bidirectional WebSocket Demo (Server + Client)
 
-Demonstrates WebSocket-based bidirectional protobuf streaming using `ProtobufDuplexStream`.
+**Server**:
+- ASP.NET Core with `WithWebSocket()` builder
+- Connection manager for broadcast
+- Echo handler: receives message, broadcasts to all connected clients
+- Lifecycle logging (connect, disconnect, error)
 
-### Running
+**Client**:
+- `ProtobufWebSocketClient` with retry policy
+- Request-response pattern
+- Continuous listening mode
+- Graceful disconnect
 
-```bash
-# Start the WebSocket server (port 5300)
-dotnet run --project demos/ProtobuffEncoder.Demo.Bidirectional.Server
+## Schema Generation Demo
 
-# Run the console client
-dotnet run --project demos/ProtobuffEncoder.Demo.Bidirectional.Client
-```
+- Loads `ProtobuffEncoder.Contracts` assembly
+- Generates all `.proto` files to an output directory
+- Demonstrates versioned output (`v1/Order.proto`)
+- Shows cross-file imports
+- Optionally patches a `.csproj`
 
-### Browser Dashboard
+## Running the Demos
 
-Open `http://localhost:5300` for an interactive dashboard with:
-
-**Chat Panel**
-- Connect/disconnect to the WebSocket chat endpoint
-- Send messages with configurable level (Info/Warning/Error)
-- Real-time message display with color-coded levels
-- Protobuf byte size shown on each message
-- Server validates messages (rejects empty text)
-- Milestone notifications every 3 messages
-
-**Weather Panel**
-- Connect/disconnect to the weather stream endpoint
-- Request forecasts by city, days, and wind toggle
-- Weather cards show temperature, condition, humidity
-- Protobuf request/response byte sizes displayed
-
-### WebSocket Endpoints
-
-- `ws://localhost:5300/ws/chat` — bidirectional chat using protobuf binary (for native clients)
-- `ws://localhost:5300/ws/weather-stream` — weather request/response using protobuf binary
-- `ws://localhost:5300/ws/chat/json` — JSON bridge for the browser dashboard
-- `ws://localhost:5300/ws/weather-stream/json` — JSON bridge for the browser dashboard
-
-The JSON endpoints encode/decode through the protobuf library on every message to demonstrate the round-trip.
-
-### Console Client
-
-The console client connects via WebSocket and runs two demos:
-
-1. **Chat** — sends 5 messages concurrently with receiving, including an empty message to trigger server-side validation rejection
-2. **Weather** — sequential request-response for Amsterdam, London, and Tokyo
-
-## gRPC
-
-Demonstrates code-first gRPC using `[ProtoService]` and `[ProtoMethod]` attributes with the
-unified `AddProtobuffEncoder()` setup. No `.proto` files or code generation required.
-
-### Running
-
-```bash
-# Start the gRPC server (HTTP/1.1 on 5400, HTTP/2 on 5401)
-dotnet run --project demos/ProtobuffEncoder.Demo.Grpc.Server
-
-# Run the console client (connects to gRPC on 5401)
-dotnet run --project demos/ProtobuffEncoder.Demo.Grpc.Client
-```
-
-### Browser Dashboard
-
-Open `http://localhost:5400` (HTTP/1.1 port) for an overview dashboard showing:
-- Registered services and methods
-- Method types (Unary, ServerStreaming, DuplexStreaming)
-- Request/response type mappings
-- gRPC route table
-- Quick-start code examples
-
-### Services
-
-**Weather** (`/Weather/...`):
-- `GetForecast` (Unary) — single city forecast
-- `StreamForecasts` (Server Streaming) — day-by-day forecast stream with simulated delays
-
-**Chat** (`/Chat/...`):
-- `Chat` (Duplex Streaming) — bidirectional message stream with command routing (`/ping`, `/time`, `/stats`)
-- `SendNotification` (Unary) — single notification with acknowledgement
-
-### Console Client
-
-Interactive menu with four demos:
-1. **Unary Weather** — configure city, days, and wind; receive a full forecast
-2. **Streaming Weather** — watch forecasts arrive day-by-day in real time
-3. **Unary Notification** — send a message and receive an `AckResponse`
-4. **Duplex Chat** — configurable message count and delay, concurrent send/receive
-
-## Console Showcase
-
-Demonstrates all core library features in a single console application.
-
-### Running
+### Console
 
 ```bash
 dotnet run --project demos/ProtobuffEncoder.Demo.Console
-dotnet run --project demos/ProtobuffEncoder.Demo.Console -- -v    # verbose (trace spans)
-dotnet run --project demos/ProtobuffEncoder.Demo.Console -- -s    # silent
 ```
 
-### Showcases
+### REST API
 
-1. **Basic Encode/Decode** — round-trip encoding of a complex `Person` object with nested types, collections, enums, and nullable fields. Also demonstrates static message compilation.
+```bash
+# Terminal 1: Start server
+dotnet run --project demos/ProtobuffEncoder.Demo.Api.Receiver
 
-2. **Async Streaming** — writes multiple messages to a stream with length-delimited framing, then reads them back as an `IAsyncEnumerable<T>`.
+# Terminal 2: Run client
+dotnet run --project demos/ProtobuffEncoder.Demo.Api.Sender
+```
 
-3. **Bi-Directional Streaming** — creates a `ProtobufDuplexStream` over memory streams, sends client requests and receives server responses concurrently.
+### gRPC
 
-4. **Validated Transport** — uses `ValidatedProtobufSender` with predicate rules to demonstrate send-time validation. Sends a valid message, then catches the `MessageValidationException` from an invalid one.
+```bash
+# Terminal 1: Start server
+dotnet run --project demos/ProtobuffEncoder.Demo.Grpc.Server
 
-Each showcase reports byte sizes, timing, and trace spans (when verbose).
+# Terminal 2: Run client
+dotnet run --project demos/ProtobuffEncoder.Demo.Grpc.Client
+```
+
+### WebSocket
+
+```bash
+# Terminal 1: Start server
+dotnet run --project demos/ProtobuffEncoder.Demo.Bidirectional.Server
+
+# Terminal 2: Run client
+dotnet run --project demos/ProtobuffEncoder.Demo.Bidirectional.Client
+```
+
+### Schema Generation
+
+```bash
+dotnet run --project demos/ProtobuffEncoder.Demo.SchemaGen
+```

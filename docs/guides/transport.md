@@ -1,210 +1,159 @@
-# Transport
+# Transport Layer
 
-The transport layer provides typed, stream-based communication primitives built on top of length-delimited protobuf framing.
+The transport layer provides typed, stream-based message passing built on top of length-delimited protobuf encoding. All transport classes are in `ProtobuffEncoder.Transport`.
 
-## ProtobufSender\<T\>
+## ProtobufSender
 
-Sends protobuf-encoded messages over a stream with automatic length-delimited framing.
+Sends protobuf-encoded messages over a stream using length-delimited framing.
 
 ```csharp
-using ProtobuffEncoder.Transport;
-
-await using var sender = new ProtobufSender<Person>(networkStream);
-
-// Send one
-await sender.SendAsync(person);
-sender.Send(person); // synchronous
-
-// Send many
-await sender.SendManyAsync(people);
-await sender.SendManyAsync(asyncStream); // IAsyncEnumerable<T>
+public sealed class ProtobufSender<T> : IAsyncDisposable, IDisposable
+    where T : class, new()
 ```
 
-## ProtobufReceiver\<T\>
+### API
 
-Receives protobuf-encoded messages from a stream.
+| Method | Description |
+|--------|-------------|
+| `Send(T instance)` | Synchronous send with flush |
+| `SendAsync(T instance, CancellationToken)` | Asynchronous send |
+| `SendManyAsync(IEnumerable<T>, CancellationToken)` | Send batch |
+| `SendManyAsync(IAsyncEnumerable<T>, CancellationToken)` | Send async stream |
+
+### Example
 
 ```csharp
-await using var receiver = new ProtobufReceiver<Person>(networkStream);
+await using var sender = new ProtobufSender<OrderMessage>(networkStream);
 
-// Read one (returns null at end of stream)
-var msg = receiver.Receive();
+// Single message
+await sender.SendAsync(order);
+
+// Batch
+await sender.SendManyAsync(orders);
 
 // Async stream
-await foreach (var person in receiver.ReceiveAllAsync(cancellationToken))
-{
-    Console.WriteLine(person.Name);
-}
-
-// Callback listener
-await receiver.ListenAsync(async person =>
-{
-    Console.WriteLine($"Received: {person.Name}");
-}, cancellationToken);
+await sender.SendManyAsync(GenerateOrdersAsync());
 ```
 
-## ProtobufDuplexStream\<TSend, TReceive\>
+## ProtobufReceiver
 
-Full bi-directional streaming over a single stream (or a pair of streams). Supports sending and receiving concurrently with thread-safe internal locking.
+Receives protobuf-encoded messages from a stream using length-delimited framing.
 
 ```csharp
-// Same type both directions
-await using var duplex = new ProtobufDuplexStream<Message>(networkStream);
-
-// Different types each direction
-await using var duplex = new ProtobufDuplexStream<Request, Response>(
-    sendStream, receiveStream);
+public sealed class ProtobufReceiver<T> : IAsyncDisposable, IDisposable
+    where T : class, new()
 ```
 
-### Send & Receive
+### API
+
+| Method | Description |
+|--------|-------------|
+| `Receive()` | Read single message (null at EOF) |
+| `ReceiveAll()` | Read all messages as `IEnumerable<T>` |
+| `ReceiveAllAsync(CancellationToken)` | Read all as `IAsyncEnumerable<T>` |
+| `ListenAsync(Func<T, Task>, CancellationToken)` | Invoke handler per message |
+| `ListenAsync(Action<T>, CancellationToken)` | Invoke sync handler per message |
+
+### Example
 
 ```csharp
-await duplex.SendAsync(message);
-duplex.Send(message); // synchronous
+await using var receiver = new ProtobufReceiver<OrderMessage>(networkStream);
 
-var response = await duplex.ReceiveAsync();
-var response = duplex.Receive(); // synchronous
+// Read all
+await foreach (var order in receiver.ReceiveAllAsync(ct))
+    ProcessOrder(order);
 
-await foreach (var msg in duplex.ReceiveAllAsync(cancellationToken))
+// Or listen with callback
+await receiver.ListenAsync(async order =>
 {
-    // process messages as they arrive
-}
+    await SaveToDatabase(order);
+}, ct);
 ```
 
-### Request-Response
+## ProtobufDuplexStream
+
+Bi-directional streaming channel. Supports sending and receiving simultaneously with thread-safe internal locks.
 
 ```csharp
-// Send a request and wait for a single response
+public sealed class ProtobufDuplexStream<TSend, TReceive> : IAsyncDisposable, IDisposable
+```
+
+### Constructors
+
+```csharp
+// Single bi-directional stream (TCP, pipe)
+new ProtobufDuplexStream<TSend, TReceive>(duplexStream, ownsStream: true)
+
+// Separate send/receive streams
+new ProtobufDuplexStream<TSend, TReceive>(sendStream, receiveStream, ownsStreams: true)
+```
+
+### API
+
+| Method | Description |
+|--------|-------------|
+| `SendAsync(TSend, CancellationToken)` | Thread-safe send |
+| `Send(TSend)` | Synchronous thread-safe send |
+| `SendManyAsync(IAsyncEnumerable<TSend>, CancellationToken)` | Send stream |
+| `ReceiveAsync(CancellationToken)` | Thread-safe receive (null at EOF) |
+| `Receive()` | Synchronous receive |
+| `ReceiveAllAsync(CancellationToken)` | Async enumerable of incoming messages |
+| `ListenAsync(Func<TReceive, Task>, CancellationToken)` | Handler per message |
+| `SendAndReceiveAsync(TSend, CancellationToken)` | Request-response pattern |
+| `RunDuplexAsync(IAsyncEnumerable<TSend>, Func<TReceive, Task>, CancellationToken)` | Concurrent send + receive |
+| `ProcessAsync(Func<TReceive, Task<TSend>>, CancellationToken)` | Transform incoming to outgoing |
+
+### Convenience Alias
+
+For same-type bidirectional streaming:
+
+```csharp
+// ProtobufDuplexStream<T> wraps ProtobufDuplexStream<T, T>
+await using var duplex = new ProtobufDuplexStream<ChatMessage>(tcpStream);
+```
+
+### Patterns
+
+#### Request-Response
+
+```csharp
 var response = await duplex.SendAndReceiveAsync(request);
 ```
 
-### Concurrent Duplex
+#### Concurrent Bidirectional
 
 ```csharp
-// Send and receive concurrently
 await duplex.RunDuplexAsync(
-    outgoing: GenerateMessages(),
-    onReceived: async msg => Console.WriteLine(msg.Text),
-    cancellationToken
-);
+    outgoing: GenerateRequestsAsync(),
+    onReceived: async response =>
+    {
+        Console.WriteLine($"Got: {response.Data}");
+    },
+    ct);
 ```
 
-### Server-Side Processing
+#### Server-Side Processing
 
 ```csharp
-// Process incoming messages and send responses
 await duplex.ProcessAsync(async request =>
 {
-    // Transform each request into a response
-    return new Response { Result = Process(request) };
-}, cancellationToken);
-```
-
-## Validation
-
-The validation layer adds message validation to any transport primitive.
-
-### ValidationPipeline\<T\>
-
-Build validation rules using predicates, delegates, or custom `IMessageValidator<T>` implementations.
-
-```csharp
-var pipeline = new ValidationPipeline<Person>();
-
-// Simple predicate rules
-pipeline.Require(p => !string.IsNullOrEmpty(p.Name), "Name is required");
-pipeline.Require(p => p.Age >= 0, "Age must be non-negative");
-
-// Delegate rule
-pipeline.Add(p => p.Age > 200
-    ? ValidationResult.Fail("Unrealistic age")
-    : ValidationResult.Success);
-
-// Custom validator
-pipeline.Add(new CustomPersonValidator());
-
-// Validate
-var result = pipeline.Validate(person); // returns ValidationResult
-pipeline.ValidateOrThrow(person);       // throws MessageValidationException
-```
-
-### ValidatedProtobufSender\<T\>
-
-Validates messages before sending. Invalid messages throw `MessageValidationException` and are never written to the stream.
-
-```csharp
-await using var sender = new ValidatedProtobufSender<Person>(stream);
-
-sender.Validation
-    .Require(p => !string.IsNullOrEmpty(p.Name), "Name is required")
-    .Require(p => p.Age >= 0, "Age must be non-negative");
-
-await sender.SendAsync(validPerson);    // OK
-await sender.SendAsync(invalidPerson);  // throws MessageValidationException
-```
-
-### ValidatedProtobufReceiver\<T\>
-
-Validates messages after deserialization with configurable behavior for invalid messages.
-
-```csharp
-await using var receiver = new ValidatedProtobufReceiver<Person>(stream);
-
-receiver.Validation.Require(p => p.Age > 0, "Age required");
-
-// Configure behavior for invalid messages (default: Throw)
-receiver.OnInvalid = InvalidMessageBehavior.Skip;  // or Throw, ReturnNull
-
-// Optional: get notified when messages are rejected
-receiver.MessageRejected += (msg, result) =>
-{
-    Console.WriteLine($"Rejected: {result.ErrorMessage}");
-};
-
-await foreach (var person in receiver.ReceiveAllAsync())
-{
-    // Only valid messages arrive here
-}
-```
-
-**InvalidMessageBehavior options:**
-
-| Behavior | Effect |
-|----------|--------|
-| `Throw` | Throws `MessageValidationException` (default) |
-| `Skip` | Skips the invalid message and continues |
-| `ReturnNull` | Stops the stream |
-
-### ValidatedDuplexStream\<TSend, TReceive\>
-
-Combines bi-directional streaming with validation on both send and receive sides.
-
-```csharp
-await using var duplex = new ValidatedDuplexStream<Request, Response>(
-    sendStream, receiveStream);
-
-// Validate outgoing
-duplex.SendValidation.Require(r => !string.IsNullOrEmpty(r.Id), "Id required");
-
-// Validate incoming
-duplex.ReceiveValidation.Require(r => r.Status >= 0, "Invalid status");
-duplex.OnInvalidReceive = InvalidMessageBehavior.Skip;
-
-// Validated request-response
-var response = await duplex.SendAndReceiveAsync(request);
-
-// Validated bidirectional
-await duplex.RunDuplexAsync(outgoing, onReceived, cancellationToken);
+    var result = await ComputeResult(request);
+    return new Response { Data = result };
+}, ct);
 ```
 
 ## Stream Ownership
 
-All transport types accept an `ownsStream` parameter (default: `true`). When `true`, disposing the transport also disposes the underlying stream.
+All transport classes accept an `ownsStream` / `ownsStreams` parameter:
+
+- `true` (default): The transport disposes the underlying stream when disposed
+- `false`: The caller retains ownership and is responsible for disposal
 
 ```csharp
-// Transport owns the stream — disposes it on cleanup
-await using var sender = new ProtobufSender<T>(stream, ownsStream: true);
+// Transport owns the stream
+await using var sender = new ProtobufSender<T>(stream); // disposes stream
 
-// Caller manages stream lifetime
-await using var sender = new ProtobufSender<T>(stream, ownsStream: false);
+// Caller owns the stream
+using var sender = new ProtobufSender<T>(stream, ownsStream: false);
+// stream remains open after sender is disposed
 ```

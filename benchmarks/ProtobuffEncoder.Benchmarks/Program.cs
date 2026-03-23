@@ -1,8 +1,8 @@
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
+using BenchmarkDotNet.Environments;
 using BenchmarkDotNet.Jobs;
 using BenchmarkDotNet.Running;
-using ProtobuffEncoder;
 using ProtobuffEncoder.Attributes;
 using ProtobuffEncoder.Schema;
 using ProtobuffEncoder.Transport;
@@ -13,12 +13,56 @@ namespace ProtobuffEncoder.Benchmarks;
 // Multi-TFM Configuration
 // ═══════════════════════════════════════════════════
 
+using BenchmarkDotNet.Columns;
+using BenchmarkDotNet.Configs;
+using BenchmarkDotNet.Diagnosers;
+using BenchmarkDotNet.Environments;
+using BenchmarkDotNet.Exporters;
+using BenchmarkDotNet.Jobs;
+using BenchmarkDotNet.Validators;
+
 public class BenchmarkConfig : ManualConfig
 {
     public BenchmarkConfig()
     {
-        AddJob(Job.ShortRun);
-        AddExporter(BenchmarkDotNet.Exporters.MarkdownExporter.GitHub);
+        // 1. The Baseline Job (Statistical Rigor & Enterprise Environment)
+        var baseJob = Job.Default
+            .WithMaxRelativeError(0.01) // Strict 1% error margin
+            .WithMinIterationCount(15)  // Ensure enough data points for statistical validity
+            .WithMaxIterationCount(100) // Put a cap on execution time
+            .WithWarmupCount(5)         // Give the JIT enough time to optimize hot paths
+            .WithGcServer(true)         // Force Server GC (Standard for enterprise web/api apps)
+            .WithGcConcurrent(true);    // Background GC enabled
+
+        // 2. Runtimes & Platforms (With corrected IDs)
+        // .NET 10
+        AddJob(baseJob.WithRuntime(CoreRuntime.Core10_0).WithPlatform(Platform.X64).WithId("x64.Net10"));
+        AddJob(baseJob.WithRuntime(CoreRuntime.Core10_0).WithPlatform(Platform.X86).WithId("x86.Net10"));
+
+        // .NET 9
+        AddJob(baseJob.WithRuntime(CoreRuntime.Core90).WithPlatform(Platform.X64).WithId("x64.Net9"));
+        AddJob(baseJob.WithRuntime(CoreRuntime.Core90).WithPlatform(Platform.X86).WithId("x86.Net9"));
+
+        // .NET 8 (Current LTS)
+        AddJob(baseJob.WithRuntime(CoreRuntime.Core80).WithPlatform(Platform.X64).WithId("x64.Net8"));
+        AddJob(baseJob.WithRuntime(CoreRuntime.Core80).WithPlatform(Platform.X86).WithId("x86.Net8"));
+
+        // 3. Enterprise Diagnosers
+        AddDiagnoser(MemoryDiagnoser.Default);     // Non-negotiable: Tracks byte allocations & GC collections
+        AddDiagnoser(ThreadingDiagnoser.Default);  // Crucial: Tracks lock contentions in concurrent code
+
+        // 4. Statistical Columns for the Report
+        AddColumn(StatisticColumn.Median);
+        AddColumn(StatisticColumn.Min);
+        AddColumn(StatisticColumn.Max);
+        AddColumn(RankColumn.Arabic); // Easily rank the fastest to slowest setups
+
+        // 5. Exporters (Artifact Generation)
+        AddExporter(MarkdownExporter.GitHub);
+        AddExporter(HtmlExporter.Default); // Excellent for attaching to Jira tickets or CI/CD dashboards
+
+        // 6. Safeguards
+        AddValidator(JitOptimizationsValidator.FailOnError); // Refuses to run if you accidentally leave it in Debug mode
     }
 }
 

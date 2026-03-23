@@ -1,383 +1,199 @@
-# Schema Generation & Decoding
+# Schema Generation
 
-ProtobuffEncoder can auto-generate `.proto` schema files from your C# types, and decode protobuf binary using only those schemas — no C# types needed on the receiving end.
+The `ProtoSchemaGenerator` generates `.proto` schema files from C# types marked with `[ProtoContract]` and `[ProtoService]`. It supports all protobuf features: messages, enums, nested types, map fields, oneof groups, services with all four RPC method types, cross-file imports, and versioned directory output.
 
-This enables the **shared contract** pattern: define types in C#, generate `.proto` files, and any consumer (even one with zero knowledge of your C# classes) can decode the messages.
+## Single Type Generation
 
-## Generating .proto Schemas
-
-### Programmatic
+Generate a `.proto` file for a single type and all its dependencies:
 
 ```csharp
 using ProtobuffEncoder.Schema;
 
-// Generate .proto content for a single type (includes all dependencies)
-string proto = ProtoSchemaGenerator.Generate(typeof(WeatherRequest));
-
-// Generate for all [ProtoContract] and [ProtoService] types in an assembly
-var allProto = ProtoSchemaGenerator.GenerateAll(assembly);
-
-// Generate to disk (one .proto file per type/namespace/service)
-List<string> paths = ProtoSchemaGenerator.GenerateToDirectory(assembly, "protos/");
+string proto = ProtoSchemaGenerator.Generate(typeof(OrderMessage));
 ```
 
-### CLI Tool
+Output:
 
-```bash
-dotnet run --project tools/ProtobuffEncoder.Tool -- \
-  "src/ProtobuffEncoder.Contracts/bin/Debug/net10.0/ProtobuffEncoder.Contracts.dll" \
-  "src/ProtobuffEncoder.Contracts/protos" \
-  "src/ProtobuffEncoder.Contracts/ProtobuffEncoder.Contracts.csproj"
+```protobuf
+syntax = "proto3";
+
+package MyApp.Models;
+
+message OrderMessage {
+  int32 OrderId = 1;
+  string CustomerName = 2;
+  double Total = 3;
+  repeated OrderItem Items = 4;
+}
+
+message OrderItem {
+  int32 ProductId = 1;
+  string ProductName = 2;
+  int32 Quantity = 3;
+  double Price = 4;
+}
 ```
 
-Arguments:
+## Assembly-Wide Generation
 
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `assembly-path` | Yes | Path to the compiled DLL containing `[ProtoContract]` types |
-| `proto-output-dir` | Yes | Directory to write `.proto` files |
-| `csproj-path` | No | `.csproj` file to auto-append `<Content>` entries for the generated proto files |
-| `--verbose` | No | Show import relationships and service details |
-| `--help` | No | Show usage information |
+Generate all `.proto` files for every `[ProtoContract]` and `[ProtoService]` type in an assembly:
 
-### MSBuild Integration
+```csharp
+Dictionary<string, string> files = ProtoSchemaGenerator.GenerateAll(assembly);
 
-Import the targets file in your `.csproj` to auto-generate on build:
-
-```xml
-<Import Project="..\..\src\ProtobuffEncoder\build\ProtobuffEncoder.targets" />
+foreach (var (filename, content) in files)
+    Console.WriteLine($"--- {filename} ---\n{content}");
 ```
 
-Configure with properties:
+## Generate to Directory
 
-```xml
-<PropertyGroup>
-  <ProtoOutputDir>protos</ProtoOutputDir>
-  <GenerateProtoOnBuild>true</GenerateProtoOnBuild>
-</PropertyGroup>
+Write all generated `.proto` files to disk:
+
+```csharp
+List<string> paths = ProtoSchemaGenerator.GenerateToDirectory(assembly, "./proto-output");
+// Returns: ["./proto-output/myapp_models.proto", "./proto-output/v1/Order.proto", ...]
 ```
 
-## File Grouping & Naming
+## File Naming and Grouping
 
-The generator groups types into `.proto` files based on these rules:
+Types are grouped into `.proto` files based on:
 
-| Rule | Condition | Example output |
-|------|-----------|----------------|
-| Named contract | `[ProtoContract(Name = "Order")]` | `Order.proto` |
-| Versioned contract | `[ProtoContract(Version = 1)]` | `v1/<namespace>.proto` |
-| Named + versioned | `[ProtoContract(Version = 1, Name = "Order")]` | `v1/Order.proto` |
-| Service interface | `[ProtoService("OrderService")]` | `OrderService.proto` |
-| Versioned service | `[ProtoService("OrderService", Version = 2)]` | `v2/OrderService.proto` |
-| Default | No name/version | `<namespace>.proto` |
+| Scenario | File Key |
+|----------|----------|
+| No `Name` or `Version` | `{namespace}.proto` (dots replaced with underscores, lowercase) |
+| `[ProtoContract(Name = "Order")]` | `Order.proto` |
+| `[ProtoContract(Version = 1)]` | `v1/{namespace}.proto` |
+| `[ProtoContract(Version = 1, Name = "Order")]` | `v1/Order.proto` |
+| `[ProtoService("OrderService")]` | `OrderService.proto` |
+| `[ProtoService("OrderService", Version = 2)]` | `v2/OrderService.proto` |
 
-## Cross-File Imports {id="imports"}
+## Cross-File Imports
 
-When a type references another type that belongs to a different `.proto` file, the generator automatically adds an `import` statement.
-
-### How it works
-
-1. **Phase 1** — All `[ProtoContract]` and `[ProtoService]` types are scanned and assigned to file groups
-2. **Phase 2** — Types are collected into their assigned file. Types belonging to a different file are skipped (not duplicated)
-3. **Phase 3** — The import resolver walks all messages and services, checks which type names reference definitions in other files, and adds `import` statements
-4. **Phase 4** — All files are rendered with their imports
-
-### Example
-
-Given these C# types:
+When a type references another type that belongs to a different file, import statements are automatically generated:
 
 ```csharp
 [ProtoContract(Version = 1, Name = "Order")]
 public class Order
 {
-    [ProtoField(1)] public Guid Id { get; set; }
+    [ProtoField(1)] public string OrderId { get; set; } = "";
     [ProtoField(2)] public CustomerDetails Customer { get; set; } = new();
-    [ProtoField(3)] public List<OrderLineItem> Items { get; set; } = [];
 }
 
-[ProtoContract]
+[ProtoContract(Name = "CustomerDetails")]
 public class CustomerDetails
 {
-    [ProtoField(1)] public string FirstName { get; set; } = "";
-    [ProtoField(2)] public ShippingAddress Address { get; set; } = new();
+    [ProtoField(1)] public string Name { get; set; } = "";
 }
+```
 
+Generated `v1/Order.proto`:
+
+```protobuf
+syntax = "proto3";
+
+import "CustomerDetails.proto";
+
+message Order {
+  string OrderId = 1;
+  CustomerDetails Customer = 2;
+}
+```
+
+The import resolver:
+
+1. Builds a type-to-file-key registry for all types in the assembly
+2. Scans message fields, map types, and service RPC types for cross-file references
+3. Adds `import` statements for any referenced type in another file
+4. Skips scalar proto types (`string`, `int32`, etc.)
+
+## Service Generation
+
+Interfaces decorated with `[ProtoService]` generate gRPC service definitions:
+
+```csharp
 [ProtoService("OrderProcessingService")]
 public interface IOrderProcessingService
 {
     [ProtoMethod(ProtoMethodType.Unary)]
     Task<Order> GetOrderAsync(GetOrderRequest request);
+
+    [ProtoMethod(ProtoMethodType.DuplexStreaming)]
+    IAsyncEnumerable<Order> ProcessOrdersAsync(
+        IAsyncEnumerable<Order> orders, CancellationToken ct);
 }
 ```
 
-The generator produces:
+Generated:
 
-**`v1/Order.proto`** — imports the namespace file for `CustomerDetails`:
-```proto
-syntax = "proto3";
-package MyApp.Models;
-
-import "myapp_models.proto";
-
-message Order {
-  bytes Id = 1;
-  CustomerDetails Customer = 2;
-  repeated OrderLineItem Items = 3;
+```protobuf
+service OrderProcessingService {
+  rpc GetOrderAsync (GetOrderRequest) returns (Order);
+  rpc ProcessOrdersAsync (stream Order) returns (stream Order);
 }
 ```
 
-**`OrderProcessingService.proto`** — imports both message files:
-```proto
-syntax = "proto3";
-package MyApp.Services;
+### Request/Response Wrapping
 
-import "GetOrderRequest.proto";
-import "v1/Order.proto";
+If a method's parameter or return type doesn't end in `Request` or `Response`, the generator auto-creates wrapper messages:
 
-message GetOrderAsyncResponse {
+```csharp
+[ProtoMethod(ProtoMethodType.Unary)]
+Task<Order> GetOrder(string orderId); // orderId is not a *Request type
+```
+
+Generates:
+
+```protobuf
+message GetOrderRequest {
+  string data = 1;
+}
+message GetOrderResponse {
   Order data = 1;
 }
-
-service OrderProcessingService {
-  rpc GetOrderAsync (GetOrderRequest) returns (GetOrderAsyncResponse);
+service MyService {
+  rpc GetOrder (GetOrderRequest) returns (GetOrderResponse);
 }
 ```
 
-> No type definitions are duplicated across files — each type is defined exactly once in its canonical file.
+## Supported Schema Features
 
-## Service Generation {id="services"}
+| Feature | Generated Proto Syntax |
+|---------|----------------------|
+| Scalar fields | `int32 Name = N;` |
+| Repeated fields | `repeated Type Name = N;` |
+| Optional fields | `optional Type Name = N;` |
+| Map fields | `map<KeyType, ValueType> Name = N;` |
+| OneOf groups | `oneof GroupName { ... }` |
+| Nested messages | `message Inner { ... }` inside parent |
+| Enums | `enum Name { VALUE = 0; ... }` |
+| Deprecated | `Type Name = N [deprecated = true];` |
+| ProtoInclude | `optional DerivedType Name = N;` |
+| Services | `service Name { rpc ... }` |
+| Imports | `import "other.proto";` |
+| Metadata comments | `// Metadata: ...` |
+| Source tracing | `// Imported from C# class: Namespace.Type` |
 
-Types marked with `[ProtoService]` automatically generate gRPC service definitions with proper request/response message wiring.
+## ProtoFile Model
 
-### Auto-wrapping
+The in-memory model used during generation:
 
-When an RPC method's parameter or return type does not end with `Request` or `Response`, the generator creates a wrapper message:
-
-| Method signature | Generated wrapper |
-|-----------------|-------------------|
-| `Task<Order> GetOrderAsync(GetOrderRequest req)` | `GetOrderRequest` used directly, `GetOrderAsyncResponse` wraps `Order` |
-| `Task ExecuteAsync(Order order)` | `ExecuteAsyncRequest` wraps `Order`, `ExecuteAsyncResponse` is empty |
-| `IAsyncEnumerable<Order> Stream(Empty req)` | `StreamRequest` wraps `Empty`, `StreamResponse` wraps `Order` |
-
-### Streaming methods
-
-The `[ProtoMethod]` attribute's `MethodType` maps to gRPC streaming keywords:
-
-| ProtoMethodType | Proto syntax |
-|----------------|-------------|
-| `Unary` | `rpc Name (Req) returns (Res);` |
-| `ServerStreaming` | `rpc Name (Req) returns (stream Res);` |
-| `ClientStreaming` | `rpc Name (stream Req) returns (Res);` |
-| `DuplexStreaming` | `rpc Name (stream Req) returns (stream Res);` |
-
-### Service metadata
-
-Add documentation comments to the generated `.proto` file:
-
-```csharp
-[ProtoService("OrderService", Metadata = "Handles order lifecycle")]
-public interface IOrderService { ... }
 ```
-
-Produces:
-```proto
-// Metadata: Handles order lifecycle
-service OrderService {
-  ...
-}
-```
-
-## Generated Output {id="output"}
-
-### Simple message
-
-```csharp
-[ProtoContract]
-public class WeatherRequest
-{
-    public string City { get; set; } = "";
-    public int Days { get; set; }
-    public bool IncludeHourly { get; set; }
-}
-```
-
-Produces:
-
-```proto
-syntax = "proto3";
-package ProtobuffEncoder.Contracts;
-
-message WeatherRequest {
-  string City = 1;
-  int32 Days = 2;
-  bool IncludeHourly = 3;
-}
-```
-
-### Supported constructs
-
-The generator handles:
-
-| Construct | Attribute/pattern |
-|-----------|------------------|
-| Nested messages | Property with `[ProtoContract]` type |
-| Enums | Enum types (with or without `[ProtoContract]`) |
-| Repeated fields | `List<T>`, `T[]`, `ICollection<T>` |
-| Optional fields | `Nullable<T>` types |
-| Map fields | `Dictionary<K,V>` with `[ProtoMap]` |
-| OneOf groups | `[ProtoOneOf("group")]` |
-| Deprecated | `[ProtoField(IsDeprecated = true)]` |
-| Inheritance | `[ProtoInclude]` derived types |
-| Implicit types | `[ProtoContract(ImplicitFields = true)]` |
-| Services | `[ProtoService]` / `[ProtoMethod]` |
-| Cross-file imports | Automatic when types span files |
-
-## Parsing .proto Files
-
-```csharp
-using ProtobuffEncoder.Schema;
-
-// Parse a single .proto file
-ProtoFile file = ProtoSchemaParser.ParseFile("protos/contracts.proto");
-
-// Parse raw .proto content
-ProtoFile file = ProtoSchemaParser.Parse(protoString);
-
-// Parse all .proto files in a directory
-List<ProtoFile> files = ProtoSchemaParser.ParseDirectory("protos/");
-```
-
-The parser supports: `message`, `enum`, `repeated`, `optional`, `oneof`, `map`, and `package` declarations.
-
-## Schema-Based Decoding
-
-A receiver with **no reference to your C# contract types** can decode messages using only `.proto` schemas.
-
-### SchemaDecoder
-
-```csharp
-using ProtobuffEncoder.Schema;
-
-// Load from a directory of .proto files
-var decoder = SchemaDecoder.FromDirectory("protos/");
-
-// Or from a single file or raw content
-var decoder = SchemaDecoder.FromFile("protos/contracts.proto");
-var decoder = SchemaDecoder.FromProtoContent(protoString);
-
-// List what's registered
-IReadOnlyCollection<string> messages = decoder.RegisteredMessages;
-IReadOnlyCollection<string> enums = decoder.RegisteredEnums;
-
-// Get definitions
-ProtoMessageDef? msg = decoder.GetMessage("WeatherRequest");
-ProtoEnumDef? enumDef = decoder.GetEnum("NotificationLevel");
-```
-
-### DecodedMessage
-
-The result of schema-based decoding is a `DecodedMessage` — a dictionary-like type with typed accessors.
-
-```csharp
-DecodedMessage msg = decoder.Decode("WeatherRequest", bytes);
-
-// Typed access
-string city = msg.Get<string>("City");
-long days = msg.Get<long>("Days");
-bool hourly = msg.Get<bool>("IncludeHourly");
-
-// Indexer (returns object?)
-object? value = msg["City"];
-
-// Repeated fields
-List<string> tags = msg.GetRepeated<string>("Tags");
-
-// Nested messages
-DecodedMessage address = msg.GetMessage("HomeAddress");
-List<DecodedMessage> forecasts = msg.GetMessages("Forecasts");
-```
-
-The decoder handles:
-- All scalar types (varint, fixed32, fixed64, length-delimited)
-- Packed repeated fields
-- Nested messages (recursive)
-- Enum name resolution
-- Map fields
-- Unknown fields (skipped gracefully)
-
-## ProtobufWriter
-
-Build protobuf messages by field number — no C# types needed.
-
-```csharp
-using ProtobuffEncoder.Schema;
-
-var writer = new ProtobufWriter();
-writer.WriteString(1, "Amsterdam");
-writer.WriteVarint(2, 3);
-writer.WriteBool(3, true);
-writer.WriteDouble(4, 52.3676);
-writer.WriteFloat(5, 4.89f);
-writer.WriteFixed64(6, timestamp);
-writer.WriteBytes(7, rawData);
-
-// Nested messages
-var inner = new ProtobufWriter();
-inner.WriteString(1, "2026-03-12");
-inner.WriteDouble(2, 5.3);
-
-var outer = new ProtobufWriter();
-outer.WriteMessage(1, inner);
-outer.WriteRepeatedMessage(2, [inner1, inner2]);
-outer.WriteRepeatedString(3, ["a", "b", "c"]);
-outer.WritePackedVarints(4, [1L, 2L, 3L]);
-
-byte[] result = outer.ToByteArray();
-```
-
-## End-to-End: Receiver Without Contract References
-
-The demo Receiver API has **zero compile-time dependency** on the Contracts project. It copies `.proto` files at build time and decodes purely from schemas.
-
-### Project setup
-
-```xml
-<!-- Demo Receiver .csproj -->
-<ItemGroup>
-  <ProjectReference Include="..\..\src\ProtobuffEncoder.AspNetCore\ProtobuffEncoder.AspNetCore.csproj" />
-  <!-- NO reference to Contracts -->
-</ItemGroup>
-
-<!-- Copy .proto schemas from Contracts as the source of truth -->
-<ItemGroup>
-  <Content Include="..\..\src\ProtobuffEncoder.Contracts\protos\**\*.proto"
-           Link="protos\%(Filename)%(Extension)">
-    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-  </Content>
-</ItemGroup>
-```
-
-### Runtime decoding
-
-```csharp
-// Startup: load schemas
-var protoDir = Path.Combine(AppContext.BaseDirectory, "protos");
-builder.Services.AddSingleton(_ => SchemaDecoder.FromDirectory(protoDir));
-
-// Endpoint: decode and respond
-app.MapPost("/api/weather", async (HttpContext ctx, SchemaDecoder schema) =>
-{
-    byte[] bytes = await ReadBodyAsync(ctx);
-    DecodedMessage request = schema.Decode("WeatherRequest", bytes);
-
-    string city = request.Get<string>("City") ?? "Unknown";
-    int days = request["Days"] is long d ? (int)d : 3;
-
-    // Build response with ProtobufWriter
-    var response = new ProtobufWriter();
-    response.WriteString(1, city);
-    response.WriteRepeatedMessage(2, forecasts);
-    response.WriteFixed64(3, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
-
-    return Results.Bytes(response.ToByteArray(), "application/x-protobuf");
-});
+ProtoFile
+├── Syntax ("proto3")
+├── Package (namespace)
+├── FilePath ("v1/Order.proto")
+├── Imports ["other.proto", ...]
+├── Messages []
+│   └── ProtoMessageDef
+│       ├── Name, SourceType, Metadata
+│       ├── Fields [] (ProtoFieldDef)
+│       ├── NestedMessages []
+│       ├── NestedEnums []
+│       └── OneOfs [] (ProtoOneOfDef)
+├── Enums []
+│   └── ProtoEnumDef { Name, Values [] }
+└── Services []
+    └── ProtoServiceDef
+        ├── Name, SourceType, Metadata
+        └── Methods [] (ProtoRpcDef)
 ```
