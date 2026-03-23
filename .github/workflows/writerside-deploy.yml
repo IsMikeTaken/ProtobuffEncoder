@@ -80,12 +80,6 @@ jobs:
         run: |
           mkdir -p dir
           unzip -qq ${{ env.ARTIFACT }} -d dir
-          ROOT_FOLDER=$(dirname $(find dir -name "index.html" | head -n 1))
-          if [ "$ROOT_FOLDER" != "dir" ]; then
-            echo "Moving files from $ROOT_FOLDER to root dir/"
-            mv $ROOT_FOLDER/* dir/
-            rm -rf $ROOT_FOLDER
-          fi
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
