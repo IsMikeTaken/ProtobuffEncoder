@@ -42,4 +42,9 @@
         </toc-element>
     </toc-element>
 
+    <toc-element toc-title="Demo">
+        <toc-element topic="simple_setup.md"/>
+        <toc-element topic="normal_setup.md"/>
+        <toc-element topic="advanced_setup.md"/>
+    </toc-element>
 </instance-profile>

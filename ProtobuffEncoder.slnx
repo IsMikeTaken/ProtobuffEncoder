@@ -28,6 +28,9 @@
     <Project Path="demos/ProtobuffEncoder.Demo.Bidirectional.Client/ProtobuffEncoder.Demo.Bidirectional.Client.csproj" />
     <Project Path="demos/ProtobuffEncoder.Demo.Grpc.Server/ProtobuffEncoder.Demo.Grpc.Server.csproj" />
     <Project Path="demos/ProtobuffEncoder.Demo.Grpc.Client/ProtobuffEncoder.Demo.Grpc.Client.csproj" />
+    <Project Path="demos/ProtobuffEncoder.Demo.Setup/ProtobuffEncoder.Demo.Setup.csproj">
+      <Build Solution="Release|*" Project="false" />
+    </Project>
   </Folder>
   <Folder Name="/benchmarks/">
     <Project Path="benchmarks/ProtobuffEncoder.Benchmarks/ProtobuffEncoder.Benchmarks.csproj" />
