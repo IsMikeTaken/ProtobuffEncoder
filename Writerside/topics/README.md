@@ -108,7 +108,8 @@ string proto = ProtoSchemaGenerator.Generate(typeof(WeatherRequest));
 | [Getting Started](getting_started.md) | Installation, first contract, encode/decode |
 | [Attributes Reference](attributes_reference.md) | All 8 attributes with properties and examples |
 | [Serialization Deep Dive](serialization_deep_dive.md) | Wire format, type mapping, encoding steps |
-| [Transport Layer](transport_layer.md) | Sender, Receiver, DuplexStream |
+| [Value Encoding](value_encoding.md) | ProtoEncoding, ProtoValue, ProtoMessage, emoji support |
+| [Transport Layer](transport_layer.md) | Sender, Receiver, DuplexStream, ValueSender/Receiver |
 | [Validation Pipeline](validation_pipeline.md) | ValidationPipeline, validated transport |
 
 ### Schema

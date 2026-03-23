@@ -66,4 +66,14 @@ public sealed class ProtoContractAttribute : Attribute
     /// Useful descriptive comments to add to the generated .proto contract definition.
     /// </summary>
     public string? Metadata { get; set; }
+
+    /// <summary>
+    /// Sets the default text encoding for all string fields in this contract.
+    /// Accepts encoding names such as "utf-8", "utf-16", "utf-32", "ascii", "latin-1",
+    /// or any name recognized by <see cref="System.Text.Encoding.GetEncoding(string)"/>.
+    /// Individual fields can override this via <see cref="ProtoFieldAttribute.Encoding"/>.
+    /// When null, UTF-8 (the protobuf standard) is used.
+    /// All Unicode-capable encodings (UTF-8, UTF-16, UTF-32) fully support emoji.
+    /// </summary>
+    public string? DefaultEncoding { get; set; }
 }

@@ -110,6 +110,12 @@ internal static class ContractResolver
             bool writeDefault = fieldAttr?.WriteDefault ?? false;
             bool isNullable = Nullable.GetUnderlyingType(prop.PropertyType) is not null;
 
+            // Resolve text encoding: field-level overrides contract-level, both fall back to null (UTF-8)
+            ProtoEncoding? encoding = null;
+            var encodingName = fieldAttr?.Encoding ?? contract?.DefaultEncoding;
+            if (encodingName is not null)
+                encoding = ProtoEncoding.FromName(encodingName);
+
             // Check for dictionary / map type
             bool isMap = mapAttr is not null || IsDictionaryType(prop.PropertyType, out _, out _);
             if (isMap && IsDictionaryType(prop.PropertyType, out var keyType, out var valueType))
@@ -140,6 +146,7 @@ internal static class ContractResolver
                     IsPacked = fieldAttr?.IsPacked,
                     IsDeprecated = fieldAttr?.IsDeprecated ?? false,
                     IsRequired = fieldAttr?.IsRequired ?? false,
+                    Encoding = encoding,
                 });
                 continue;
             }
@@ -194,7 +201,8 @@ internal static class ContractResolver
                 IsPacked = fieldAttr?.IsPacked,
                 IsDeprecated = fieldAttr?.IsDeprecated ?? false,
                 IsRequired = fieldAttr?.IsRequired ?? false,
-                IsImplicit = isImplicit
+                IsImplicit = isImplicit,
+                Encoding = encoding
             });
         }
 

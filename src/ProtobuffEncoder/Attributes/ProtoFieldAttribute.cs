@@ -56,4 +56,14 @@ public sealed class ProtoFieldAttribute : Attribute
     /// enforces it at the library level.
     /// </summary>
     public bool IsRequired { get; set; }
+
+    /// <summary>
+    /// Overrides the text encoding for this string field. Accepts encoding names such as
+    /// "utf-8", "utf-16", "utf-32", "ascii", "latin-1", or any name recognized by
+    /// <see cref="System.Text.Encoding.GetEncoding(string)"/>.
+    /// When null, inherits from <see cref="ProtoContractAttribute.DefaultEncoding"/>
+    /// or falls back to UTF-8 (the protobuf standard).
+    /// All Unicode-capable encodings (UTF-8, UTF-16, UTF-32) fully support emoji.
+    /// </summary>
+    public string? Encoding { get; set; }
 }

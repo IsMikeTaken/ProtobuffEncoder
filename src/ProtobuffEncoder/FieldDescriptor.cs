@@ -84,4 +84,10 @@ internal sealed class FieldDescriptor
     /// (the type itself doesn't have [ProtoContract] but the parent set ImplicitFields = true).
     /// </summary>
     public bool IsImplicit { get; init; }
+
+    /// <summary>
+    /// The text encoding to use for string fields. Resolved from field-level or contract-level
+    /// encoding attributes. Null means UTF-8 (the protobuf default).
+    /// </summary>
+    public ProtoEncoding? Encoding { get; init; }
 }

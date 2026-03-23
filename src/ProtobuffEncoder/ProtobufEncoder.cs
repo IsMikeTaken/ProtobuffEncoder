@@ -274,7 +274,7 @@ public static class ProtobufEncoder
             else if (field.IsCollection)
                 WriteRepeatedField(output, field, value);
             else
-                WriteField(output, field, value);
+                WriteField(output, field, value, field.Encoding);
         }
 
         // ProtoInclude: if the runtime type is a known derived type, encode it as a nested message
@@ -366,7 +366,7 @@ public static class ProtobufEncoder
         }
     }
 
-    private static void WriteField(Stream output, FieldDescriptor field, object value)
+    private static void WriteField(Stream output, FieldDescriptor field, object value, ProtoEncoding? encoding = null)
     {
         uint tag = (uint)((field.FieldNumber << 3) | (int)field.WireType);
         WriteVarint(output, tag);
@@ -383,7 +383,7 @@ public static class ProtobufEncoder
                 WriteFixed64(output, value);
                 break;
             case WireType.LengthDelimited:
-                WriteLengthDelimited(output, value);
+                WriteLengthDelimited(output, value, encoding);
                 break;
             default:
                 throw new NotSupportedException($"Wire type {field.WireType} is not supported.");
@@ -678,17 +678,17 @@ public static class ProtobufEncoder
     private static object? ReadScalarValue(ReadOnlySpan<byte> data, FieldDescriptor field, WireType wireType, ref int offset)
     {
         var targetType = Nullable.GetUnderlyingType(field.Property.PropertyType) ?? field.Property.PropertyType;
-        return ReadScalarForType(data, targetType, wireType, ref offset);
+        return ReadScalarForType(data, targetType, wireType, ref offset, field.Encoding);
     }
 
-    private static object? ReadScalarForType(ReadOnlySpan<byte> data, Type targetType, WireType wireType, ref int offset)
+    private static object? ReadScalarForType(ReadOnlySpan<byte> data, Type targetType, WireType wireType, ref int offset, ProtoEncoding? encoding = null)
     {
         return wireType switch
         {
             WireType.Varint => ConvertFromVarint(ReadVarint(data, ref offset), targetType),
             WireType.Fixed32 => ReadFixed32Value(data, targetType, ref offset),
             WireType.Fixed64 => ReadFixed64Value(data, targetType, ref offset),
-            WireType.LengthDelimited => ReadLengthDelimitedValue(data, targetType, ref offset),
+            WireType.LengthDelimited => ReadLengthDelimitedValue(data, targetType, ref offset, encoding),
             _ => throw new NotSupportedException($"Wire type {wireType} is not supported.")
         };
     }
@@ -752,11 +752,11 @@ public static class ProtobufEncoder
         output.Write(bytes);
     }
 
-    private static void WriteLengthDelimited(Stream output, object value)
+    private static void WriteLengthDelimited(Stream output, object value, ProtoEncoding? encoding = null)
     {
         byte[] payload = value switch
         {
-            string s => Encoding.UTF8.GetBytes(s),
+            string s => (encoding?.Encoding ?? Encoding.UTF8).GetBytes(s),
             byte[] b => b,
             Guid g => g.ToByteArray(),
             decimal d => Encoding.UTF8.GetBytes(d.ToString(CultureInfo.InvariantCulture)),
@@ -889,13 +889,13 @@ public static class ProtobufEncoder
         throw new NotSupportedException($"Cannot read fixed64 as {targetType.Name}.");
     }
 
-    private static object? ReadLengthDelimitedValue(ReadOnlySpan<byte> data, Type targetType, ref int offset)
+    private static object? ReadLengthDelimitedValue(ReadOnlySpan<byte> data, Type targetType, ref int offset, ProtoEncoding? encoding = null)
     {
         int length = (int)ReadVarint(data, ref offset);
         var payload = data.Slice(offset, length);
         offset += length;
 
-        if (targetType == typeof(string)) return Encoding.UTF8.GetString(payload);
+        if (targetType == typeof(string)) return (encoding?.Encoding ?? Encoding.UTF8).GetString(payload);
         if (targetType == typeof(byte[])) return payload.ToArray();
         if (targetType == typeof(Guid)) return new Guid(payload);
         if (targetType == typeof(decimal)) return decimal.Parse(Encoding.UTF8.GetString(payload), CultureInfo.InvariantCulture);

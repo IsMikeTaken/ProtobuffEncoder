@@ -142,6 +142,89 @@ await duplex.ProcessAsync(async request =>
 }, ct);
 ```
 
+## ProtobufValueSender
+
+Sends single values and dynamic messages over a stream without requiring a `[ProtoContract]` class. Supports strings, booleans, integers, floats, dates, GUIDs, byte arrays, and `ProtoMessage` instances.
+
+```C#
+public sealed class ProtobufValueSender : IAsyncDisposable, IDisposable
+```
+
+### API
+
+| Method | Description |
+|--------|-------------|
+| `Send(string value)` | Send a string (supports emoji with Unicode encodings) |
+| `SendAsync(string, CancellationToken)` | Async string send |
+| `Send(bool value)` | Send a boolean |
+| `Send(int value)` | Send a 32-bit integer |
+| `Send(long value)` | Send a 64-bit integer |
+| `Send(double value)` | Send a double |
+| `Send(float value)` | Send a float |
+| `Send(DateTime value)` | Send a DateTime |
+| `Send(Guid value)` | Send a GUID |
+| `Send(byte[] value)` | Send raw bytes |
+| `Send(ProtoMessage message)` | Send a dynamic message |
+| `SendManyAsync(IAsyncEnumerable<string>, CancellationToken)` | Stream strings |
+| `SendManyAsync(IAsyncEnumerable<ProtoMessage>, CancellationToken)` | Stream messages |
+
+### Example
+
+```C#
+await using var sender = new ProtobufValueSender(networkStream, ProtoEncoding.UTF8);
+
+// Send strings with emoji
+await sender.SendAsync("Hello 🌍🎉");
+await sender.SendAsync("こんにちは世界");
+
+// Send other types directly
+await sender.SendAsync(42);
+await sender.SendAsync(true);
+await sender.SendAsync(DateTime.UtcNow);
+```
+
+## ProtobufValueReceiver
+
+Receives single values and dynamic messages from a stream.
+
+```C#
+public sealed class ProtobufValueReceiver : IAsyncDisposable, IDisposable
+```
+
+### API
+
+| Method | Description |
+|--------|-------------|
+| `ReceiveString()` | Read a string (null at EOF) |
+| `ReceiveBool()` | Read a boolean (null at EOF) |
+| `ReceiveInt32()` | Read an int32 (null at EOF) |
+| `ReceiveInt64()` | Read an int64 (null at EOF) |
+| `ReceiveDouble()` | Read a double (null at EOF) |
+| `ReceiveFloat()` | Read a float (null at EOF) |
+| `ReceiveDateTime()` | Read a DateTime (null at EOF) |
+| `ReceiveGuid()` | Read a GUID (null at EOF) |
+| `ReceiveBytes()` | Read a byte array (null at EOF) |
+| `ReceiveMessage()` | Read a ProtoMessage (null at EOF) |
+| `ReceiveAllStrings()` | Read all strings as `IEnumerable<string>` |
+| `ReceiveAllStringsAsync(CancellationToken)` | Read all as `IAsyncEnumerable<string>` |
+| `ReceiveAllMessages()` | Read all as `IEnumerable<ProtoMessage>` |
+| `ListenAsync(Func<string, Task>, CancellationToken)` | Callback per string |
+| `ListenAsync(Func<ProtoMessage, Task>, CancellationToken)` | Callback per message |
+
+### Example
+
+```C#
+await using var receiver = new ProtobufValueReceiver(networkStream, ProtoEncoding.UTF8);
+
+// Read strings with emoji
+await foreach (var text in receiver.ReceiveAllStringsAsync(ct))
+    Console.WriteLine(text); // "Hello 🌍🎉", "こんにちは世界"
+
+// Or use typed receivers
+int? count = receiver.ReceiveInt32();
+bool? flag = receiver.ReceiveBool();
+```
+
 ## Stream Ownership
 
 All transport classes accept an `ownsStream` / `ownsStreams` parameter:

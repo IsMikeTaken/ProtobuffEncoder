@@ -9,6 +9,7 @@
     <toc-element toc-title="Core">
         <toc-element topic="attributes_reference.md"/>
         <toc-element topic="serialization_deep_dive.md"/>
+        <toc-element topic="value_encoding.md"/>
         <toc-element topic="transport_layer.md"/>
         <toc-element topic="validation_pipeline.md"/>
     </toc-element>
