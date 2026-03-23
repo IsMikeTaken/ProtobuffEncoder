@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2026-03-23
+
+### Added
+- New **Demo/Setup** documentation category with tiered examples (Simple, Normal, Advanced).
+- Unified boilerplate project: `ProtobuffEncoder.Demo.Setup` demonstrating REST, WebSockets, and gRPC.
+
 ## [1.1.0] - 2026-03-23
 
 ### Added
