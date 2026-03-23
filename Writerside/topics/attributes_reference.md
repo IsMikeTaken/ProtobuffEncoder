@@ -156,7 +156,7 @@ public class ConfigMessage
 
 Generated schema:
 
-```protobuf
+```
 message ConfigMessage {
   map<string, string> Settings = 1;
   map<int32, string> Labels = 2;
@@ -199,7 +199,7 @@ public class ContactInfo
 
 Generated schema:
 
-```protobuf
+```
 message ContactInfo {
   string Name = 1;
   oneof contact {

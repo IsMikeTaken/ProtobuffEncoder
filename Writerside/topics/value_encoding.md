@@ -31,7 +31,7 @@ public sealed class ProtoEncoding
 | `GetString(ReadOnlySpan<byte>)` | Decode bytes to string |
 | `GetString(byte[])` | Decode byte array to string |
 
-### Properties
+### Properties {id="encoding-properties"}
 
 | Property | Type | Description |
 |----------|------|-------------|
@@ -39,7 +39,7 @@ public sealed class ProtoEncoding
 | `Encoding` | `Encoding` | Underlying `System.Text.Encoding` |
 | `SupportsEmoji` | `bool` | True for Unicode-capable encodings |
 
-### Example
+### Example {id="encoding-example"}
 
 ```C#
 // Use presets
@@ -93,7 +93,7 @@ public static class ProtoValue
 | **Byte** | `Encode(byte)` | via `DecodeInt32` |
 | **Half** | `Encode(Half)` | via `DecodeBytes` |
 
-### Example
+### Example {id="value-example"}
 
 ```C#
 // Encode values — no contract class needed
@@ -173,7 +173,7 @@ All set methods return the message for fluent chaining.
 | `HasField(int fieldNumber)` | Check if field exists |
 | `Remove(int fieldNumber)` | Remove a field |
 
-### Properties
+### Properties {id="message-properties"}
 
 | Property | Type | Description |
 |----------|------|-------------|
@@ -194,7 +194,7 @@ All set methods return the message for fluent chaining.
 | `ReadAllDelimitedFrom(Stream, ProtoEncoding?)` | Read all from stream |
 | `ReadAllDelimitedFromAsync(Stream, ProtoEncoding?, CancellationToken)` | Async read all |
 
-### Example
+### Example {id="message-example"}
 
 ```C#
 // Build a message with fluent API

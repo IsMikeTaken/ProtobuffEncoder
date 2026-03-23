@@ -88,7 +88,7 @@ Types sharing the same file key are grouped into a single `.proto` file.
 
 The generator walks all message fields, oneof members, map key/value types, and service RPC signatures to detect references to types defined in other files. Import statements are automatically added:
 
-```Protobuf
+```
 syntax = "proto3";
 package MyApp.Contracts;
 
@@ -185,7 +185,7 @@ Targets: `Property` — with `Inherited = true`.
 
 Generated schema for the example above:
 
-```Protobuf
+```
 message Product {
   int32 Id = 1;
   string product_name = 2;
@@ -251,7 +251,7 @@ Task<OrderResponse> FetchOrder(OrderRequest request);
 
 Generated schema for the service example above:
 
-```Protobuf
+```
 syntax = "proto3";
 package MyApp.Contracts;
 
@@ -316,7 +316,7 @@ Targets: `class` — `AllowMultiple = true`, `Inherited = false`.
 
 Generated schema:
 
-```Protobuf
+```
 message Animal {
   string Name = 1;
   Dog dog = 10;
@@ -357,7 +357,7 @@ Targets: `Property` — with `Inherited = true`.
 
 Generated schema:
 
-```Protobuf
+```
 message Inventory {
   map<string, int32> Stock = 1;
   map<int32, string> Labels = 2;
@@ -391,7 +391,7 @@ Targets: `Property` — with `Inherited = true`.
 
 Generated schema:
 
-```Protobuf
+```
 message ContactInfo {
   oneof contact {
     string Email = 1;
@@ -597,7 +597,7 @@ protos/
 ```
 
 `v1/Order.proto`:
-```Protobuf
+```
 syntax = "proto3";
 package MyApp.Contracts;
 
@@ -620,7 +620,7 @@ enum OrderStatus {
 ```
 
 `v1/OrderService.proto`:
-```Protobuf
+```
 syntax = "proto3";
 package MyApp.Contracts;
 

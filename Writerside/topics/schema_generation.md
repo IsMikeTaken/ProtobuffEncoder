@@ -14,7 +14,7 @@ string proto = ProtoSchemaGenerator.Generate(typeof(OrderMessage));
 
 Output:
 
-```Protobuf
+```
 syntax = "proto3";
 
 package MyApp.Models;
@@ -88,7 +88,7 @@ public class CustomerDetails
 
 Generated `v1/Order.proto`:
 
-```Protobuf
+```
 syntax = "proto3";
 
 import "CustomerDetails.proto";
@@ -125,7 +125,7 @@ public interface IOrderProcessingService
 
 Generated:
 
-```Protobuf
+```
 service OrderProcessingService {
   rpc GetOrderAsync (GetOrderRequest) returns (Order);
   rpc ProcessOrdersAsync (stream Order) returns (stream Order);
@@ -143,7 +143,7 @@ Task<Order> GetOrder(string orderId); // orderId is not a *Request type
 
 Generates:
 
-```Protobuf
+```
 message GetOrderRequest {
   string data = 1;
 }
