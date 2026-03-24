@@ -34,9 +34,9 @@ public class Child
         // If I want to suppress it, I'd need complex symbol analysis.
         // For now, I'll verify the message is the new one.
 
-        var expected = VerifyCS.Diagnostic(""PROTO005"")
+        var expected = VerifyCS.Diagnostic("PROTO005")
             .WithLocation(12, 6)
-            .WithArguments(""Value"", ""Child"");
+            .WithArguments("Value", "Child");
 
         await VerifyCS.VerifyAnalyzerAsync(test, expected);
     }
