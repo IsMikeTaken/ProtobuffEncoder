@@ -13,7 +13,6 @@
     <Project Path="tests/ProtobuffEncoder.Grpc.Tests/ProtobuffEncoder.Grpc.Tests.csproj" />
     <Project Path="tests/ProtobuffEncoder.WebSockets.Tests/ProtobuffEncoder.WebSockets.Tests.csproj" />
     <Project Path="tests/ProtobuffEncoder.Tool.Tests/ProtobuffEncoder.Tool.Tests.csproj" />
-    <Project Path="tests/ProtobuffEncoder.Analyzers.Tests/ProtobuffEncoder.Analyzers.Tests.csproj" />
   </Folder>
 
   <Folder Name="/tools/">
