@@ -1,0 +1,20 @@
+name: Publish to NuGet
+
+on:
+  push:
+    branches: [ master, preview ]
+    paths-ignore:
+      - 'docs/**'
+      - 'Writerside/**'
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  publish:
+    name: Build, Test and Publish
+    uses: ./.github/workflows/_build-test-pack.yml
+    with:
+      version_suffix: >-
+        ${{ github.ref == 'refs/heads/master' && '' || format('beta.{0}', github.run_number) }}
+      push_to_nuget: true
+    secrets:
+      NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}

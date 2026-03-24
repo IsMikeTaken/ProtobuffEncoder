@@ -1,0 +1,89 @@
+name: CI — Pull Request
+
+on:
+  pull_request:
+    branches: [master, develop]
+    paths-ignore:
+      - 'Writerside/**'
+      - 'docs/**'
+      - '*.md'
+
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  NUGET_SOURCE: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
+
+jobs:
+
+  # ── Build & Test ──────────────────────────────────────────
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        dotnet: ['8.0.x', '9.0.x', '10.0.x']
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET ${{ matrix.dotnet }}
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ matrix.dotnet }}
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Test
+        run: >-
+          dotnet test --no-build --configuration Release
+          --logger "trx;LogFileName=results-${{ matrix.dotnet }}.trx"
+          --results-directory ./TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.dotnet }}
+          path: TestResults/*.trx
+          retention-days: 7
+
+  # ── Pack preview NuGet packages ───────────────────────────
+  pack:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Pack with PR version suffix
+        run: >-
+          dotnet pack --configuration Release
+          -p:VersionSuffix="pr.${{ github.event.pull_request.number }}.${{ github.run_number }}"
+          --output ./nupkgs
+          src/ProtobuffEncoder/ProtobuffEncoder.csproj
+          src/ProtobuffEncoder.AspNetCore/ProtobuffEncoder.AspNetCore.csproj
+          src/ProtobuffEncoder.Contracts/ProtobuffEncoder.Contracts.csproj
+          src/ProtobuffEncoder.Grpc/ProtobuffEncoder.Grpc.csproj
+          src/ProtobuffEncoder.WebSockets/ProtobuffEncoder.WebSockets.csproj
+          src/ProtobuffEncoder.Analyzers/ProtobuffEncoder.Analyzers.csproj
+
+      - name: Upload NuGet artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nupkgs-pr
+          path: ./nupkgs/*.nupkg
+          retention-days: 7

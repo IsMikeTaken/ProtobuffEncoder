@@ -1,0 +1,33 @@
+<Project>
+
+  <PropertyGroup>
+    <!-- ── Central version ─────────────────────────────────── -->
+    <!-- Bump these when cutting a release.                     -->
+    <VersionMajor>1</VersionMajor>
+    <VersionMinor>3</VersionMinor>
+    <VersionPatch>0</VersionPatch>
+
+    <!-- CI workflows override VersionSuffix for pre-releases.  -->
+    <!-- Empty = stable release (e.g. 1.3.0).                   -->
+    <!-- dev.42 = development build (e.g. 1.3.0-dev.42).        -->
+    <!-- pr.7.42 = pull request build (e.g. 1.3.0-pr.7.42).    -->
+    <Version>$(VersionMajor).$(VersionMinor).$(VersionPatch)</Version>
+    <Version Condition="'$(VersionSuffix)' != ''">$(VersionMajor).$(VersionMinor).$(VersionPatch)-$(VersionSuffix)</Version>
+
+    <AssemblyVersion>$(VersionMajor).$(VersionMinor).$(VersionPatch).0</AssemblyVersion>
+    <FileVersion>$(VersionMajor).$(VersionMinor).$(VersionPatch).0</FileVersion>
+
+    <!-- ── Package metadata ────────────────────────────────── -->
+    <Authors>IsMikeTaken</Authors>
+    <Company>IsMikeTaken</Company>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/IsMikeTaken/ProtobuffEncoder</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

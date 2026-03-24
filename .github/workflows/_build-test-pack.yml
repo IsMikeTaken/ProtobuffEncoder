@@ -1,0 +1,64 @@
+name: Build, Test, and Pack
+
+on:
+  workflow_call:
+    inputs:
+      version_suffix:
+        required: false
+        type: string
+        default: ''
+      push_to_nuget:
+        required: false
+        type: boolean
+        default: false
+      is_preview:
+        required: false
+        type: boolean
+        default: false
+    secrets:
+      NUGET_API_KEY:
+        required: false
+
+jobs:
+  build-test-pack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+          cache: true
+          cache-dependency-path: '**/packages.lock.json' # Or Directory.Packages.props
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet test --no-build --configuration Release --verbosity normal
+
+      - name: Pack
+        run: |
+          VERSION_SUFFIX_ARG=""
+          if [ -n "${{ inputs.version_suffix }}" ]; then
+            VERSION_SUFFIX_ARG="--version-suffix ${{ inputs.version_suffix }}"
+          fi
+          dotnet pack --no-build --configuration Release $VERSION_SUFFIX_ARG --output ./artifacts
+
+      - name: Push to NuGet
+        if: ${{ inputs.push_to_nuget && secrets.NUGET_API_KEY != '' }}
+        run: |
+          dotnet nuget push ./artifacts/*.nupkg \
+            --api-key ${{ secrets.NUGET_API_KEY }} \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate

@@ -1,0 +1,153 @@
+name: CI — Release
+
+on:
+  push:
+    branches: [master]
+    paths-ignore:
+      - 'Writerside/**'
+      - 'docs/**'
+      - '*.md'
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  NUGET_SOURCE: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+
+  # ── Build & Test across all target frameworks ─────────────
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        dotnet: ['8.0.x', '9.0.x', '10.0.x']
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET ${{ matrix.dotnet }}
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ matrix.dotnet }}
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Test
+        run: >-
+          dotnet test --no-build --configuration Release
+          --logger "trx;LogFileName=results-${{ matrix.dotnet }}.trx"
+          --results-directory ./TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.dotnet }}
+          path: TestResults/*.trx
+          retention-days: 30
+
+  # ── Pack & Publish stable release packages ────────────────
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Read version from Directory.Build.props
+        id: version
+        run: |
+          MAJOR=$(grep -oP '(?<=<VersionMajor>)\d+' Directory.Build.props)
+          MINOR=$(grep -oP '(?<=<VersionMinor>)\d+' Directory.Build.props)
+          PATCH=$(grep -oP '(?<=<VersionPatch>)\d+' Directory.Build.props)
+          echo "version=v${MAJOR}.${MINOR}.${PATCH}" >> "$GITHUB_OUTPUT"
+
+      - name: Pack release (no version suffix)
+        run: >-
+          dotnet pack --configuration Release
+          --output ./nupkgs
+          src/ProtobuffEncoder/ProtobuffEncoder.csproj
+          src/ProtobuffEncoder.AspNetCore/ProtobuffEncoder.AspNetCore.csproj
+          src/ProtobuffEncoder.Contracts/ProtobuffEncoder.Contracts.csproj
+          src/ProtobuffEncoder.Grpc/ProtobuffEncoder.Grpc.csproj
+          src/ProtobuffEncoder.WebSockets/ProtobuffEncoder.WebSockets.csproj
+          src/ProtobuffEncoder.Analyzers/ProtobuffEncoder.Analyzers.csproj
+
+      - name: Upload NuGet artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nupkgs-release
+          path: ./nupkgs/*.nupkg
+          retention-days: 30
+
+      - name: Push to GitHub Packages
+        run: >-
+          dotnet nuget push ./nupkgs/*.nupkg
+          --api-key ${{ secrets.GITHUB_TOKEN }}
+          --source ${{ env.NUGET_SOURCE }}
+          --skip-duplicate
+
+  # ── Create GitHub Release with tag ────────────────────────
+  release:
+    needs: publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if tag exists
+        id: tag_check
+        run: |
+          if git rev-parse "${{ needs.publish.outputs.version }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download NuGet packages
+        if: steps.tag_check.outputs.exists == 'false'
+        uses: actions/download-artifact@v4
+        with:
+          name: nupkgs-release
+          path: ./nupkgs
+
+      - name: Create tag and GitHub Release
+        if: steps.tag_check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ needs.publish.outputs.version }}"
+          git tag "$VERSION"
+          git push origin "$VERSION"
+          gh release create "$VERSION" \
+            --title "$VERSION" \
+            --generate-notes \
+            ./nupkgs/*.nupkg
