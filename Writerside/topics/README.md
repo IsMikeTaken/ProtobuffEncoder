@@ -143,6 +143,14 @@ pie title "Test Suite (430+ tests)"
 | [gRPC](grpc_integration.md) | Marshaller, client proxy, service discovery |
 | [WebSockets](websocket_integration.md) | Client, server, connection manager, retry |
 
+### Setup Guides
+
+| Tier | What You Will Learn |
+|------|-------------|
+| [Simple Setup](simple_setup.md) | REST, WebSocket, and gRPC in the fewest lines possible |
+| [Normal Setup](normal_setup.md) | Builder pattern, options, validation, HttpClient, assembly discovery |
+| [Advanced Setup](advanced_setup.md) | Auto-discovery, ProtobufWriter, SchemaDecoder, polymorphism, schema generation |
+
 ### Tools and Quality
 
 | Topic | What You Will Learn |
@@ -150,4 +158,4 @@ pie title "Test Suite (430+ tests)"
 | [CLI Tool](cli_tool.md) | Schema generation, `.csproj` patching |
 | [Test Strategy](test_strategy_overview.md) | FIRST-U patterns, 430+ tests |
 | [Benchmarks](benchmarks_overview.md) | Performance results across .NET 8, 9, and 10 |
-| [Demos](demos_overview.md) | Demo project walkthroughs |
+| [Demos](demos_overview.md) | Demo project walkthroughs and setup guides |

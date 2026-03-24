@@ -29,9 +29,25 @@
     <Project Path="demos/ProtobuffEncoder.Demo.Bidirectional.Client/ProtobuffEncoder.Demo.Bidirectional.Client.csproj" />
     <Project Path="demos/ProtobuffEncoder.Demo.Grpc.Server/ProtobuffEncoder.Demo.Grpc.Server.csproj" />
     <Project Path="demos/ProtobuffEncoder.Demo.Grpc.Client/ProtobuffEncoder.Demo.Grpc.Client.csproj" />
-    <Project Path="demos/ProtobuffEncoder.Demo.Setup/ProtobuffEncoder.Demo.Setup.csproj">
-      <Build Solution="Release|*" Project="false" />
-    </Project>
+  </Folder>
+
+  <Folder Name="/demos/setup/">
+    <Project Path="demos/Setup/Shared/ProtobuffEncoder.Demo.Setup.Shared.csproj" />
+    <Folder Name="/demos/setup/simple/">
+      <Project Path="demos/Setup/Simple/Rest/ProtobuffEncoder.Demo.Setup.Simple.Rest.csproj" />
+      <Project Path="demos/Setup/Simple/WebSockets/ProtobuffEncoder.Demo.Setup.Simple.WebSockets.csproj" />
+      <Project Path="demos/Setup/Simple/Grpc/ProtobuffEncoder.Demo.Setup.Simple.Grpc.csproj" />
+    </Folder>
+    <Folder Name="/demos/setup/normal/">
+      <Project Path="demos/Setup/Normal/Rest/ProtobuffEncoder.Demo.Setup.Normal.Rest.csproj" />
+      <Project Path="demos/Setup/Normal/WebSockets/ProtobuffEncoder.Demo.Setup.Normal.WebSockets.csproj" />
+      <Project Path="demos/Setup/Normal/Grpc/ProtobuffEncoder.Demo.Setup.Normal.Grpc.csproj" />
+    </Folder>
+    <Folder Name="/demos/setup/advanced/">
+      <Project Path="demos/Setup/Advanced/Rest/ProtobuffEncoder.Demo.Setup.Advanced.Rest.csproj" />
+      <Project Path="demos/Setup/Advanced/WebSockets/ProtobuffEncoder.Demo.Setup.Advanced.WebSockets.csproj" />
+      <Project Path="demos/Setup/Advanced/Grpc/ProtobuffEncoder.Demo.Setup.Advanced.Grpc.csproj" />
+    </Folder>
   </Folder>
   <Folder Name="/benchmarks/">
     <Project Path="benchmarks/ProtobuffEncoder.Benchmarks/ProtobuffEncoder.Benchmarks.csproj" />
