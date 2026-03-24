@@ -21,7 +21,9 @@ on:
 
 jobs:
   build-test-pack:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        dotnet-version: [ '8.0.x', '9.0.x', '10.0.x' ]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,12 +33,9 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: |
-            8.0.x
-            9.0.x
-            10.0.x
+          dotnet-version: ${{ matrix.dotnet-version }}
           cache: true
-          cache-dependency-path: '**/packages.lock.json' # Or Directory.Packages.props
+          cache-dependency-path: '**/packages.lock.json'
 
       - name: Restore dependencies
         run: dotnet restore
@@ -45,7 +44,11 @@ jobs:
         run: dotnet build --no-restore --configuration Release
 
       - name: Test
-        run: dotnet test --no-build --configuration Release --verbosity normal
+        run: |
+          # Convert '8.0.x' to 'net8.0'
+          DOTNET_VER="${{ matrix.dotnet-version }}"
+          FRAMEWORK_VER=${DOTNET_VER%.x}
+          dotnet test --no-build --configuration Release --verbosity normal --framework "net$FRAMEWORK_VER"
 
       - name: Pack
         run: |

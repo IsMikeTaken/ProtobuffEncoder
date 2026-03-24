@@ -317,7 +317,7 @@ flowchart TD
 
     B --> E["AddProtobufFormatters\nAddProtobufWebSocketEndpoint\nWithGrpc + AddService"]
     C --> F["AddProtobuffEncoder + Options\nValidationPipeline\nHttpClient extensions\nAddServiceAssembly"]
-    D --> G["ProtoRegistry auto-discovery\nProtobufWriter manual encoding\nSchemaDecoder\nProtoInclude polymorphism\nGenerateAll assembly schemas"]
+    D --> G["ProtoRegistry auto-discovery\nProtobufWriter manual encoding\nSchemaDecoder\nProtoInclude polymorphism\nAddProtobufValidation\nGenerateAll assembly schemas"]
 
     style A fill:#4a9eff,color:#fff
     style B fill:#34a853,color:#fff

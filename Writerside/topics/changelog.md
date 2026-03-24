@@ -9,12 +9,17 @@ All notable changes to this project will be documented in this file.
 - Shared models project (`ProtobuffEncoder.Demo.Setup.Shared`) with common contracts and gRPC service interfaces.
 - **Roslyn Analyser** (`ProtobuffEncoder.Analyzers`) with 10 compile-time diagnostics (PROTO001–PROTO010) for missing fields, duplicate numbers, invalid ranges, and more.
 - **Templates** — three console app templates (Simple, Normal, Advanced) under `templates/` demonstrating core encode/decode, collections, auto-discovery, and schema generation.
+- Expanded test coverage for `ProtobufValueSender` and `ProtobufValueReceiver`.
+- New integration tests for Tiered Setup Validation (Simple/Normal/Advanced).
+- New `AddProtobufValidation` extension method in `ProtobuffEncoder.AspNetCore`.
 - Advanced demos print resolver output: field numbering strategies, generated `.proto` schemas, registration status, and polymorphism round-trips.
 
 ### Changed {id="v130_changed"}
 - Replaced the single `ProtobuffEncoder.Demo.Setup` project with nine per-transport projects.
 - Restructured the "Demo" section in the documentation table of contents; setup guides now live under **Demos > Setup Guides**.
 - Updated simple, normal, and advanced setup documentation to reflect the new per-transport structure with accurate API usage and expected console output.
+- Enabled multi-targeting for .NET 8, 9, and 10 across all test projects.
+- Updated GitHub Actions CI/CD to use a build matrix for .NET 8, 9, and 10.
 - Overhauled demos overview page with the new folder structure and a setup guide summary table.
 
 ### Fixed {id="v130_fixed"}

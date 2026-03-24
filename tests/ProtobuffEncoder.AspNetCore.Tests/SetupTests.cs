@@ -1,8 +1,10 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using ProtobuffEncoder.AspNetCore.Setup;
 using ProtobuffEncoder.AspNetCore.Setup.Strategies;
 using ProtobuffEncoder.AspNetCore.Tests.Fixtures;
 using ProtobuffEncoder.Transport;
+using ProtobuffEncoder.WebSockets;
 
 namespace ProtobuffEncoder.AspNetCore.Tests;
 
@@ -184,35 +186,85 @@ public class SetupTests
 
     #endregion
 
-    #region Mock-Object Pattern — strategy invocation
+    #region Integration-Tier Pattern — Tiered Setup (Simple, Normal, Advanced)
 
     [Fact]
-    public void WebSocketStrategy_AddEndpoint_RegistersConnectionManager()
+    public void Setup_SimpleTier_RegistersBaseServices()
     {
         var services = new ServiceCollection();
+        
+        // Simulating Program_Simple.cs
+        services.AddControllers().AddProtobufFormatters();
+        services.AddProtobufWebSocketEndpoint<TestResponse, TestRequest>();
+        services.AddGrpc();
         services.AddProtobuffEncoder()
-            .WithWebSocket(ws => ws.AddEndpoint<TestRequest, TestResponse>());
+            .WithGrpc(grpc => grpc.AddService<FakeGrpcService>());
 
         var provider = services.BuildServiceProvider();
+        
+        Assert.NotNull(provider.GetService<ProtobufEncoderOptions>());
+        Assert.NotNull(provider.GetService<WebSockets.WebSocketConnectionManager<TestResponse, TestRequest>>());
+    }
 
-        // The WebSocket strategy should register WebSocketConnectionManager<TSend, TReceive>
-        var manager = provider.GetService<WebSockets.WebSocketConnectionManager<TestRequest, TestResponse>>();
-        Assert.NotNull(manager);
+    [Fact]
+    public void Setup_NormalTier_AddsValidation()
+    {
+        var services = new ServiceCollection();
+        
+        // Simulating Program_Normal.cs
+        services.AddProtobuffEncoder(options => { });
+        services.AddProtobufValidation(registry => 
+        {
+            registry.AddRule<TestRequest>(req => req.Id > 0, "Id must be positive");
+        });
+
+        var provider = services.BuildServiceProvider();
+        var validator = provider.GetRequiredService<IProtobufValidator>();
+        
+        var validResult = validator.Validate(new TestRequest { Id = 1 });
+        var invalidResult = validator.Validate(new TestRequest { Id = 0 });
+
+        Assert.True(validResult.IsValid);
+        Assert.False(invalidResult.IsValid);
+        Assert.Equal("Id must be positive", invalidResult.ErrorMessage);
+    }
+
+    [Fact]
+    public void Setup_AdvancedTier_GlobalValidationCallback()
+    {
+        var services = new ServiceCollection();
+        bool callbackCalled = false;
+        
+        // Simulating Program_Advanced.cs
+        services.AddProtobuffEncoder(options => 
+        {
+            options.OnGlobalValidationFailure = (msg, result) => callbackCalled = true;
+        });
+
+        var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<ProtobufEncoderOptions>>().Value;
+        
+        options.OnGlobalValidationFailure?.Invoke(new object(), ValidationResult.Fail("Error"));
+        
+        Assert.True(callbackCalled);
     }
 
     #endregion
 
-    /// <summary>Fake strategy for testing custom transport registration.</summary>
-    private class FakeTransportStrategy : IProtobufTransportStrategy
-    {
-        public bool ServicesConfigured { get; private set; }
-        public bool EndpointsConfigured { get; private set; }
+}
 
-        public void ConfigureServices(IServiceCollection services, ProtobufEncoderOptions options)
-            => ServicesConfigured = true;
+internal class FakeGrpcService { }
 
-        public void ConfigureEndpoints(Microsoft.AspNetCore.Routing.IEndpointRouteBuilder endpoints,
-            ProtobufEncoderOptions options)
-            => EndpointsConfigured = true;
-    }
+/// <summary>Fake strategy for testing custom transport registration.</summary>
+internal class FakeTransportStrategy : IProtobufTransportStrategy
+{
+    public bool ServicesConfigured { get; private set; }
+    public bool EndpointsConfigured { get; private set; }
+
+    public void ConfigureServices(IServiceCollection services, ProtobufEncoderOptions options)
+        => ServicesConfigured = true;
+
+    public void ConfigureEndpoints(Microsoft.AspNetCore.Routing.IEndpointRouteBuilder endpoints,
+        ProtobufEncoderOptions options)
+        => EndpointsConfigured = true;
 }

@@ -41,6 +41,7 @@ builder.Services.AddProtobuffEncoder(options =>
     options.OnGlobalValidationFailure = (message, result) =>
         Console.WriteLine($"[Validation] {message.GetType().Name}: {result.ErrorMessage}");
 })
+.AddProtobufValidation()
 .WithRestFormatters();
 ```
 
