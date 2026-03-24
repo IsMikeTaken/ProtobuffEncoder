@@ -16,11 +16,9 @@ Compares `StaticMessage<T>` (pre-compiled delegates) against the standard dynami
 ### Performance Optimization: Static vs Dynamic
 
 ```mermaid
-xychart-beta
-    title "Static vs Dynamic Encoding (.NET 10)"
-    x-axis ["Static", "Dynamic"]
-    y-axis "Time (ns)"
-    bar [824.4, 1602.7]
+pie title "Static vs Dynamic Encoding (.NET 10)"
+    "Static (824 ns)" : 824
+    "Dynamic (1603 ns)" : 1603
 ```
 
 **Key Insight:** `StaticMessage` provides a ~50% performance boost in encoding by bypassing the `ContractResolver` dictionary lookup and using pre-compiled delegates for field access.
@@ -69,3 +67,4 @@ pie title "ProtobufWriter Allocation (Simple Message)"
 ```
 
 **Key Insight:** For performance-critical code where object allocation must be avoided, the `ProtobufWriter` provides the fastest possible path to generating Protobuf-compliant binary data.
+

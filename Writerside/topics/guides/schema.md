@@ -112,7 +112,7 @@ public interface IOrderProcessingService
 The generator produces:
 
 **`v1/Order.proto`** — imports the namespace file for `CustomerDetails`:
-```protobuf
+```text
 syntax = "proto3";
 package MyApp.Models;
 
@@ -126,7 +126,7 @@ message Order {
 ```
 
 **`OrderProcessingService.proto`** — imports both message files:
-```protobuf
+```text
 syntax = "proto3";
 package MyApp.Services;
 
@@ -179,7 +179,7 @@ public interface IOrderService { ... }
 ```
 
 Produces:
-```protobuf
+```text
 // Metadata: Handles order lifecycle
 service OrderService {
   ...
@@ -202,7 +202,7 @@ public class WeatherRequest
 
 Produces:
 
-```protobuf
+```text
 syntax = "proto3";
 package ProtobuffEncoder.Contracts;
 
@@ -381,3 +381,4 @@ app.MapPost("/api/weather", async (HttpContext ctx, SchemaDecoder schema) =>
     return Results.Bytes(response.ToByteArray(), "application/x-protobuf");
 });
 ```
+

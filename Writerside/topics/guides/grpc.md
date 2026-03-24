@@ -256,3 +256,4 @@ options:
 // Both browser and gRPC connect to the same HTTPS endpoint
 var channel = GrpcChannel.ForAddress("https://localhost:7400");
 ```
+

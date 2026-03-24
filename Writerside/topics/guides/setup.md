@@ -283,3 +283,4 @@ public class MyService
 
 When you reference `ProtobuffEncoder.AspNetCore`, all transport libraries are transitively
 available — the unified setup builder can configure any combination.
+

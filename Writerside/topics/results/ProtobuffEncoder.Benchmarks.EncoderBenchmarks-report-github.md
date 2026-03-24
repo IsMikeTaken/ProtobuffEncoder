@@ -16,3 +16,4 @@ WarmupCount=3
 | Decode_Small | 529.1 ns |   264.2 ns | 14.48 ns | 0.0572 |      - |     736 B |
 | Encode_Large | 999.0 ns |   639.3 ns | 35.04 ns | 0.5417 | 0.0038 |    6832 B |
 | Decode_Large | 820.5 ns |   669.7 ns | 36.71 ns | 0.3052 |      - |    3832 B |
+

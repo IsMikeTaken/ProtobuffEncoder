@@ -208,3 +208,4 @@ await using var sender = new ProtobufSender<T>(stream, ownsStream: true);
 // Caller manages stream lifetime
 await using var sender = new ProtobufSender<T>(stream, ownsStream: false);
 ```
+

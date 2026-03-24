@@ -42,3 +42,4 @@ Tests how deep object hierarchies affect performance.
 | **Decode_Deep (3 Levels)** | 2.383 μs | 0.1026 μs | 0.2365 | 2.92 KB |
 
 **Key Insight:** Each level of nesting adds roughly 1.2 μs and 1.5 KB of allocation overhead during serialization due to recursive processing and length-prefix calculation.
+

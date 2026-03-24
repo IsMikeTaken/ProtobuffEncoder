@@ -109,3 +109,4 @@ app.MapGet("/api/send-weather", async (
 ### Schema-only receiver (no Contracts reference)
 
 See [Schema Guide](schema.md) for the full pattern of receiving and decoding protobuf without any compile-time knowledge of the sender's C# types.
+

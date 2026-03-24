@@ -202,3 +202,4 @@ var summary = await client.UploadReadings(GenerateReadingsAsync(), ct);
 await foreach (var alert in client.Monitor(GenerateReadingsAsync(), ct))
     Console.WriteLine($"Alert: {alert.Message}");
 ```
+

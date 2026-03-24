@@ -88,3 +88,4 @@ dotnet test tests/ProtobuffEncoder.Grpc.Tests/
 dotnet test tests/ProtobuffEncoder.WebSockets.Tests/
 dotnet test tests/ProtobuffEncoder.Tool.Tests/
 ```
+

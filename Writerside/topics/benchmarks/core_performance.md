@@ -45,3 +45,4 @@ Tests how deep object hierarchies affect performance.
 
 > [!IMPORTANT]
 > Each level of nesting adds roughly 1.2 μs and 1.5 KB of allocation overhead during serialization due to recursive processing and length-prefix calculation.
+

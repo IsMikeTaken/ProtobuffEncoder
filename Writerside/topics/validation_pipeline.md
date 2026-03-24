@@ -182,3 +182,4 @@ public class MessageValidationException : Exception
     // message contains the validation error message
 }
 ```
+

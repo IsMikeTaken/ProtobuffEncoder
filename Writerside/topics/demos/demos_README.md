@@ -182,3 +182,4 @@ dotnet run --project demos/ProtobuffEncoder.Demo.Console -- -s    # silent
 4. **Validated Transport** — uses `ValidatedProtobufSender` with predicate rules to demonstrate send-time validation. Sends a valid message, then catches the `MessageValidationException` from an invalid one.
 
 Each showcase reports byte sizes, timing, and trace spans (when verbose).
+

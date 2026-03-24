@@ -81,3 +81,4 @@ The target runs `AfterTargets="Build"` and invokes the tool with the current pro
 ## Multi-target Support
 
 The tool targets `net10.0`, `net9.0`, and `net8.0`. When building via MSBuild targets, it uses the same framework as the host project.
+

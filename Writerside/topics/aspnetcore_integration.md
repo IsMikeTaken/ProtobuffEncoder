@@ -192,3 +192,4 @@ var response = await client.PostProtobufAsync<WeatherRequest, WeatherResponse>(
 
 Console.WriteLine($"{response.City}: {response.Temperature}C, {response.Description}");
 ```
+

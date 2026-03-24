@@ -40,3 +40,4 @@ You can also filter for specific benchmarks:
 ```bash
 dotnet run -c Release --project benchmarks/ProtobuffEncoder.Benchmarks -- --filter "*EncoderBenchmarks*"
 ```
+

@@ -218,3 +218,4 @@ var person = new Person
 byte[] encoded = ProtobufEncoder.Encode(person);
 var decoded = ProtobufEncoder.Decode<Person>(encoded);
 ```
+

@@ -5,11 +5,11 @@ ProtobuffEncoder includes a comprehensive benchmark suite using [BenchmarkDotNet
 ## Performance Overview
 
 ```mermaid
-xychart-beta
-    title "Core Throughput: .NET 10 (Op/s)"
-    x-axis ["Encode Small", "Decode Small", "Encode Large", "Decode Large"]
-    y-axis "Operations per Second"
-    bar [570223, 743955, 170146, 289027]
+pie title "Core Throughput: .NET 10 (Op/s)"
+    "Encode Small (570K)" : 570223
+    "Decode Small (744K)" : 743955
+    "Encode Large (170K)" : 170146
+    "Decode Large (289K)" : 289027
 ```
 
 ## Running Benchmarks
@@ -98,3 +98,4 @@ Measures validation pipeline throughput.
 - **One allocation per nested message** during encoding for length-prefix calculation.
 - **ContractResolver caches** are thread-safe and never evicted.
 - **StaticMessage** caches delegate references, minimizing the hot path.
+

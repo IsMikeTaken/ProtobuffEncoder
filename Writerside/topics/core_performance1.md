@@ -16,19 +16,17 @@ Measures the fundamental encode and decode operations for small (2 fields) and l
 ### Runtime Comparison (.NET 8 vs 9 vs 10)
 
 ```mermaid
-xychart-beta
-    title "Encoder Performance: Small Message (ns)"
-    x-axis [".NET 8", ".NET 9", ".NET 10"]
-    y-axis "Time (ns)"
-    bar [892.9, 1174.2, 1753.7]
+pie title "Small Message Encode Time (ns)"
+    ".NET 8 (893 ns)" : 893
+    ".NET 9 (1174 ns)" : 1174
+    ".NET 10 (1754 ns)" : 1754
 ```
 
 ```mermaid
-xychart-beta
-    title "Encoder Performance: Large Message (ns)"
-    x-axis [".NET 8", ".NET 9", ".NET 10"]
-    y-axis "Time (ns)"
-    bar [2940.6, 2698.6, 5877.3]
+pie title "Large Message Encode Time (ns)"
+    ".NET 8 (2941 ns)" : 2941
+    ".NET 9 (2699 ns)" : 2699
+    ".NET 10 (5877 ns)" : 5877
 ```
 
 **Key Insight:** While .NET 10 shows higher absolute numbers in these specific runs, the allocation profile remains stable across versions. Decode performance consistently outperforms encode for larger structures.
@@ -68,3 +66,4 @@ Tests how deep object hierarchies affect performance (.NET 10).
 | **Decode_Deep (3 Levels)** | 2.883 μs | 0.2415 μs | 0.0610 | 2.92 KB |
 
 **Key Insight:** Nesting depth primarily affects encoding time because each level requires a separate length-prefix calculation and a temporary buffer. Decoding remains relatively flat as it can process nested fields sequentially.
+

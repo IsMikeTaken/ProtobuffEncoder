@@ -96,3 +96,4 @@ dotnet test --filter "FullyQualifiedName~Validation"
 # Run with detailed output
 dotnet test -v detailed
 ```
+

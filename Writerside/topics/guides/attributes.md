@@ -157,7 +157,7 @@ public class UserProfile
 
 Generated `.proto` output:
 
-```protobuf
+```text
 message UserProfile {
   map<string, string> Preferences = 1;
   map<string, Address> Addresses = 2;
@@ -184,7 +184,7 @@ public class Contact
 
 Generated `.proto` output:
 
-```protobuf
+```text
 message Contact {
   oneof primary_contact {
     string Email = 1;
@@ -266,3 +266,4 @@ public class AdminProfile : UserProfile
     public string Department { get; set; } = "";
 }
 ```
+

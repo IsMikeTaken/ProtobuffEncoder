@@ -5,6 +5,7 @@
     <Project Path="src/ProtobuffEncoder.Contracts/ProtobuffEncoder.Contracts.csproj" />
     <Project Path="src/ProtobuffEncoder.WebSockets/ProtobuffEncoder.WebSockets.csproj" />
     <Project Path="src/ProtobuffEncoder.Grpc/ProtobuffEncoder.Grpc.csproj" />
+    <Project Path="src/ProtobuffEncoder.Analyzers/ProtobuffEncoder.Analyzers.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/ProtobuffEncoder.Tests/ProtobuffEncoder.Tests.csproj" />
@@ -36,6 +37,12 @@
     <Project Path="benchmarks/ProtobuffEncoder.Benchmarks/ProtobuffEncoder.Benchmarks.csproj" />
   </Folder>
   <Folder Name="/demos/" />
+
+  <Folder Name="/templates/">
+    <Project Path="templates/ProtobuffEncoder.Template.Simple/ProtobuffEncoder.Template.Simple.csproj" />
+    <Project Path="templates/ProtobuffEncoder.Template.Normal/ProtobuffEncoder.Template.Normal.csproj" />
+    <Project Path="templates/ProtobuffEncoder.Template.Advanced/ProtobuffEncoder.Template.Advanced.csproj" />
+  </Folder>
 
   <Folder Name="/demos/console/">
     <Project Path="demos/ProtobuffEncoder.Demo.Console/ProtobuffEncoder.Demo.Console.csproj" />

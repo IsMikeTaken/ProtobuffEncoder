@@ -17,11 +17,10 @@ Measures the time to generate a `.proto` schema string from C# types using refle
 ### Runtime Comparison: Schema Generation
 
 ```mermaid
-xychart-beta
-    title "Schema Generation Time (μs)"
-    x-axis [".NET 8", ".NET 9", ".NET 10"]
-    y-axis "Time (μs)"
-    bar [3.514, 3.926, 5.126]
+pie title "Schema Generation Time (proportional)"
+    ".NET 8 (3.51 μs)" : 3514
+    ".NET 9 (3.93 μs)" : 3926
+    ".NET 10 (5.13 μs)" : 5126
 ```
 
 **Key Insight:** Schema generation is a reflection-heavy operation. While not intended for hot-path use, it is efficient enough to be used for dynamic discovery or on-the-fly schema serving.
@@ -36,3 +35,4 @@ Measures the performance of the `ProtoSchemaParser` and the `SchemaDecoder` (.NE
 | **SchemaDecoder_Decode** | 320.9 ns | 22.63 ns | 0.0145 | 696 B |
 
 **Key Insight:** Once a schema is parsed, the `SchemaDecoder` is extremely fast at extracting data from binary Protobuf messages, making it an excellent choice for generic proxies or data inspection tools where C# models are not available.
+

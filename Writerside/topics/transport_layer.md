@@ -240,3 +240,4 @@ await using var sender = new ProtobufSender<T>(stream); // disposes stream
 using var sender = new ProtobufSender<T>(stream, ownsStream: false);
 // stream remains open after sender is disposed
 ```
+

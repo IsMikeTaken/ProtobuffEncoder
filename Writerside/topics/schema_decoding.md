@@ -222,3 +222,4 @@ var decoded = decoder.Decode("OrderMessage", bytes);
 Console.WriteLine(decoded["OrderId"]); // 1
 Console.WriteLine(decoded["Total"]);   // 99.99
 ```
+

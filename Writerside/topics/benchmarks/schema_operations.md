@@ -28,3 +28,4 @@ Measures the performance of the `ProtoSchemaParser` and the `SchemaDecoder` (whi
 
 > [!TIP]
 > Once a schema is parsed, the `SchemaDecoder` is extremely fast at extracting data from binary Protobuf messages, making it an excellent choice for generic proxies or data inspection tools where C# models are not available.
+
