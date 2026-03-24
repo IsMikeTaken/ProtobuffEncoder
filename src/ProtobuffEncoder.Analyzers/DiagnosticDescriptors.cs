@@ -64,11 +64,11 @@ internal static class DiagnosticDescriptors
     public static readonly DiagnosticDescriptor FieldWithoutContract = new(
         id: "PROTO005",
         title: "[ProtoField] used without [ProtoContract]",
-        messageFormat: "Property '{0}' on type '{1}' has [ProtoField] but the type is not marked with [ProtoContract] — the attribute will have no effect unless the type is registered with ProtoRegistry",
+        messageFormat: "Property '{0}' on type '{1}' has [ProtoField] but the type is not marked with [ProtoContract]. This is only valid if the type is registered via ProtoRegistry or used as an implicit nested type.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
-        description: "The [ProtoField] attribute only takes effect on types that are either marked with [ProtoContract] or registered via ProtoRegistry.");
+        description: "The [ProtoField] attribute only takes effect on types that are either marked with [ProtoContract], registered via ProtoRegistry, or used as an implicit nested type in a parent contract.");
 
     /// <summary>
     /// PROTO006: A [ProtoField] has a field number less than 1.

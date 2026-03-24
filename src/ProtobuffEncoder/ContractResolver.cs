@@ -20,9 +20,10 @@ internal static class ContractResolver
     {
         return Cache.GetOrAdd(type, static t =>
         {
-            // Auto-discovery: if the type isn't a contract but is registered or auto-discover is on
+            // Auto-discovery: if the type isn't a contract but is registered, auto-discover is on,
+            // or it was implicitly registered during a parent's resolution
             if (t.GetCustomAttribute<ProtoContractAttribute>() is null
-                && (ProtoRegistry.IsRegistered(t) || ProtoRegistry.Options.AutoDiscover))
+                && (ProtoRegistry.IsRegistered(t) || ProtoRegistry.Options.AutoDiscover || ImplicitlyRegistered.ContainsKey(t)))
             {
                 return ResolveCore(t, implicitMode: true);
             }
