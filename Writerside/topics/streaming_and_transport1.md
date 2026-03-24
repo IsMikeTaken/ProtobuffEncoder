@@ -15,11 +15,10 @@ Tests throughput for reading and writing batches of 100 messages with length-del
 ### Runtime Comparison: Streaming (.NET 8 vs 9 vs 10)
 
 ```mermaid
-xychart-beta
-    title "Round Trip Latency (μs)"
-    x-axis [".NET 8", ".NET 9", ".NET 10"]
-    y-axis "Time (μs)"
-    bar [1.708, 1.504, 2.234]
+pie title "Round Trip Latency (proportional)"
+    ".NET 8 (1.71 μs)" : 1708
+    ".NET 9 (1.50 μs)" : 1504
+    ".NET 10 (2.23 μs)" : 2234
 ```
 
 **Key Insight:** Batch processing remains efficient across all runtimes. The .NET 10 results reflect higher stability in memory management (Gen0 collections) during high-throughput streaming.
@@ -48,11 +47,10 @@ Tests the performance of asynchronous encoding, decoding, and streaming APIs (.N
 ### Async Overhead Analysis
 
 ```mermaid
-xychart-beta
-    title "Async vs Sync Encoding (ns)"
-    x-axis ["Sync (.NET 10)", "Async (.NET 10)"]
-    y-axis "Time (ns)"
-    bar [1753, 745]
+pie title "Async vs Sync Encoding (.NET 10)"
+    "Sync (1753 ns)" : 1753
+    "Async (745 ns)" : 745
 ```
 
 **Key Insight:** Interestingly, `EncodeAsync` shows better performance in these benchmarks when using high-performance memory streams, likely due to optimized task scheduling and buffer reuse in the async pipeline.
+

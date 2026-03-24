@@ -16,11 +16,10 @@ Benchmarks serialization of `List<int>` (100 items), `List<string>` (50 items), 
 ### Runtime Comparison: Collections (.NET 8, 9, 10)
 
 ```mermaid
-xychart-beta
-    title "List Serialization Performance (μs)"
-    x-axis [".NET 8", ".NET 9", ".NET 10"]
-    y-axis "Time (μs)"
-    bar [5.737, 4.524, 5.886]
+pie title "List Serialization Time (proportional)"
+    ".NET 8 (5.74 μs)" : 5737
+    ".NET 9 (4.52 μs)" : 4524
+    ".NET 10 (5.89 μs)" : 5886
 ```
 
 **Key Insight:** Map serialization is significantly more expensive than list serialization because Protobuf maps are represented as a repeated sequence of key-value messages, requiring more object allocations and length-prefixing.
@@ -56,3 +55,4 @@ Tests polymorphic encoding where a derived type is serialized through its base c
 | **Decode_DerivedType** | 1,201.0 ns | 66.93 ns | 0.0153 | 888 B |
 
 **Key Insight:** Encoding derived types is slower because it must resolve the hierarchy and wrap the derived fields in a sub-message. However, decoding is highly efficient as it uses pre-resolved type mapping.
+

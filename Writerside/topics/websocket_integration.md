@@ -249,3 +249,4 @@ ConfigureWebSocket = ws =>
 ## WebSocketStream
 
 Internal `Stream` adapter that bridges `System.Net.WebSockets.WebSocket` to the `Stream` API used by `ProtobufDuplexStream`. Handles binary message framing and proper WebSocket close handshake.
+

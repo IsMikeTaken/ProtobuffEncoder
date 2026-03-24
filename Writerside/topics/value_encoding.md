@@ -284,3 +284,4 @@ var content = new LocalizedContent
 byte[] bytes = ProtobufEncoder.Encode(content);
 var decoded = ProtobufEncoder.Decode<LocalizedContent>(bytes);
 ```
+

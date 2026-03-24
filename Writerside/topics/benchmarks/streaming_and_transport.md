@@ -39,3 +39,4 @@ Tests the performance of asynchronous encoding, decoding, and streaming APIs.
 
 > [!IMPORTANT]
 > Async operations in .NET 10 are highly optimized, showing very low overhead compared to their synchronous counterparts when running on high-performance streams like `MemoryStream`.
+

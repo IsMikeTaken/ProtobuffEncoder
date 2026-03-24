@@ -236,3 +236,4 @@ Features:
 - Graceful close detection
 - Buffer pooling via `MemoryPool<byte>`
 - Works identically for server and client WebSockets
+

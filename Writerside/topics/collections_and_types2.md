@@ -38,3 +38,4 @@ Tests polymorphic encoding where a derived type is serialized through its base c
 | **Decode_DerivedType** | 588.6 ns | 16.38 ns | 0.0687 | 888 B |
 
 **Key Insight:** Encoding derived types is slower because it must resolve the hierarchy and wrap the derived fields in a sub-message (field 10 in this benchmark). Decoding is efficient as it uses the pre-resolved type mapping.
+

@@ -118,3 +118,4 @@ dotnet run --project demos/ProtobuffEncoder.Demo.Bidirectional.Client
 ```bash
 dotnet run --project demos/ProtobuffEncoder.Demo.SchemaGen
 ```
+

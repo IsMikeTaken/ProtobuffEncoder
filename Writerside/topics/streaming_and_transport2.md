@@ -36,3 +36,4 @@ Tests the performance of asynchronous encoding, decoding, and streaming APIs.
 | **WriteDelimitedAsync_50** | 37.504 μs | 1,884.59 ns | 4.6387 | 58.53 KB |
 
 **Key Insight:** Async operations in .NET 10 are highly optimized, showing very low overhead compared to their synchronous counterparts when running on high-performance streams like `MemoryStream`.
+

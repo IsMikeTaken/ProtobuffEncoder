@@ -11,7 +11,7 @@ Marks a class, struct, or enum for protobuf serialization.
 public sealed class ProtoContractAttribute : Attribute
 ```
 
-### Properties
+### Properties {id="protocontract_props"}
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
@@ -25,7 +25,7 @@ public sealed class ProtoContractAttribute : Attribute
 | `FieldNumbering` | `FieldNumbering` | not set | Controls auto-assigned field numbering strategy: `DeclarationOrder`, `Alphabetical`, or `TypeThenAlphabetical`. See [Auto-Discovery](auto_discovery.md) |
 | `DefaultEncoding` | `string?` | `null` | Sets the default text encoding for all string fields (e.g. "utf-8", "utf-16", "utf-32", "ascii"). Supports emoji with Unicode encodings |
 
-### Examples
+### Examples {id="protocontract_examples"}
 
 ```C#
 // Basic contract - all public properties included automatically
@@ -97,7 +97,7 @@ Overrides protobuf field metadata for a property.
 public sealed class ProtoFieldAttribute : Attribute
 ```
 
-### Properties
+### Properties {id="protofield_props"}
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
@@ -110,7 +110,7 @@ public sealed class ProtoFieldAttribute : Attribute
 | `IsRequired` | `bool` | `false` | Throws if field is null/default during encoding |
 | `Encoding` | `string?` | `null` | Override text encoding for this field (inherits from `DefaultEncoding` or UTF-8) |
 
-### Examples
+### Examples {id="protofield_examples"}
 
 ```C#
 [ProtoContract]
@@ -142,14 +142,14 @@ Marks a `Dictionary<K,V>` property as a protobuf map field.
 public sealed class ProtoMapAttribute : Attribute
 ```
 
-### Properties
+### Properties {id="protomap_props"}
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `KeyType` | `string?` | `null` | Override key's proto type name |
 | `ValueType` | `string?` | `null` | Override value's proto type name |
 
-### Example
+### Example {id="protomap_example"}
 
 ```C#
 [ProtoContract]
@@ -183,13 +183,13 @@ Groups properties into a protobuf `oneof` union. At most one property in the gro
 public sealed class ProtoOneOfAttribute : Attribute
 ```
 
-### Properties
+### Properties {id="protooneof_props"}
 
 | Property | Type | Description |
 |----------|------|-------------|
 | `GroupName` | `string` | Name of the oneof group |
 
-### Example
+### Example {id="protooneof_example"}
 
 ```C#
 [ProtoContract]
@@ -232,14 +232,14 @@ Declares a known derived type for polymorphic serialization.
 public sealed class ProtoIncludeAttribute : Attribute
 ```
 
-### Properties
+### Properties {id="protoinclude_props"}
 
 | Property | Type | Description |
 |----------|------|-------------|
 | `FieldNumber` | `int` | Field number for the derived type's nested message |
 | `DerivedType` | `Type` | The derived CLR type |
 
-### Example
+### Example {id="protoinclude_example"}
 
 ```C#
 [ProtoContract]
@@ -274,7 +274,7 @@ Excludes a property from serialization.
 public sealed class ProtoIgnoreAttribute : Attribute
 ```
 
-### Example
+### Example {id="protoignore_example"}
 
 ```C#
 [ProtoContract]
@@ -295,7 +295,7 @@ Marks an interface as a gRPC service definition for code-first service generatio
 public sealed class ProtoServiceAttribute : Attribute
 ```
 
-### Properties
+### Properties {id="protoservice_props"}
 
 | Property | Type | Description |
 |----------|------|-------------|
@@ -312,14 +312,14 @@ Marks a method on a `[ProtoService]` interface as an RPC method.
 public sealed class ProtoMethodAttribute : Attribute
 ```
 
-### Properties
+### Properties {id="protomethod_props"}
 
 | Property | Type | Description |
 |----------|------|-------------|
 | `MethodType` | `ProtoMethodType` | `Unary`, `ServerStreaming`, `ClientStreaming`, or `DuplexStreaming` |
 | `Name` | `string?` | Override RPC method name |
 
-### Example
+### Example {id="protomethod_example"}
 
 ```C#
 [ProtoService("WeatherService")]
@@ -349,3 +349,4 @@ The `WireType` enum controls how values are encoded on the wire:
 | `Fixed64` | 1 | `double`, `long`, `ulong`, `DateTime`, `TimeSpan` |
 | `LengthDelimited` | 2 | `string`, `byte[]`, nested messages, `decimal`, `Guid`, `BigInteger` |
 | `Fixed32` | 5 | `float`, `int` (when forced), `uint` |
+

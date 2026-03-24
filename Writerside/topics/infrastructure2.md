@@ -51,3 +51,4 @@ Benchmarks the manual message construction using the low-level `ProtobufWriter` 
 | **Writer_PackedVarints** | 388.86 ns | 70.844 ns | 0.0720 | 904 B |
 
 **Key Insight:** For performance-critical code where object allocation must be avoided, the `ProtobufWriter` provides the fastest possible path to generating Protobuf-compliant binary data.
+

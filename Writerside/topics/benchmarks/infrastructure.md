@@ -55,3 +55,4 @@ Benchmarks the manual message construction using the low-level `ProtobufWriter` 
 
 > [!IMPORTANT]
 > For performance-critical code where object allocation must be avoided, the `ProtobufWriter` provides the fastest possible path to generating Protobuf-compliant binary data.
+

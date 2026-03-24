@@ -659,3 +659,4 @@ The `ProjectModifier` is covered by 12 tests in `ProtobuffEncoder.Tool.Tests` fo
 | **Bit-Error-Simulation** | 1 | Subdirectory relative path handling |
 | **Signalled** | 1 | Sequential calls all persist |
 | **Performance** | 1 | 100 files complete in under 2 seconds |
+
