@@ -56,7 +56,10 @@ jobs:
           if [ -n "${{ inputs.version_suffix }}" ]; then
             VERSION_SUFFIX_ARG="--version-suffix ${{ inputs.version_suffix }}"
           fi
-          dotnet pack --no-build --configuration Release $VERSION_SUFFIX_ARG --output ./artifacts
+          for project in src/*/*.csproj; do
+            echo "Packing $project..."
+            dotnet pack "$project" --no-build --configuration Release $VERSION_SUFFIX_ARG --output ./artifacts
+          done
 
       - name: Push to NuGet
         if: ${{ inputs.push_to_nuget && secrets.NUGET_API_KEY != '' }}

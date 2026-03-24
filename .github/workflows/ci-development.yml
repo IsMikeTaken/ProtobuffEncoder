@@ -74,16 +74,13 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Pack with dev version suffix
-        run: >-
-          dotnet pack --configuration Release
-          -p:VersionSuffix="dev.${{ github.run_number }}"
-          --output ./nupkgs
-          src/ProtobuffEncoder/ProtobuffEncoder.csproj
-          src/ProtobuffEncoder.AspNetCore/ProtobuffEncoder.AspNetCore.csproj
-          src/ProtobuffEncoder.Contracts/ProtobuffEncoder.Contracts.csproj
-          src/ProtobuffEncoder.Grpc/ProtobuffEncoder.Grpc.csproj
-          src/ProtobuffEncoder.WebSockets/ProtobuffEncoder.WebSockets.csproj
-          src/ProtobuffEncoder.Analyzers/ProtobuffEncoder.Analyzers.csproj
+        run: |
+          for project in src/*/*.csproj; do
+            echo "Packing $project..."
+            dotnet pack "$project" --configuration Release \
+              -p:VersionSuffix="dev.${{ github.run_number }}" \
+              --output ./nupkgs
+          done
 
       - name: Push to GitHub Packages
         run: >-
