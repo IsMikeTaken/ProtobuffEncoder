@@ -23,12 +23,20 @@ permissions:
 
 jobs:
 
-  # ── Build & Test across all target frameworks ─────────────
+  # ── Build & Test each target framework ────────────────────
   build:
+    name: test / ${{ matrix.framework }}
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        dotnet: ['8.0.x', '9.0.x', '10.0.x']
+        include:
+          - framework: net8.0
+            label: '.NET 8'
+          - framework: net9.0
+            label: '.NET 9'
+          - framework: net10.0
+            label: '.NET 10'
 
     steps:
       - name: Checkout
@@ -36,33 +44,50 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup .NET ${{ matrix.dotnet }}
+      - name: Setup .NET SDKs
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: ${{ matrix.dotnet }}
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
 
       - name: Restore
         run: dotnet restore
 
-      - name: Build
+      - name: Build (all targets)
         run: dotnet build --no-restore --configuration Release
 
-      - name: Test
+      - name: Test — ${{ matrix.label }}
         run: >-
           dotnet test --no-build --configuration Release
-          --logger "trx;LogFileName=results-${{ matrix.dotnet }}.trx"
+          --framework ${{ matrix.framework }}
+          --logger "trx;LogFileName=results-${{ matrix.framework }}.trx"
           --results-directory ./TestResults
+
+      - name: Verify test results exist
+        if: always()
+        run: |
+          echo "── Test result files ──"
+          find ./TestResults -name '*.trx' -exec echo "  ✓ {}" \; 2>/dev/null
+          COUNT=$(find ./TestResults -name '*.trx' 2>/dev/null | wc -l)
+          echo "Found $COUNT result file(s)"
+          if [ "$COUNT" -eq 0 ]; then
+            echo "::error::No test results produced for ${{ matrix.framework }} — tests may have been skipped entirely"
+            exit 1
+          fi
 
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results-${{ matrix.dotnet }}
+          name: test-results-${{ matrix.framework }}
           path: TestResults/*.trx
           retention-days: 30
 
   # ── Pack & Publish stable release packages ────────────────
   publish:
+    name: publish / stable
     needs: build
     runs-on: ubuntu-latest
     outputs:
@@ -74,10 +99,13 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup .NET
+      - name: Setup .NET SDKs
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
 
       - name: Read version from Directory.Build.props
         id: version
@@ -95,6 +123,9 @@ jobs:
               --output ./nupkgs
           done
 
+      - name: List packages
+        run: ls -lh ./nupkgs/*.nupkg
+
       - name: Upload NuGet artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -111,6 +142,7 @@ jobs:
 
   # ── Create GitHub Release with tag ────────────────────────
   release:
+    name: release / tag
     needs: publish
     runs-on: ubuntu-latest
 
