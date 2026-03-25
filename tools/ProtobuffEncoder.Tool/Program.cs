@@ -48,7 +48,7 @@ if (protoFiles.Count == 0)
     return 0;
 }
 
-// Write to directory
+// Write to a directory
 var generatedPaths = ProtoSchemaGenerator.GenerateToDirectory(assembly, outputDir);
 
 foreach (var path in generatedPaths)

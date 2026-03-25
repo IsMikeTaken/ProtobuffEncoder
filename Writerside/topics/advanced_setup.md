@@ -1,17 +1,17 @@
 # Advanced Setup
 
-The Advanced tier is for scenarios that demand maximum control: auto-discovery without attributes, manual wire-level encoding, polymorphic inheritance, schema-only decoding, and assembly-wide schema generation. Each demo prints its resolver output to the console so you can see exactly how the framework interprets your types.
+The Advanced tier is for scenarios that demand maximum control: auto-discovery without attributes, the ProtoRegistry, field numbering strategies, assembly scanning, schema generation, and mixing attributed and plain types. The service interface defined here uses auto-discovered request and response types.
 
 ## What Changes from Normal
 
 ```mermaid
 flowchart TD
     A["Normal Setup"] -->|adds| B["ProtoRegistry auto-discovery"]
-    A -->|adds| C["ProtobufWriter manual encoding"]
-    A -->|adds| D["SchemaDecoder schema-only decode"]
-    A -->|adds| E["ProtoInclude polymorphism"]
-    A -->|adds| F["ProtoSchemaGenerator output"]
-    A -->|adds| G["Assembly-wide schema generation"]
+    A -->|adds| C["Field numbering strategies"]
+    A -->|adds| D["Assembly scanning"]
+    A -->|adds| E["Schema generation"]
+    A -->|adds| F["Mixed attributes + auto-discovery"]
+    A -->|adds| G["Services with plain types"]
 
     style A fill:#4a9eff,color:#fff
     style B fill:#ea4335,color:#fff
@@ -24,112 +24,200 @@ flowchart TD
 
 ---
 
-## REST
+## Auto-Discovery
 
-### Auto-Discovery via ProtoRegistry
-
-Register plain C# classes — no `[ProtoContract]` needed. The resolver assigns field numbers based on the strategy you choose:
+Register a plain C# class — no `[ProtoContract]` needed. The resolver assigns field numbers based on the strategy you choose:
 
 ```C#
-// Explicit registration with a named strategy.
-ProtoRegistry.Register<Customer>(FieldNumbering.Alphabetical);
-ProtoRegistry.Register<Invoice>(FieldNumbering.DeclarationOrder);
+public class Customer
+{
+    public string Name { get; set; } = "";
+    public string Email { get; set; } = "";
+    public decimal CreditLimit { get; set; }
+}
 
-// Or enable global auto-discovery for any class.
+ProtoRegistry.Register<Customer>(FieldNumbering.Alphabetical);
+
+var customer = new Customer { Name = "Acme Ltd", Email = "info@acme.co.uk", CreditLimit = 50_000m };
+byte[] bytes = ProtobufEncoder.Encode(customer);
+var decoded = ProtobufEncoder.Decode<Customer>(bytes);
+```
+
+### Assembly Scanning
+
+`RegisterAssembly` finds every public class with at least one public read/write property and registers it in one call:
+
+```C#
+int count = ProtoRegistry.RegisterAssembly(Assembly.GetExecutingAssembly());
+```
+
+### Global Auto-Discover
+
+Enable auto-discover mode so any class can be serialised without explicit registration:
+
+```C#
 ProtoRegistry.Configure(opts =>
 {
     opts.AutoDiscover = true;
-    opts.DefaultFieldNumbering = FieldNumbering.TypeThenAlphabetical;
+    opts.DefaultFieldNumbering = FieldNumbering.Alphabetical;
 });
 ```
 
-When the demo starts, it prints the resolver output for each type:
+With this in place, any class is resolvable:
 
-```text
-── Customer (Alphabetical) ──
-syntax = "proto3";
-message Customer {
-  string Email = 1;
-  bool   IsActive = 2;
-  string Name = 3;
+```C#
+public class Invoice
+{
+    public string Number { get; set; } = "";
+    public decimal Amount { get; set; }
+    public string Currency { get; set; } = "GBP";
+    public DateTime DueDate { get; set; }
 }
 
-── Invoice (DeclarationOrder) ──
-syntax = "proto3";
-message Invoice {
-  string       Number = 1;
-  string       CustomerName = 2;
-  repeated string LineItems = 3;
-  double       Total = 4;
-}
+var bytes = ProtobufEncoder.Encode(invoice);  // no registration needed
+bool resolvable = ProtoRegistry.IsResolvable(typeof(Invoice));  // true
+```
 
-── Product (Auto-discovered, TypeThenAlphabetical) ──
-syntax = "proto3";
-message Product {
-  string       Category = 1;
-  string       Name = 2;
-  double       Price = 3;
-  repeated string Tags = 4;
+---
+
+## Field Numbering Strategies
+
+The three strategies control how the resolver assigns field numbers to properties without a `[ProtoField]` attribute:
+
+| Strategy | Rule | Example order for `Product` |
+|---|---|---|
+| `DeclarationOrder` | Source declaration order | Name=1, Price=2, Category=3 |
+| `Alphabetical` | Property name, A–Z | Category=1, Name=2, Price=3 |
+| `TypeThenAlphabetical` | Scalars, then collections, then messages — alphabetically within each group | Category=1, Name=2, Price=3 |
+
+```C#
+public class Product
+{
+    public string Name { get; set; } = "";
+    public decimal Price { get; set; }
+    public string Category { get; set; } = "";
 }
 ```
 
-> **Key insight:** Alphabetical numbering sorts by property name (`Email` before `Name`). DeclarationOrder follows source order. TypeThenAlphabetical groups scalars first, then collections, then nested messages — alphabetically within each group.
+Per-type overrides let you mix strategies within the same application:
 
-### Polymorphism with [ProtoInclude]
+```C#
+ProtoRegistry.Register<Product>(FieldNumbering.Alphabetical);
+ProtoRegistry.Register<Customer>(FieldNumbering.DeclarationOrder);
+```
 
-Map derived types to dedicated field numbers on the base class. The encoder wraps each subtype's fields in a nested message at that number:
+---
+
+## Mixing Attributes and Auto-Discovery
+
+When a class has `[ProtoField]` attributes, they always take precedence over the registry's numbering strategy. This lets you gradually migrate from auto-discovery to explicit contracts:
 
 ```C#
 [ProtoContract]
-[ProtoInclude(10, typeof(Circle))]
-[ProtoInclude(11, typeof(Rectangle))]
-public class Shape
+public class AttributedProduct
 {
-    [ProtoField(1)] public string Name { get; set; } = "";
-}
-
-[ProtoContract]
-public class Circle : Shape
-{
-    [ProtoField(1)] public double Radius { get; set; }
+    [ProtoField(10)] public string Sku { get; set; } = "";
+    [ProtoField(20)] public string Title { get; set; } = "";
+    [ProtoField(30)] public double Weight { get; set; }
 }
 ```
 
-Round-trip example output:
-
-```text
-Encoded Circle → 22 bytes
-Decoded as Circle: Name=MyCircle
-Radius=5
-```
-
-### ProtobufWriter — Manual Wire-Level Encoding
-
-For ultra-high-throughput paths, bypass all reflection and write raw protobuf fields directly:
+With `AutoDiscover = true`, both attributed and plain types work side by side:
 
 ```C#
-app.MapPost("/api/manual", (HttpContext context) =>
-{
-    var writer = new ProtobufWriter();
-    writer.WriteString(1, "Manual Response");
-    writer.WriteVarint(2, 42);
-    writer.WriteDouble(3, 3.14159);
-    writer.WriteBool(4, true);
+ProtoRegistry.Configure(opts => opts.AutoDiscover = true);
 
-    var rawBytes = writer.ToByteArray();
-    context.Response.ContentType = "application/x-protobuf";
-    return context.Response.Body.WriteAsync(rawBytes).AsTask();
+var attributed = new AttributedProduct { Sku = "SKU-001", Title = "Premium Widget", Weight = 1.5 };
+var plain = new Customer { Name = "Plain Co", Email = "plain@example.com", CreditLimit = 10_000m };
+
+ProtobufEncoder.Encode(attributed);  // uses field numbers 10, 20, 30
+ProtobufEncoder.Encode(plain);       // uses auto-assigned numbers
+```
+
+---
+
+## Schema Generation
+
+`ProtoSchemaGenerator.Generate` produces a `.proto` definition from any resolvable type. Useful for interop with other languages:
+
+```C#
+string schema = ProtoSchemaGenerator.Generate(typeof(AttributedProduct));
+Console.WriteLine(schema);
+```
+
+Output:
+
+```text
+syntax = "proto3";
+message AttributedProduct {
+  string Sku = 10;
+  string Title = 20;
+  double Weight = 30;
+}
+```
+
+`GenerateAll` scans an assembly and returns one `.proto` string per type:
+
+```C#
+Dictionary<string, string> allSchemas = ProtoSchemaGenerator.GenerateAll(Assembly.GetExecutingAssembly());
+```
+
+---
+
+## Service Interface with Auto-Discovered Types
+
+The service interface uses `[ProtoService]` and `[ProtoMethod]` attributes, but the request and response types are plain classes handled by the registry:
+
+```C#
+public class InventoryQuery
+{
+    public string Sku { get; set; } = "";
+    public string Warehouse { get; set; } = "";
+}
+
+public class StockLevel
+{
+    public string Sku { get; set; } = "";
+    public int Quantity { get; set; }
+    public bool InStock { get; set; }
+    public string Warehouse { get; set; } = "";
+}
+
+[ProtoService("InventoryService")]
+public interface IInventoryService
+{
+    [ProtoMethod(ProtoMethodType.Unary)]
+    Task<StockLevel> CheckStock(InventoryQuery query);
+
+    [ProtoMethod(ProtoMethodType.ServerStreaming)]
+    IAsyncEnumerable<StockLevel> WatchStock(
+        InventoryQuery query, CancellationToken ct = default);
+}
+```
+
+---
+
+## REST
+
+### Auto-Discovery and Schema Endpoints
+
+Register types explicitly or enable global auto-discover, then expose schema introspection alongside your API:
+
+```C#
+ProtoRegistry.Register<Customer>(FieldNumbering.Alphabetical);
+ProtoRegistry.Configure(opts => opts.AutoDiscover = true);
+
+app.MapPost("/api/customer", (Customer customer) =>
+    Results.Ok(new { customer.Name, customer.CreditLimit }));
+
+app.MapGet("/api/schema/{type}", (string type) =>
+{
+    var resolved = ProtoRegistry.RegisteredTypes
+        .FirstOrDefault(t => t.Name == type);
+    return resolved is not null
+        ? Results.Ok(ProtoSchemaGenerator.Generate(resolved))
+        : Results.NotFound();
 });
-```
-
-### SchemaDecoder — Decode Without CLR Types
-
-Generate a `.proto` schema from a type, then decode raw bytes using only that schema. This is useful when the receiver does not have a compile-time reference to the sender's assembly:
-
-```C#
-var protoSchema = ProtoSchemaGenerator.Generate(typeof(Customer));
-var decoder = SchemaDecoder.FromProtoContent(protoSchema);
-var message = decoder.Decode("Customer", rawBytes);
 ```
 
 *Full source: [Advanced/Rest/Program.cs](https://github.com/IsMikeTaken/ProtobuffEncoder/blob/master/demos/Setup/Advanced/Rest/Program.cs)*
@@ -140,7 +228,7 @@ var message = decoder.Decode("Customer", rawBytes);
 
 ### Auto-Discovered Types over WebSockets
 
-Combine `ProtoRegistry` auto-discovery with WebSocket endpoints. The types below have no attributes — the resolver assigns field numbers alphabetically:
+Combine registry auto-discovery with WebSocket endpoints. The types below have no attributes:
 
 ```C#
 public class SensorReading
@@ -155,32 +243,7 @@ public class SensorCommand
     public string SensorId { get; set; } = "";
     public int IntervalMs { get; set; } = 1000;
 }
-```
 
-Resolver output:
-
-```text
-── SensorReading (auto-discovered, Alphabetical) ──
-syntax = "proto3";
-message SensorReading {
-  string SensorId = 1;
-  string Unit = 2;
-  double Value = 3;
-}
-
-── SensorCommand (auto-discovered, Alphabetical) ──
-syntax = "proto3";
-message SensorCommand {
-  int32  IntervalMs = 1;
-  string SensorId = 2;
-}
-```
-
-### Validation + Broadcast
-
-The endpoint combines receive-side validation with a broadcast pattern via the `WebSocketConnectionManager`:
-
-```C#
 app.MapProtobufWebSocket<SensorReading, SensorCommand>("/ws/sensors", options =>
 {
     options.ConfigureReceiveValidation = pipeline =>
@@ -198,30 +261,12 @@ app.MapProtobufWebSocket<SensorReading, SensorCommand>("/ws/sensors", options =>
             {
                 SensorId = command.SensorId,
                 Value = Math.Round(random.NextDouble() * 100, 2),
-                Unit = "°C"
+                Unit = "C"
             });
             await Task.Delay(command.IntervalMs);
         }
     };
 });
-```
-
-For broadcast to all connected clients, inject the connection manager:
-
-```C#
-var manager = app.Services
-    .GetRequiredService<WebSocketConnectionManager<ChatReply, ChatMessage>>();
-await manager.BroadcastAsync(new ChatReply { Text = "Hello everyone!" });
-```
-
-### ProtobufWriter Output
-
-The demo also shows manual wire construction and its hex output:
-
-```text
-── ProtobufWriter demo ──
-  Manual SensorReading: 26 bytes
-  Hex: 0A0E74656D7065726174757265...
 ```
 
 *Full source: [Advanced/WebSockets/Program.cs](https://github.com/IsMikeTaken/ProtobuffEncoder/blob/master/demos/Setup/Advanced/WebSockets/Program.cs)*
@@ -230,78 +275,24 @@ The demo also shows manual wire construction and its hex output:
 
 ## gRPC
 
-### Assembly-Wide Schema Generation
+### Mixed Services with Auto-Discovery
 
-`ProtoSchemaGenerator.GenerateAll` scans an assembly and produces a `.proto` file for every registered and attributed type:
-
-```C#
-var allSchemas = ProtoSchemaGenerator.GenerateAll(typeof(Program).Assembly);
-// Generated 4 .proto file(s):
-//   InventoryItem  (312 chars)
-//   StockLevel     (287 chars)
-//   DemoRequest    (198 chars)
-//   ...
-```
-
-### Schema-Only Decode over gRPC
-
-Encode an auto-discovered type, then decode it through a schema without any CLR type reference:
+The gRPC server auto-discovers service implementations. Request and response types can be plain auto-discovered classes:
 
 ```C#
-var item = new InventoryItem { Sku = "WIDGET-01", Name = "Widget", Quantity = 42, UnitPrice = 9.99 };
-var encoded = ProtobufEncoder.Encode(item);
+ProtoRegistry.Register<InventoryItem>(FieldNumbering.DeclarationOrder);
+ProtoRegistry.Configure(opts => opts.AutoDiscover = true);
 
-var schema = ProtoSchemaGenerator.Generate(typeof(InventoryItem));
-var decoder = SchemaDecoder.FromProtoContent(schema);
-var decoded = decoder.Decode("InventoryItem", encoded);
+builder.Services.AddProtobuffEncoder()
+    .WithGrpc(grpc => grpc
+        .UseKestrel(httpPort: 5000, grpcPort: 5001)
+        .AddServiceAssembly(typeof(Program).Assembly));
+
+var app = builder.Build();
+app.MapProtobufEndpoints();
 ```
 
-Console output:
-
-```text
-── Registration status ──
-  InventoryItem   registered:  True
-  InventoryItem   numbering:   DeclarationOrder
-  StockLevel      registered:  False  (auto-discover)
-  StockLevel      resolvable:  True
-
-── InventoryItem (DeclarationOrder) ──
-syntax = "proto3";
-message InventoryItem {
-  string Sku = 1;
-  string Name = 2;
-  int32  Quantity = 3;
-  double UnitPrice = 4;
-}
-
-── StockLevel (auto-discovered, Alphabetical) ──
-syntax = "proto3";
-message StockLevel {
-  bool   InStock = 1;
-  int32  Quantity = 2;
-  string Sku = 3;
-  string Warehouse = 4;
-}
-
-── Schema-only decode demo ──
-  Encoded InventoryItem: 28 bytes
-  Decoded via schema: { Sku=WIDGET-01, Name=Widget, Quantity=42, UnitPrice=9.99 }
-```
-
-### Mixed Attributed and Auto-Discovered Services
-
-You can have `[ProtoService]` interfaces whose request and response types use auto-discovery:
-
-```C#
-[ProtoService("InventoryService")]
-public interface IInventoryGrpcService
-{
-    [ProtoMethod(ProtoMethodType.Unary)]
-    Task<StockLevel> CheckStock(InventoryItem request);
-}
-```
-
-Here `InventoryItem` and `StockLevel` are plain classes — the resolver handles them through the registry while the service interface uses standard `[ProtoService]` attributes.
+On startup, the demo prints the registration status and generated schemas for all discovered types.
 
 *Full source: [Advanced/Grpc/Program.cs](https://github.com/IsMikeTaken/ProtobuffEncoder/blob/master/demos/Setup/Advanced/Grpc/Program.cs)*
 
@@ -315,9 +306,9 @@ flowchart TD
     A -->|"Validation + Options"| C["Normal Setup"]
     A -->|"Full control"| D["Advanced Setup"]
 
-    B --> E["AddProtobufFormatters\nAddProtobufWebSocketEndpoint\nWithGrpc + AddService"]
-    C --> F["AddProtobuffEncoder + Options\nValidationPipeline\nHttpClient extensions\nAddServiceAssembly"]
-    D --> G["ProtoRegistry auto-discovery\nProtobufWriter manual encoding\nSchemaDecoder\nProtoInclude polymorphism\nAddProtobufValidation\nGenerateAll assembly schemas"]
+    B --> E["AddProtobufFormatters\nProtoService + ProtoMethod\nCreateStaticMessage"]
+    C --> F["Builder pattern + Options\nOneOf & Maps\nValidation pipeline\nHttpClient extensions"]
+    D --> G["ProtoRegistry auto-discovery\nField numbering strategies\nSchema generation\nPlain types as service contracts"]
 
     style A fill:#4a9eff,color:#fff
     style B fill:#34a853,color:#fff
@@ -325,15 +316,50 @@ flowchart TD
     style D fill:#ea4335,color:#fff
 ```
 
-## Running the Demos
+## Running the Template
 
 ```bash
-# REST (prints resolver output, schema, polymorphism round-trip)
-dotnet run --project demos/Setup/Advanced/Rest
+dotnet run --project templates/ProtobuffEncoder.Template.Advanced
+```
 
-# WebSockets (prints schemas, raw writer hex, starts sensor + chat endpoints)
-dotnet run --project demos/Setup/Advanced/WebSockets
+Expected output:
 
-# gRPC (prints registration status, all schemas, schema-only decode)
-dotnet run --project demos/Setup/Advanced/Grpc
+```text
+ProtobuffEncoder — Advanced Template
+
+Customer: Acme Ltd, credit=£50000
+  Registered: True
+
+Assembly scanning...
+  Registered 6 type(s) from this assembly
+  Customer:  True
+  Invoice:   True
+
+Global auto-discover...
+  Invoice INV-2026-001: GBP 1250.00
+  Resolvable (auto): True
+
+Field numbering strategies...
+  DeclarationOrder:     25 bytes  (Name=1, Price=2, Category=3)
+  Alphabetical:         25 bytes  (Category=1, Name=2, Price=3)
+  TypeThenAlphabetical: 25 bytes  (scalars first, then alphabetical)
+
+  Product  -> Alphabetical
+  Customer -> DeclarationOrder
+
+Mixed: attributed + auto-discovered...
+  Attributed: SKU-001 — Premium Widget, 1.5 kg
+  Auto-discovered: Plain Co
+
+Schema generation...
+syntax = "proto3";
+message AttributedProduct { ... }
+
+Assembly-wide schema generation...
+  Generated 6 .proto file(s):
+    ...
+
+Service interface declared: IInventoryService
+  CheckStock(InventoryQuery) -> StockLevel              [Unary]
+  WatchStock(InventoryQuery) -> stream of StockLevel    [ServerStreaming]
 ```

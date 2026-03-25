@@ -11,11 +11,11 @@ internal static class DiagnosticDescriptors
     private const string Category = "ProtobuffEncoder";
 
     /// <summary>
-    /// PROTO001: A class has [ProtoContract] but no serialisable properties.
+    /// PROTO001: A class has [ProtoContract] but no serializable properties.
     /// </summary>
     public static readonly DiagnosticDescriptor ProtoContractWithoutFields = new(
         id: "PROTO001",
-        title: "ProtoContract has no serialisable fields",
+        title: "ProtoContract has no serializable fields",
         messageFormat: "Type '{0}' is marked with [ProtoContract] but has no public properties with getters and setters — nothing will be serialised",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Warning,
@@ -83,7 +83,7 @@ internal static class DiagnosticDescriptors
         description: "Protobuf field numbers must be positive integers between 1 and 536,870,911. Numbers 19,000–19,999 are reserved by the protobuf specification.");
 
     /// <summary>
-    /// PROTO007: A [ProtoField] uses a reserved field number range (19000–19999).
+    /// PROTO007: A [ProtoField] uses a reserved field number range (19,000–19,999).
     /// </summary>
     public static readonly DiagnosticDescriptor ReservedFieldNumber = new(
         id: "PROTO007",
@@ -119,7 +119,7 @@ internal static class DiagnosticDescriptors
         description: "A OneOf group with a single member provides no semantic benefit. Either add more alternatives or remove the [ProtoOneOf] attribute.");
 
     /// <summary>
-    /// PROTO010: An encoding name on [ProtoField] or [ProtoContract] is not recognised.
+    /// PROTO010: An encoding name on [ProtoField] or [ProtoContract] is not recognized.
     /// </summary>
     public static readonly DiagnosticDescriptor UnrecognisedEncoding = new(
         id: "PROTO010",

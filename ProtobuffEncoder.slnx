@@ -9,6 +9,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/ProtobuffEncoder.Tests/ProtobuffEncoder.Tests.csproj" />
+    <Project Path="tests/ProtobuffEncoder.Analyzers.Tests/ProtobuffEncoder.Analyzers.Tests.csproj" />
     <Project Path="tests/ProtobuffEncoder.AspNetCore.Tests/ProtobuffEncoder.AspNetCore.Tests.csproj" />
     <Project Path="tests/ProtobuffEncoder.Grpc.Tests/ProtobuffEncoder.Grpc.Tests.csproj" />
     <Project Path="tests/ProtobuffEncoder.WebSockets.Tests/ProtobuffEncoder.WebSockets.Tests.csproj" />

@@ -1,6 +1,6 @@
 # Simple Setup
 
-The fastest way to get ProtobuffEncoder running in an ASP.NET Core application. Each transport — REST, WebSockets, and gRPC — requires only a single registration call. No custom configuration, no options objects; just wire it up and go.
+The fastest way to start with ProtobuffEncoder. This guide covers contracts, encoding, decoding, streaming, and declaring a service interface. Each transport — REST, WebSockets, and gRPC — requires only a single registration call.
 
 ## What You Get
 
@@ -21,15 +21,113 @@ flowchart LR
     style D fill:#34a853,color:#fff
 ```
 
-Each transport has its own dedicated demo project with a standalone `Program.cs` you can run immediately.
+---
+
+## Contracts
+
+Every message starts as a C# class decorated with `[ProtoContract]`. Properties are marked with `[ProtoField(n)]` where `n` is the protobuf field number. Nested types and collections work out of the box.
+
+```C#
+[ProtoContract]
+public class WeatherRequest
+{
+    [ProtoField(1)] public string City { get; set; } = "";
+    [ProtoField(2)] public int Days { get; set; }
+    [ProtoField(3)] public bool IncludeWind { get; set; }
+}
+
+[ProtoContract]
+public class WeatherForecast
+{
+    [ProtoField(1)] public string City { get; set; } = "";
+    [ProtoField(2)] public List<DayEntry> Entries { get; set; } = [];
+}
+
+[ProtoContract]
+public class DayEntry
+{
+    [ProtoField(1)] public string Date { get; set; } = "";
+    [ProtoField(2)] public double HighC { get; set; }
+    [ProtoField(3)] public double LowC { get; set; }
+    [ProtoField(4)] public string Condition { get; set; } = "";
+}
+```
+
+## Encode and Decode
+
+`ProtobufEncoder.Encode` serialises any `[ProtoContract]` to a byte array. `Decode<T>` reverses the operation.
+
+```C#
+var request = new WeatherRequest { City = "London", Days = 3, IncludeWind = true };
+
+byte[] encoded = ProtobufEncoder.Encode(request);
+var decoded = ProtobufEncoder.Decode<WeatherRequest>(encoded);
+```
+
+Nested contracts follow the same pattern. The encoder handles repeated fields and child messages automatically:
+
+```C#
+var forecast = new WeatherForecast
+{
+    City = "London",
+    Entries =
+    [
+        new DayEntry { Date = "2026-03-25", HighC = 14.5, LowC = 7.2, Condition = "Partly cloudy" },
+        new DayEntry { Date = "2026-03-26", HighC = 16.0, LowC = 8.1, Condition = "Sunny" }
+    ]
+};
+
+var bytes = ProtobufEncoder.Encode(forecast);
+var result = ProtobufEncoder.Decode<WeatherForecast>(bytes);
+```
+
+## Streaming
+
+Length-delimited streaming writes multiple messages to a single stream and reads them back one by one. This is the foundation for gRPC server-streaming and transport layers.
+
+```C#
+using var stream = new MemoryStream();
+
+for (int i = 1; i <= 3; i++)
+    ProtobufEncoder.WriteDelimitedMessage(new WeatherForecast { City = $"City-{i}" }, stream);
+
+stream.Position = 0;
+foreach (var msg in ProtobufEncoder.ReadDelimitedMessages<WeatherForecast>(stream))
+    Console.WriteLine(msg.City);
+```
+
+A static (pre-compiled) encoder avoids repeated reflection when you encode the same type many times:
+
+```C#
+var staticMsg = ProtobufEncoder.CreateStaticMessage<WeatherRequest>();
+var fastBytes = staticMsg.Encode(request);
+var fastDecoded = staticMsg.Decode(fastBytes);
+```
+
+---
+
+## Service Interface
+
+Define a service contract with `[ProtoService]` and `[ProtoMethod]`. No `.proto` files, no code generation. The interface below declares the methods that the gRPC integration package maps to HTTP/2 endpoints.
+
+```C#
+[ProtoService("WeatherService")]
+public interface IWeatherService
+{
+    [ProtoMethod(ProtoMethodType.Unary)]
+    Task<WeatherForecast> GetForecast(WeatherRequest request);
+
+    [ProtoMethod(ProtoMethodType.ServerStreaming)]
+    IAsyncEnumerable<WeatherForecast> StreamForecasts(
+        WeatherRequest request, CancellationToken ct = default);
+}
+```
 
 ---
 
 ## REST
 
-Add protobuf formatters to your MVC pipeline. Both controllers and Minimal APIs will then accept and return `application/x-protobuf` bodies alongside JSON.
-
-### Service Registration
+Add protobuf formatters to your MVC pipeline. Both controllers and Minimal APIs then accept and return `application/x-protobuf` bodies alongside JSON.
 
 ```C#
 var builder = WebApplication.CreateBuilder(args);
@@ -40,35 +138,15 @@ builder.Services.AddControllers()
 var app = builder.Build();
 ```
 
-### Minimal API
-
 Minimal APIs pick up the registered formatters automatically:
 
 ```C#
-app.MapPost("/api/echo", (DemoRequest request) =>
-    new DemoResponse { Message = $"Echo: {request.Name}, value={request.Value}" });
-
-app.MapPost("/api/order", (OrderRequest order) =>
-    new OrderConfirmation
+app.MapPost("/api/weather", (WeatherRequest request) =>
+    new WeatherForecast
     {
-        OrderId = Guid.NewGuid().ToString("N")[..8],
-        Total = order.Quantity * order.UnitPrice
+        City = request.City,
+        Entries = [new DayEntry { Date = "2026-03-25", HighC = 14.5, LowC = 7.2, Condition = "Sunny" }]
     });
-```
-
-### Controller
-
-Decorate your action methods as usual — the `ProtobufInputFormatter` and `ProtobufOutputFormatter` handle the rest:
-
-```C#
-[ApiController]
-[Route("api/[controller]")]
-public class DemoController : ControllerBase
-{
-    [HttpPost("echo")]
-    public ActionResult<DemoResponse> Echo([FromBody] DemoRequest request)
-        => Ok(new DemoResponse { Message = $"Controller Echo: {request.Name}" });
-}
 ```
 
 > **Tip:** Send a request with `Content-Type: application/x-protobuf` and `Accept: application/x-protobuf` to use the binary format. Omit those headers and you get standard JSON.
@@ -81,47 +159,28 @@ public class DemoController : ControllerBase
 
 Register an endpoint type pair, map a path, and supply an `OnMessage` handler. The framework manages connections, framing, and lifecycle events.
 
-### Service Registration
-
 ```C#
 var builder = WebApplication.CreateBuilder(args);
 
-// Register the type pair — creates a WebSocketConnectionManager singleton.
-builder.Services.AddProtobufWebSocketEndpoint<ChatReply, ChatMessage>();
+builder.Services.AddProtobufWebSocketEndpoint<WeatherForecast, WeatherRequest>();
 
 var app = builder.Build();
 app.UseWebSockets();
-```
 
-### Mapping the Endpoint
-
-```C#
-app.MapProtobufWebSocket<ChatReply, ChatMessage>("/ws/chat", options =>
+app.MapProtobufWebSocket<WeatherForecast, WeatherRequest>("/ws/weather", options =>
 {
     options.OnConnect = connection =>
     {
-        Console.WriteLine($"[+] Client connected: {connection.ConnectionId}");
-        return connection.SendAsync(new ChatReply
-        {
-            Text = "Welcome! Send a ChatMessage to start chatting.",
-            IsSystem = true
-        });
-    };
-
-    options.OnMessage = (connection, message) =>
-    {
-        Console.WriteLine($"[{message.User}] {message.Text}");
-        return connection.SendAsync(new ChatReply
-        {
-            Text = $"Server received: \"{message.Text}\""
-        });
-    };
-
-    options.OnDisconnect = connection =>
-    {
-        Console.WriteLine($"[-] Client disconnected: {connection.ConnectionId}");
+        Console.WriteLine($"[+] {connection.ConnectionId} connected");
         return Task.CompletedTask;
     };
+
+    options.OnMessage = (connection, request) =>
+        connection.SendAsync(new WeatherForecast
+        {
+            City = request.City,
+            Entries = [new DayEntry { Date = "2026-03-25", HighC = 14.5, LowC = 7.2, Condition = "Sunny" }]
+        });
 });
 ```
 
@@ -131,67 +190,74 @@ app.MapProtobufWebSocket<ChatReply, ChatMessage>("/ws/chat", options =>
 
 ## gRPC
 
-Define a service interface with `[ProtoService]`, implement it, and register through the builder. No `.proto` files, no `protoc`, no code generation.
-
-### Service Contract
+Implement the service interface and register it through the builder. The framework maps each `[ProtoMethod]` to an HTTP/2 endpoint.
 
 ```C#
-[ProtoService("DemoService")]
-public interface IDemoGrpcService
+public class WeatherServiceImpl : IWeatherService
 {
-    [ProtoMethod(ProtoMethodType.Unary)]
-    Task<DemoResponse> Echo(DemoRequest request);
+    public Task<WeatherForecast> GetForecast(WeatherRequest request)
+        => Task.FromResult(new WeatherForecast
+        {
+            City = request.City,
+            Entries = [new DayEntry { Date = "2026-03-25", HighC = 14.5, LowC = 7.2, Condition = "Sunny" }]
+        });
 
-    [ProtoMethod(ProtoMethodType.Unary)]
-    Task<OrderConfirmation> PlaceOrder(OrderRequest request);
+    public async IAsyncEnumerable<WeatherForecast> StreamForecasts(
+        WeatherRequest request, [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        for (int i = 0; i < request.Days && !ct.IsCancellationRequested; i++)
+        {
+            yield return new WeatherForecast { City = request.City };
+            await Task.Delay(500, ct);
+        }
+    }
 }
 ```
-
-### Service Registration
 
 ```C#
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddProtobuffEncoder()
-    .WithGrpc(grpc => grpc.AddService<DemoGrpcServiceImpl>());
+    .WithGrpc(grpc => grpc.AddService<WeatherServiceImpl>());
 
 var app = builder.Build();
 app.MapProtobufEndpoints();
-```
-
-### Implementation
-
-```C#
-public class DemoGrpcServiceImpl : IDemoGrpcService
-{
-    public Task<DemoResponse> Echo(DemoRequest request)
-        => Task.FromResult(new DemoResponse
-        {
-            Message = $"gRPC Echo: {request.Name}, value={request.Value}"
-        });
-
-    public Task<OrderConfirmation> PlaceOrder(OrderRequest request)
-        => Task.FromResult(new OrderConfirmation
-        {
-            OrderId = Guid.NewGuid().ToString("N")[..8],
-            Total = request.Quantity * request.UnitPrice
-        });
-}
 ```
 
 *Full source: [Simple/Grpc/Program.cs](https://github.com/IsMikeTaken/ProtobuffEncoder/blob/master/demos/Setup/Simple/Grpc/Program.cs)*
 
 ---
 
-## Running the Demos
+## Running the Template
+
+The console template demonstrates all of the above without needing a web server:
 
 ```bash
-# REST
-dotnet run --project demos/Setup/Simple/Rest
+dotnet run --project templates/ProtobuffEncoder.Template.Simple
+```
 
-# WebSockets
-dotnet run --project demos/Setup/Simple/WebSockets
+Expected output:
 
-# gRPC
-dotnet run --project demos/Setup/Simple/Grpc
+```text
+ProtobuffEncoder — Simple Template
+
+Encoded WeatherRequest to 12 bytes
+Decoded: City=London, Days=3, IncludeWind=True
+
+Forecast for London: 3 day(s)
+  2026-03-25  7.2–14.5 C  Partly cloudy
+  2026-03-26  8.1–16 C  Sunny
+  2026-03-27  6.9–12.3 C  Rain
+
+Streaming three forecasts into a MemoryStream...
+  Read back: City-1
+  Read back: City-2
+  Read back: City-3
+
+Static encoder round-trip...
+  London, 3 day(s) — 12 bytes
+
+Service interface declared: IWeatherService
+  GetForecast(WeatherRequest) -> WeatherForecast   [Unary]
+  StreamForecasts(WeatherRequest) -> stream         [ServerStreaming]
 ```

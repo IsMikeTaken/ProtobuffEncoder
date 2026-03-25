@@ -2,12 +2,34 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.0] - 2026-03-25
+
+### Added {id="v140_added"}
+- **GitHub Actions CI/CD workflows** — three new workflows (`ci-pr.yml`, `ci-development.yml`, `ci-release.yml`) for source projects with incremental versioning and publishing to GitHub Packages.
+  - PR builds: `1.3.0-pr.<number>.<run>` preview packages.
+  - Development builds: `1.3.0-dev.<run>` pre-release packages pushed to GitHub Packages.
+  - Master builds: stable `1.3.0` packages, automatic Git tag and GitHub Release with attached `.nupkg` files.
+- `Directory.Build.props` for centralised version management and NuGet package metadata.
+- Each CI workflow tests against .NET 8, 9, and 10 in parallel with framework-specific `--framework` filtering to ensure no tests are silently skipped.
+- Post-test verification step that fails the build if no `.trx` result files are produced.
+
+### Changed {id="v140_changed"}
+- **Templates rewritten** — all three console templates (Simple, Normal, Advanced) now showcase at least one `[ProtoService]` interface and two `[ProtoContract]` types each. Removed ASCII-art comment blocks in favour of natural guiding comments.
+  - Simple: `WeatherRequest`, `WeatherForecast`, `DayEntry` contracts + `IWeatherService` (Unary, ServerStreaming).
+  - Normal: `Team`, `SensorReading`, `Alert`, `ChatMessage`, `ChatReply` contracts + `IChatService` (Unary, DuplexStreaming).
+  - Advanced: `Customer`, `Invoice`, `Product`, `InventoryQuery`, `StockLevel`, `AttributedProduct` contracts + `IInventoryService` (Unary, ServerStreaming).
+- Updated simple, normal, and advanced setup documentation to match new template content with expected console output.
+- Analyzer test project (`ProtobuffEncoder.Analyzers.Tests`) retargeted from `netstandard2.0` to `net8.0` so tests actually execute. Added explicit `Microsoft.CodeAnalysis.CSharp` reference to resolve version conflict with analyzer testing package.
+
+### Fixed {id="v140_fixed"}
+- CI `--framework` filter now targets a specific runtime per matrix entry instead of installing a single SDK and hoping the other frameworks build. All three SDKs are installed in every job.
+
 ## [1.3.0] - 2026-03-24
 
 ### Added {id="v130_added"}
-- **Per-transport setup demos** — nine standalone projects (Simple, Normal, Advanced × REST, WebSockets, gRPC) each with their own `Program.cs` under `demos/Setup/`.
+- **Per-transport setup demos** — nine standalone projects (Simple, Normal, Advanced x REST, WebSockets, gRPC) each with their own `Program.cs` under `demos/Setup/`.
 - Shared models project (`ProtobuffEncoder.Demo.Setup.Shared`) with common contracts and gRPC service interfaces.
-- **Roslyn Analyser** (`ProtobuffEncoder.Analyzers`) with 10 compile-time diagnostics (PROTO001–PROTO010) for missing fields, duplicate numbers, invalid ranges, and more.
+- **Roslyn Analyser** (`ProtobuffEncoder.Analyzers`) with 10 compile-time diagnostics (PROTO001-PROTO010) for missing fields, duplicate numbers, invalid ranges, and more.
 - **Templates** — three console app templates (Simple, Normal, Advanced) under `templates/` demonstrating core encode/decode, collections, auto-discovery, and schema generation.
 - Expanded test coverage for `ProtobufValueSender` and `ProtobufValueReceiver`.
 - New integration tests for Tiered Setup Validation (Simple/Normal/Advanced).

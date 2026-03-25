@@ -7,7 +7,7 @@ using Microsoft.CodeAnalysis.Diagnostics;
 namespace ProtobuffEncoder.Analyzers;
 
 /// <summary>
-/// Analyses types marked with [ProtoContract] for common configuration mistakes.
+/// Analyzes types marked with [ProtoContract] for common configuration mistakes.
 /// Reports: PROTO001, PROTO002, PROTO003, PROTO004, PROTO008, PROTO009.
 /// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
@@ -20,13 +20,14 @@ public sealed class ProtoContractAnalyzer : DiagnosticAnalyzer
     private const string ProtoMapAttributeName = "ProtobuffEncoder.Attributes.ProtoMapAttribute";
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
-        ImmutableArray.Create(
-            DiagnosticDescriptors.ProtoContractWithoutFields,
+    [
+        DiagnosticDescriptors.ProtoContractWithoutFields,
             DiagnosticDescriptors.DuplicateFieldNumber,
             DiagnosticDescriptors.MissingParameterlessConstructor,
             DiagnosticDescriptors.PropertyWithoutSetter,
             DiagnosticDescriptors.MutableStructContract,
-            DiagnosticDescriptors.SingleMemberOneOf);
+            DiagnosticDescriptors.SingleMemberOneOf
+    ];
 
     public override void Initialize(AnalysisContext context)
     {
@@ -39,7 +40,7 @@ public sealed class ProtoContractAnalyzer : DiagnosticAnalyzer
     {
         var namedType = (INamedTypeSymbol)context.Symbol;
 
-        // Only analyse types with [ProtoContract]
+        // Only analyze types with [ProtoContract]
         var contractAttr = GetAttribute(namedType, ProtoContractAttributeName);
         if (contractAttr is null)
             return;
@@ -47,7 +48,7 @@ public sealed class ProtoContractAnalyzer : DiagnosticAnalyzer
         var isExplicitFields = GetNamedBoolArg(contractAttr, "ExplicitFields");
 
         // PROTO008: Struct warning
-        if (namedType.IsValueType && namedType.TypeKind == TypeKind.Struct)
+        if (namedType is { IsValueType: true, TypeKind: TypeKind.Struct })
         {
             context.ReportDiagnostic(Diagnostic.Create(
                 DiagnosticDescriptors.MutableStructContract,
@@ -82,7 +83,7 @@ public sealed class ProtoContractAnalyzer : DiagnosticAnalyzer
             .Where(p => p.DeclaredAccessibility == Accessibility.Public && !p.IsStatic)
             .ToList();
 
-        // PROTO001: No serialisable properties
+        // PROTO001: No serializable properties
         var serialisableProps = properties
             .Where(p => p.GetMethod is not null && p.SetMethod is not null)
             .Where(p => GetAttribute(p, ProtoIgnoreAttributeName) is null)
@@ -104,7 +105,7 @@ public sealed class ProtoContractAnalyzer : DiagnosticAnalyzer
                 namedType.Name));
         }
 
-        // PROTO004: Properties without setter (only non-ignored, non-explicit-fields)
+        // PROTO004: Properties without a setter (only non-ignored, non-explicit-fields)
         if (!isExplicitFields)
         {
             foreach (var prop in properties)
@@ -210,7 +211,7 @@ public sealed class ProtoContractAnalyzer : DiagnosticAnalyzer
 
         foreach (var arg in fieldAttr.NamedArguments)
         {
-            if (arg.Key == "FieldNumber" && arg.Value.Value is int fn)
+            if (arg is { Key: "FieldNumber", Value.Value: int fn })
                 return fn;
         }
 
