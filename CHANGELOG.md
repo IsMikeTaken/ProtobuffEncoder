@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-03-24
+
+### Added
+- **Per-transport setup demos** — nine standalone projects (Simple, Normal, Advanced × REST, WebSockets, gRPC) under `demos/Setup/`.
+- **Roslyn Analyser** (`ProtobuffEncoder.Analyzers`) with 10 compile-time diagnostics (PROTO001–PROTO010).
+- **Templates** — three console app templates (Simple, Normal, Advanced) under `templates/`.
+- Expanded test coverage for `ProtobufValueSender` and `ProtobufValueReceiver`.
+- New integration tests for Tiered Setup Validation (Simple/Normal/Advanced).
+- New `AddProtobufValidation` extension method in `ProtobuffEncoder.AspNetCore`.
+
+### Changed
+- Refined boilerplate structure: replaced single `Demo.Setup` with per-transport projects.
+- Enabled multi-targeting for .NET 8, 9, and 10 across all test projects.
+- Updated GitHub Actions CI/CD to use a build matrix for .NET 8, 9, and 10.
+- Updated documentation and setup guides to reflect new demo structure.
+
 ## [1.2.0] - 2026-03-23
 
 ### Added

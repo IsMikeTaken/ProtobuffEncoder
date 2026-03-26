@@ -1,0 +1,21 @@
+name: Verify Build and Tests
+
+on:
+  pull_request:
+    branches: [ master, development, preview ]
+    paths-ignore:
+      - 'docs/**'
+      - 'Writerside/**'
+  push:
+    branches: [ development ]
+    paths-ignore:
+      - 'docs/**'
+      - 'Writerside/**'
+
+jobs:
+  verify:
+    name: Build and Test
+    uses: ./.github/workflows/_build-test-pack.yml
+    with:
+      version_suffix: 'pr.${{ github.event.pull_request.number || github.run_number }}'
+      push_to_nuget: false

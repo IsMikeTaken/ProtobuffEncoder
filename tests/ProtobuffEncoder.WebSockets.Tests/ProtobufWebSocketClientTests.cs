@@ -1,4 +1,5 @@
 using System.Net.WebSockets;
+using System.Linq;
 using ProtobuffEncoder.WebSockets.Tests.Fixtures;
 
 namespace ProtobuffEncoder.WebSockets.Tests;
@@ -91,8 +92,13 @@ public class ProtobufWebSocketClientTests
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => client.RunDuplexAsync(
-                AsyncEnumerable.Empty<Heartbeat>(),
+                EmptyAsyncEnumerable<Heartbeat>(),
                 _ => Task.CompletedTask));
+    }
+
+    private static async IAsyncEnumerable<T> EmptyAsyncEnumerable<T>()
+    {
+        yield break;
     }
 
     #endregion

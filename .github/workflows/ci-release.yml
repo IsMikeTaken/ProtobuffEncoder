@@ -1,0 +1,182 @@
+name: CI — Release
+
+on:
+  push:
+    branches: [master]
+    paths-ignore:
+      - 'Writerside/**'
+      - 'docs/**'
+      - '*.md'
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  NUGET_SOURCE: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+
+  # ── Build & Test each target framework ────────────────────
+  build:
+    name: test / ${{ matrix.framework }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - framework: net8.0
+            label: '.NET 8'
+          - framework: net9.0
+            label: '.NET 9'
+          - framework: net10.0
+            label: '.NET 10'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET SDKs
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build (all targets)
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Test — ${{ matrix.label }}
+        run: >-
+          dotnet test --no-build --configuration Release
+          --framework ${{ matrix.framework }}
+          --logger "trx;LogFileName=results-${{ matrix.framework }}.trx"
+          --results-directory ./TestResults
+
+      - name: Verify test results exist
+        if: always()
+        run: |
+          echo "── Test result files ──"
+          find ./TestResults -name '*.trx' -exec echo "  ✓ {}" \; 2>/dev/null
+          COUNT=$(find ./TestResults -name '*.trx' 2>/dev/null | wc -l)
+          echo "Found $COUNT result file(s)"
+          if [ "$COUNT" -eq 0 ]; then
+            echo "::error::No test results produced for ${{ matrix.framework }} — tests may have been skipped entirely"
+            exit 1
+          fi
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.framework }}
+          path: TestResults/*.trx
+          retention-days: 30
+
+  # ── Pack & Publish stable release packages ────────────────
+  publish:
+    name: publish / stable
+    needs: build
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET SDKs
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+
+      - name: Read version from Directory.Build.props
+        id: version
+        run: |
+          MAJOR=$(grep -oP '(?<=<VersionMajor>)\d+' Directory.Build.props)
+          MINOR=$(grep -oP '(?<=<VersionMinor>)\d+' Directory.Build.props)
+          PATCH=$(grep -oP '(?<=<VersionPatch>)\d+' Directory.Build.props)
+          echo "version=v${MAJOR}.${MINOR}.${PATCH}" >> "$GITHUB_OUTPUT"
+
+      - name: Pack release (no version suffix)
+        run: |
+          for project in src/*/*.csproj; do
+            echo "Packing $project..."
+            dotnet pack "$project" --configuration Release \
+              --output ./nupkgs
+          done
+
+      - name: List packages
+        run: ls -lh ./nupkgs/*.nupkg
+
+      - name: Upload NuGet artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nupkgs-release
+          path: ./nupkgs/*.nupkg
+          retention-days: 30
+
+      - name: Push to GitHub Packages
+        run: >-
+          dotnet nuget push ./nupkgs/*.nupkg
+          --api-key ${{ secrets.GITHUB_TOKEN }}
+          --source ${{ env.NUGET_SOURCE }}
+          --skip-duplicate
+
+  # ── Create GitHub Release with tag ────────────────────────
+  release:
+    name: release / tag
+    needs: publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if tag exists
+        id: tag_check
+        run: |
+          if git rev-parse "${{ needs.publish.outputs.version }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download NuGet packages
+        if: steps.tag_check.outputs.exists == 'false'
+        uses: actions/download-artifact@v4
+        with:
+          name: nupkgs-release
+          path: ./nupkgs
+
+      - name: Create tag and GitHub Release
+        if: steps.tag_check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ needs.publish.outputs.version }}"
+          git tag "$VERSION"
+          git push origin "$VERSION"
+          gh release create "$VERSION" \
+            --title "$VERSION" \
+            --generate-notes \
+            ./nupkgs/*.nupkg

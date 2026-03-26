@@ -11,11 +11,11 @@ internal static class DiagnosticDescriptors
     private const string Category = "ProtobuffEncoder";
 
     /// <summary>
-    /// PROTO001: A class has [ProtoContract] but no serialisable properties.
+    /// PROTO001: A class has [ProtoContract] but no serializable properties.
     /// </summary>
     public static readonly DiagnosticDescriptor ProtoContractWithoutFields = new(
         id: "PROTO001",
-        title: "ProtoContract has no serialisable fields",
+        title: "ProtoContract has no serializable fields",
         messageFormat: "Type '{0}' is marked with [ProtoContract] but has no public properties with getters and setters — nothing will be serialised",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Warning,
@@ -64,11 +64,11 @@ internal static class DiagnosticDescriptors
     public static readonly DiagnosticDescriptor FieldWithoutContract = new(
         id: "PROTO005",
         title: "[ProtoField] used without [ProtoContract]",
-        messageFormat: "Property '{0}' on type '{1}' has [ProtoField] but the type is not marked with [ProtoContract] — the attribute will have no effect unless the type is registered with ProtoRegistry",
+        messageFormat: "Property '{0}' on type '{1}' has [ProtoField] but the type is not marked with [ProtoContract]. This is only valid if the type is registered via ProtoRegistry or used as an implicit nested type.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
-        description: "The [ProtoField] attribute only takes effect on types that are either marked with [ProtoContract] or registered via ProtoRegistry.");
+        description: "The [ProtoField] attribute only takes effect on types that are either marked with [ProtoContract], registered via ProtoRegistry, or used as an implicit nested type in a parent contract.");
 
     /// <summary>
     /// PROTO006: A [ProtoField] has a field number less than 1.
@@ -83,7 +83,7 @@ internal static class DiagnosticDescriptors
         description: "Protobuf field numbers must be positive integers between 1 and 536,870,911. Numbers 19,000–19,999 are reserved by the protobuf specification.");
 
     /// <summary>
-    /// PROTO007: A [ProtoField] uses a reserved field number range (19000–19999).
+    /// PROTO007: A [ProtoField] uses a reserved field number range (19,000–19,999).
     /// </summary>
     public static readonly DiagnosticDescriptor ReservedFieldNumber = new(
         id: "PROTO007",
@@ -119,7 +119,7 @@ internal static class DiagnosticDescriptors
         description: "A OneOf group with a single member provides no semantic benefit. Either add more alternatives or remove the [ProtoOneOf] attribute.");
 
     /// <summary>
-    /// PROTO010: An encoding name on [ProtoField] or [ProtoContract] is not recognised.
+    /// PROTO010: An encoding name on [ProtoField] or [ProtoContract] is not recognized.
     /// </summary>
     public static readonly DiagnosticDescriptor UnrecognisedEncoding = new(
         id: "PROTO010",
@@ -129,4 +129,64 @@ internal static class DiagnosticDescriptors
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
         description: "The encoding name should be one recognised by System.Text.Encoding.GetEncoding(). Common values: utf-8, utf-16, utf-32, ascii, latin-1.");
+
+    /// <summary>
+    /// PROTO011: A [ProtoService] interface has no methods marked with [ProtoMethod].
+    /// </summary>
+    public static readonly DiagnosticDescriptor ServiceWithoutMethods = new(
+        id: "PROTO011",
+        title: "ProtoService has no methods",
+        messageFormat: "Interface '{0}' is marked with [ProtoService] but has no methods with [ProtoMethod]. Add at least one service method.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: "A service interface should declare at least one method annotated with [ProtoMethod] to be useful as a gRPC service.");
+
+    /// <summary>
+    /// PROTO012: A [ProtoMethod] with ServerStreaming must return IAsyncEnumerable.
+    /// </summary>
+    public static readonly DiagnosticDescriptor StreamingReturnTypeMismatch = new(
+        id: "PROTO012",
+        title: "Streaming method has wrong return type",
+        messageFormat: "Method '{0}' on service '{1}' is {2} but does not return IAsyncEnumerable<T>. Streaming methods must return IAsyncEnumerable<T>.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "ServerStreaming and DuplexStreaming methods must return IAsyncEnumerable<T>. Unary and ClientStreaming methods must return Task<T>.");
+
+    /// <summary>
+    /// PROTO013: A [ProtoInclude] field number conflicts with a [ProtoField] number on the same type.
+    /// </summary>
+    public static readonly DiagnosticDescriptor IncludeFieldNumberConflict = new(
+        id: "PROTO013",
+        title: "ProtoInclude field number conflicts with ProtoField",
+        messageFormat: "ProtoInclude field number {0} for derived type '{1}' on '{2}' conflicts with an existing ProtoField number. Each number must be unique.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "ProtoInclude field numbers share the same namespace as ProtoField numbers. A conflict causes data corruption during serialisation.");
+
+    /// <summary>
+    /// PROTO014: A [ProtoInclude] references a type that is not a subclass of the annotated type.
+    /// </summary>
+    public static readonly DiagnosticDescriptor IncludeNotDerived = new(
+        id: "PROTO014",
+        title: "ProtoInclude type is not a subclass",
+        messageFormat: "ProtoInclude on '{0}' references '{1}' which does not derive from '{0}'. The included type must be a direct or indirect subclass.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "The type specified in [ProtoInclude] must inherit from the type that carries the attribute, otherwise polymorphic deserialisation will fail.");
+
+    /// <summary>
+    /// PROTO015: A [ProtoMap] attribute is on a property that is not a Dictionary.
+    /// </summary>
+    public static readonly DiagnosticDescriptor MapOnNonDictionary = new(
+        id: "PROTO015",
+        title: "ProtoMap on non-Dictionary property",
+        messageFormat: "Property '{0}' on type '{1}' has [ProtoMap] but its type is not Dictionary<TKey, TValue>. ProtoMap only applies to dictionary properties.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "The [ProtoMap] attribute is only valid on properties of type Dictionary<TKey, TValue>. Using it on other types has no effect and indicates a mistake.");
 }

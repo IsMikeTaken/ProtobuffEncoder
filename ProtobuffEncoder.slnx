@@ -9,6 +9,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/ProtobuffEncoder.Tests/ProtobuffEncoder.Tests.csproj" />
+    <Project Path="tests/ProtobuffEncoder.Analyzers.Tests/ProtobuffEncoder.Analyzers.Tests.csproj" />
     <Project Path="tests/ProtobuffEncoder.AspNetCore.Tests/ProtobuffEncoder.AspNetCore.Tests.csproj" />
     <Project Path="tests/ProtobuffEncoder.Grpc.Tests/ProtobuffEncoder.Grpc.Tests.csproj" />
     <Project Path="tests/ProtobuffEncoder.WebSockets.Tests/ProtobuffEncoder.WebSockets.Tests.csproj" />
@@ -17,6 +18,36 @@
 
   <Folder Name="/tools/">
     <Project Path="tools/ProtobuffEncoder.Tool/ProtobuffEncoder.Tool.csproj" />
+  </Folder>
+  <Folder Name="/demos/setup/Advanced/" />
+  <Folder Name="/demos/setup/Advanced/Grpc/">
+    <Project Path="demos/Setup/Advanced/Grpc/ProtobuffEncoder.Demo.Setup.Advanced.Grpc.csproj" />
+  </Folder>
+  <Folder Name="/demos/setup/Advanced/Rest/">
+    <Project Path="demos/Setup/Advanced/Rest/ProtobuffEncoder.Demo.Setup.Advanced.Rest.csproj" />
+  </Folder>
+  <Folder Name="/demos/setup/Advanced/WebSockets/">
+    <Project Path="demos/Setup/Advanced/WebSockets/ProtobuffEncoder.Demo.Setup.Advanced.WebSockets.csproj" />
+  </Folder>
+  <Folder Name="/demos/setup/Normal/" />
+  <Folder Name="/demos/setup/Normal/Grpc/">
+    <Project Path="demos/Setup/Normal/Grpc/ProtobuffEncoder.Demo.Setup.Normal.Grpc.csproj" />
+  </Folder>
+  <Folder Name="/demos/setup/Normal/Rest/">
+    <Project Path="demos/Setup/Normal/Rest/ProtobuffEncoder.Demo.Setup.Normal.Rest.csproj" />
+  </Folder>
+  <Folder Name="/demos/setup/Normal/WebSockets/">
+    <Project Path="demos/Setup/Normal/WebSockets/ProtobuffEncoder.Demo.Setup.Normal.WebSockets.csproj" />
+  </Folder>
+  <Folder Name="/demos/setup/Simple/" />
+  <Folder Name="/demos/setup/Simple/Grpc/">
+    <Project Path="demos/Setup/Simple/Grpc/ProtobuffEncoder.Demo.Setup.Simple.Grpc.csproj" />
+  </Folder>
+  <Folder Name="/demos/setup/Simple/Rest/">
+    <Project Path="demos/Setup/Simple/Rest/ProtobuffEncoder.Demo.Setup.Simple.Rest.csproj" />
+  </Folder>
+  <Folder Name="/demos/setup/Simple/WebSockets/">
+    <Project Path="demos/Setup/Simple/WebSockets/ProtobuffEncoder.Demo.Setup.Simple.WebSockets.csproj" />
   </Folder>
   <Folder Name="/demos/tool/">
     <Project Path="demos/ProtobuffEncoder.Demo.SchemaGen/ProtobuffEncoder.Demo.SchemaGen.csproj" />
@@ -48,6 +79,24 @@
       <Project Path="demos/Setup/Advanced/WebSockets/ProtobuffEncoder.Demo.Setup.Advanced.WebSockets.csproj" />
       <Project Path="demos/Setup/Advanced/Grpc/ProtobuffEncoder.Demo.Setup.Advanced.Grpc.csproj" />
     </Folder>
+  </Folder>
+  <Folder Name="/.github/">
+    <File Path=".github/PULL_REQUEST_TEMPLATE.md" />
+  </Folder>
+  <Folder Name="/.github/ISSUE_TEMPLATE/">
+    <File Path=".github/ISSUE_TEMPLATE/bug_report.md" />
+    <File Path=".github/ISSUE_TEMPLATE/config.yml" />
+    <File Path=".github/ISSUE_TEMPLATE/feature_request.md" />
+  </Folder>
+  <Folder Name="/.github/workflows/">
+    <File Path=".github/workflows/ci-development.yml" />
+    <File Path=".github/workflows/ci-pr.yml" />
+    <File Path=".github/workflows/ci-release.yml" />
+    <File Path=".github/workflows/publish.yml" />
+    <File Path=".github/workflows/verify.yml" />
+    <File Path=".github/workflows/writerside-build.yml" />
+    <File Path=".github/workflows/writerside-deploy.yml" />
+    <File Path=".github/workflows/_build-test-pack.yml" />
   </Folder>
   <Folder Name="/benchmarks/">
     <Project Path="benchmarks/ProtobuffEncoder.Benchmarks/ProtobuffEncoder.Benchmarks.csproj" />

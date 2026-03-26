@@ -47,12 +47,12 @@ This document outlines the comprehensive testing strategy for the `ProtobuffEnco
 
 | Project | Tests | Key Areas |
 |---------|-------|-----------|
-| `ProtobuffEncoder.Tests` | 231 | Core encode/decode, attributes, collections, maps, oneof, inheritance, validation, streaming, schema generation, cross-file imports, service wiring, concurrency, stress |
-| `ProtobuffEncoder.AspNetCore.Tests` | 41 | Input/output formatters, HttpClient extensions (TestHost), setup builder, options, strategy registration |
+| `ProtobuffEncoder.Tests` | 268 | Core encode/decode, ValueSender/Receiver, attributes, collections, maps, oneof, inheritance, validation, streaming, schema generation, cross-file imports, service wiring, concurrency, stress |
+| `ProtobuffEncoder.AspNetCore.Tests` | 43 | Input/output formatters, HttpClient extensions (TestHost), tiered setup validation, setup builder, options, strategy registration |
 | `ProtobuffEncoder.Grpc.Tests` | 34 | Marshaller round-trips, service method discovery (all 4 types), channel extensions, DI registration |
 | `ProtobuffEncoder.WebSockets.Tests` | 123 | WebSocket stream, retry policy, connection manager, client lifecycle, endpoint integration (TestHost) |
 | `ProtobuffEncoder.Tool.Tests` | 12 | ProjectModifier csproj manipulation, duplicate prevention, subdirectory paths, batch operations |
-| **Total** | **441+** | |
+| **Total** | **480+** | |
 
 ## Benchmarks
 

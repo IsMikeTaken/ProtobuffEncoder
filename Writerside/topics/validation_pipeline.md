@@ -157,6 +157,21 @@ duplex.MessageRejected += (response, result) =>
 var response = await duplex.SendAndReceiveAsync(request);
 ```
 
+## ASP.NET Core Registration
+
+To enable validation in an ASP.NET Core application, use the `AddProtobufValidation` extension on the `IServiceCollection` or within the `AddProtobufEncoder` builder:
+
+```C#
+// Simple setup
+builder.Services.AddProtobufValidation();
+
+// Advanced setup with builder
+builder.Services.AddProtobufEncoder(options => { ... })
+       .AddProtobufValidation();
+```
+
+This registers the necessary `IProtobufValidator` services and enables the tiered validation strategies for REST, WebSockets, and gRPC.
+
 ### ValidatedDuplexStream API
 
 | Property / Method | Description |

@@ -1,198 +1,119 @@
-// ============================================================================
 // ProtobuffEncoder — Normal Template
-// ============================================================================
-// This template covers intermediate features: collections, maps, nullable
-// fields, custom encodings, ProtoValue for single values, ProtoMessage for
-// dynamic schema-less messages, and oneOf groups.
 //
-// Run with:  dotnet run
-// ============================================================================
+// Collections, maps, nullable fields, OneOf groups, custom encoding,
+// ProtoValue, ProtoMessage, and a chat service interface.
+//
+// Contracts live in Contracts/, the service interface in Services/.
+//
+// Run with: dotnet run
 
 using ProtobuffEncoder;
-using ProtobuffEncoder.Attributes;
+using ProtobuffEncoder.Template.Normal.Contracts;
 
-Console.WriteLine("=== ProtobuffEncoder — Normal Template ===\n");
+Console.WriteLine("ProtobuffEncoder — Normal Template\n");
 
-// ── 1. Collections and maps ─────────────────────────────────────────────────
+// Collections and maps.
 
 var team = new Team
 {
-    Name = "Engineering",
+    Name = "Platform",
     Members = ["Alice", "Bob", "Charlie"],
     Scores = new Dictionary<string, int>
     {
-        ["Alice"] = 95,
-        ["Bob"] = 87,
-        ["Charlie"] = 92
+        ["Alice"] = 95, ["Bob"] = 87, ["Charlie"] = 92
     }
 };
 
 var teamBytes = ProtobufEncoder.Encode(team);
 var decodedTeam = ProtobufEncoder.Decode<Team>(teamBytes);
+
 Console.WriteLine($"Team: {decodedTeam.Name}, {decodedTeam.Members.Count} members");
 foreach (var (name, score) in decodedTeam.Scores)
     Console.WriteLine($"  {name}: {score}");
 
-// ── 2. Nullable and required fields ─────────────────────────────────────────
+// Nullable and required fields.
 
-Console.WriteLine("\n--- Nullable Fields ---");
+Console.WriteLine("\nNullable and required fields...");
 
-var sensor = new SensorReading
+var reading = new SensorReading
 {
     SensorId = "temp-01",
     Value = 22.5,
-    CalibratedAt = DateTime.UtcNow,
-    ErrorMargin = null // optional, won't be serialized
+    Timestamp = DateTime.UtcNow,
+    ErrorMargin = null
 };
 
-var sensorBytes = ProtobufEncoder.Encode(sensor);
-var decodedSensor = ProtobufEncoder.Decode<SensorReading>(sensorBytes);
-Console.WriteLine($"Sensor: {decodedSensor.SensorId}, Value={decodedSensor.Value}, Error={decodedSensor.ErrorMargin?.ToString() ?? "N/A"}");
+var readingBytes = ProtobufEncoder.Encode(reading);
+var decodedReading = ProtobufEncoder.Decode<SensorReading>(readingBytes);
+Console.WriteLine($"  Sensor {decodedReading.SensorId}: {decodedReading.Value}, margin={decodedReading.ErrorMargin?.ToString() ?? "N/A"}");
 
-// ── 3. Custom text encoding (emoji support) ─────────────────────────────────
+// OneOf groups — mutually exclusive fields.
 
-Console.WriteLine("\n--- Custom Encoding ---");
+Console.WriteLine("\nOneOf groups...");
+
+var alert = new Alert
+{
+    Id = 1,
+    Text = "Server CPU above 90%",
+    Email = "ops@example.com"
+};
+
+var alertBytes = ProtobufEncoder.Encode(alert);
+var decodedAlert = ProtobufEncoder.Decode<Alert>(alertBytes);
+Console.WriteLine($"  Alert #{decodedAlert.Id}: via email={decodedAlert.Email}, sms={decodedAlert.Sms ?? "(none)"}");
+
+// Custom encoding with emoji.
+
+Console.WriteLine("\nCustom encoding with emoji...");
 
 var chat = new ChatMessage
 {
     Author = "Alice",
-    Content = "Hello! Greetings from London \U0001F1EC\U0001F1E7\u2615" // GB flag + coffee emoji
+    Text = "Deploying now \U0001F680 wish me luck \U0001F340"
 };
 
 var chatBytes = ProtobufEncoder.Encode(chat);
 var decodedChat = ProtobufEncoder.Decode<ChatMessage>(chatBytes);
-Console.WriteLine($"{decodedChat.Author}: {decodedChat.Content}");
+Console.WriteLine($"  {decodedChat.Author}: {decodedChat.Text}");
 
-// ── 4. ProtoValue — single-value encoding ───────────────────────────────────
+// ProtoValue — bare values without a contract.
 
-Console.WriteLine("\n--- ProtoValue (single values without contracts) ---");
+Console.WriteLine("\nProtoValue (bare values)...");
 
-var encodedString = ProtoValue.Encode("Hello, World!");
-var encodedBool = ProtoValue.Encode(true);
-var encodedInt = ProtoValue.Encode(42);
-var encodedDate = ProtoValue.Encode(DateTime.UtcNow);
-var encodedGuid = ProtoValue.Encode(Guid.NewGuid());
+var encStr = ProtoValue.Encode("Hello from ProtoValue");
+var encInt = ProtoValue.Encode(42);
+var encGuid = ProtoValue.Encode(Guid.NewGuid());
+var encDate = ProtoValue.Encode(DateTime.UtcNow);
 
-Console.WriteLine($"String: {ProtoValue.DecodeString(encodedString)} ({encodedString.Length} bytes)");
-Console.WriteLine($"Bool:   {ProtoValue.DecodeBool(encodedBool)}");
-Console.WriteLine($"Int:    {ProtoValue.DecodeInt32(encodedInt)}");
-Console.WriteLine($"Date:   {ProtoValue.DecodeDateTime(encodedDate):O}");
-Console.WriteLine($"Guid:   {ProtoValue.DecodeGuid(encodedGuid)}");
+Console.WriteLine($"  string: {ProtoValue.DecodeString(encStr)} ({encStr.Length} bytes)");
+Console.WriteLine($"  int:    {ProtoValue.DecodeInt32(encInt)}");
+Console.WriteLine($"  guid:   {ProtoValue.DecodeGuid(encGuid)}");
+Console.WriteLine($"  date:   {ProtoValue.DecodeDateTime(encDate):yyyy-MM-dd HH:mm:ss}");
 
-// Emoji encoding round-trip
-var emoji = "Sending love \u2764\uFE0F and rockets \U0001F680!";
-var emojiBytes = ProtoValue.Encode(emoji, ProtoEncoding.UTF8);
-var emojiDecoded = ProtoValue.DecodeString(emojiBytes, ProtoEncoding.UTF8);
-Console.WriteLine($"Emoji:  {emojiDecoded}");
+// ProtoMessage — dynamic schema-less messages.
 
-// ── 5. ProtoMessage — dynamic schema-less messages ──────────────────────────
-
-Console.WriteLine("\n--- ProtoMessage (dynamic, no contract needed) ---");
+Console.WriteLine("\nProtoMessage (dynamic, no contract needed)...");
 
 var msg = new ProtoMessage()
     .Set(1, "ProtobuffEncoder")
     .Set(2, 42)
     .Set(3, true)
-    .Set(4, 3.14)
-    .Set(5, DateTime.UtcNow)
-    .Set(6, "Works with emoji too! \U0001F389");
-
-var msgBytes = msg.ToBytes();
-Console.WriteLine($"Dynamic message: {msg.FieldCount} fields, {msgBytes.Length} bytes");
-
-var decoded2 = ProtoMessage.FromBytes(msgBytes);
-Console.WriteLine($"  Field 1 (string): {decoded2.GetString(1)}");
-Console.WriteLine($"  Field 2 (int):    {decoded2.Get<int>(2)}");
-Console.WriteLine($"  Field 3 (bool):   {decoded2.Get<bool>(3)}");
-Console.WriteLine($"  Field 6 (emoji):  {decoded2.GetString(6)}");
-
-// Nested dynamic messages
-var nested = new ProtoMessage()
-    .Set(1, "parent")
-    .Set(2, new ProtoMessage()
-        .Set(1, "child")
+    .Set(4, DateTime.UtcNow)
+    .Set(5, new ProtoMessage()
+        .Set(1, "nested-child")
         .Set(2, 100));
 
-var nestedBytes = nested.ToBytes();
-var decodedNested = ProtoMessage.FromBytes(nestedBytes);
-Console.WriteLine($"\n  Nested parent: {decodedNested.GetString(1)}");
+var msgBytes = msg.ToBytes();
+var decodedMsg = ProtoMessage.FromBytes(msgBytes);
+Console.WriteLine($"  {decodedMsg.FieldCount} fields, {msgBytes.Length} bytes");
+Console.WriteLine($"  Field 1: {decodedMsg.GetString(1)}");
+Console.WriteLine($"  Field 2: {decodedMsg.Get<int>(2)}");
+Console.WriteLine($"  Field 5 (nested): {decodedMsg.GetMessage(5)?.GetString(1)}");
 
-// ── 6. OneOf groups ─────────────────────────────────────────────────────────
+// The IChatService interface (in Services/) declares Unary and DuplexStreaming.
 
-Console.WriteLine("\n--- OneOf Groups ---");
+Console.WriteLine("\nService: IChatService (see Services/IChatService.cs)");
+Console.WriteLine("  Send(ChatMessage)    -> ChatReply        [Unary]");
+Console.WriteLine("  LiveChat(stream)     -> stream           [DuplexStreaming]");
 
-var notification = new Notification
-{
-    Id = 1,
-    Email = "user@example.com",
-    // Sms and Push are also set but only the first non-default in the group wins
-};
-
-var notifBytes = ProtobufEncoder.Encode(notification);
-var decodedNotif = ProtobufEncoder.Decode<Notification>(notifBytes);
-Console.WriteLine($"Notification #{decodedNotif.Id}: Email={decodedNotif.Email}");
-
-Console.WriteLine("\nDone! This template covers the most common intermediate patterns.");
-
-// ============================================================================
-// Models
-// ============================================================================
-
-[ProtoContract]
-public class Team
-{
-    [ProtoField(1)]
-    public string Name { get; set; } = "";
-
-    [ProtoField(2)]
-    public List<string> Members { get; set; } = [];
-
-    [ProtoMap]
-    [ProtoField(3)]
-    public Dictionary<string, int> Scores { get; set; } = new();
-}
-
-[ProtoContract]
-public class SensorReading
-{
-    [ProtoField(1, IsRequired = true)]
-    public string SensorId { get; set; } = "";
-
-    [ProtoField(2)]
-    public double Value { get; set; }
-
-    [ProtoField(3)]
-    public DateTime CalibratedAt { get; set; }
-
-    [ProtoField(4)]
-    public double? ErrorMargin { get; set; }
-}
-
-[ProtoContract(DefaultEncoding = "utf-8")]
-public class ChatMessage
-{
-    [ProtoField(1)]
-    public string Author { get; set; } = "";
-
-    [ProtoField(2)]
-    public string Content { get; set; } = "";
-}
-
-[ProtoContract]
-public class Notification
-{
-    [ProtoField(1)]
-    public int Id { get; set; }
-
-    [ProtoOneOf("delivery")]
-    [ProtoField(2)]
-    public string? Email { get; set; }
-
-    [ProtoOneOf("delivery")]
-    [ProtoField(3)]
-    public string? Sms { get; set; }
-
-    [ProtoOneOf("delivery")]
-    [ProtoField(4)]
-    public string? Push { get; set; }
-}
+Console.WriteLine("\nDone.");

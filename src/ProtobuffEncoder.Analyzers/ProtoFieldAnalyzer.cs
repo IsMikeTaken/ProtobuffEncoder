@@ -8,7 +8,7 @@ using Microsoft.CodeAnalysis.Diagnostics;
 namespace ProtobuffEncoder.Analyzers;
 
 /// <summary>
-/// Analyses individual [ProtoField] usages for correctness.
+/// Analyzes individual [ProtoField] usages for correctness.
 /// Reports: PROTO005, PROTO006, PROTO007, PROTO010.
 /// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
@@ -25,11 +25,12 @@ public sealed class ProtoFieldAnalyzer : DiagnosticAnalyzer
     };
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
-        ImmutableArray.Create(
-            DiagnosticDescriptors.FieldWithoutContract,
+    [
+        DiagnosticDescriptors.FieldWithoutContract,
             DiagnosticDescriptors.InvalidFieldNumber,
             DiagnosticDescriptors.ReservedFieldNumber,
-            DiagnosticDescriptors.UnrecognisedEncoding);
+            DiagnosticDescriptors.UnrecognisedEncoding
+    ];
 
     public override void Initialize(AnalysisContext context)
     {
@@ -75,7 +76,7 @@ public sealed class ProtoFieldAnalyzer : DiagnosticAnalyzer
         }
 
         // PROTO007: Reserved range 19000–19999
-        if (fieldNumber >= 19_000 && fieldNumber <= 19_999)
+        if (fieldNumber is >= 19_000 and <= 19_999)
         {
             context.ReportDiagnostic(Diagnostic.Create(
                 DiagnosticDescriptors.ReservedFieldNumber,
@@ -84,7 +85,7 @@ public sealed class ProtoFieldAnalyzer : DiagnosticAnalyzer
                 property.Name));
         }
 
-        // PROTO010: Unrecognised encoding on field
+        // PROTO010: Unrecognized encoding on a field
         var encodingArg = GetNamedStringArg(fieldAttr, "Encoding");
         if (encodingArg is not null && !KnownEncodings.Contains(encodingArg))
         {
@@ -123,7 +124,7 @@ public sealed class ProtoFieldAnalyzer : DiagnosticAnalyzer
 
         foreach (var arg in fieldAttr.NamedArguments)
         {
-            if (arg.Key == "FieldNumber" && arg.Value.Value is int fn)
+            if (arg is { Key: "FieldNumber", Value.Value: int fn })
                 return fn;
         }
 

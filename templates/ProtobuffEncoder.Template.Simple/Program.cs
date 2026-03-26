@@ -1,126 +1,77 @@
-// ============================================================================
 // ProtobuffEncoder — Simple Template
-// ============================================================================
-// This template covers the basics: defining contracts, encoding, decoding,
-// and streaming messages over an in-memory stream.
 //
-// Run with:  dotnet run
-// ============================================================================
+// Walks through the basics: contracts, encode/decode, streaming, and
+// declaring a service interface for gRPC.
+//
+// Contracts live in Contracts/, the service interface in Services/.
+//
+// Run with: dotnet run
 
 using ProtobuffEncoder;
-using ProtobuffEncoder.Attributes;
+using ProtobuffEncoder.Template.Simple.Contracts;
 
-Console.WriteLine("=== ProtobuffEncoder — Simple Template ===\n");
+Console.WriteLine("ProtobuffEncoder — Simple Template\n");
 
-// ── 1. Basic encode / decode ────────────────────────────────────────────────
+// Encode a request and decode it back.
 
-var person = new Person
+var request = new WeatherRequest
 {
-    Id = 1,
-    Name = "Alice",
-    Email = "alice@example.com",
-    IsActive = true
+    City = "London",
+    Days = 3,
+    IncludeWind = true
 };
 
-byte[] bytes = ProtobufEncoder.Encode(person);
-Console.WriteLine($"Encoded Person to {bytes.Length} bytes");
+byte[] encoded = ProtobufEncoder.Encode(request);
+Console.WriteLine($"Encoded WeatherRequest to {encoded.Length} bytes");
 
-var decoded = ProtobufEncoder.Decode<Person>(bytes);
-Console.WriteLine($"Decoded: Id={decoded.Id}, Name={decoded.Name}, Email={decoded.Email}, Active={decoded.IsActive}");
+var decoded = ProtobufEncoder.Decode<WeatherRequest>(encoded);
+Console.WriteLine($"Decoded: City={decoded.City}, Days={decoded.Days}, IncludeWind={decoded.IncludeWind}");
 
-// ── 2. Nested messages ──────────────────────────────────────────────────────
+// Nested contracts with repeated fields.
 
-var order = new Order
+var forecast = new WeatherForecast
 {
-    OrderId = 42,
-    Total = 99.95m,
-    ShippingAddress = new Address
-    {
-        Street = "123 Main St",
-        City = "London",
-        PostCode = "SW1A 1AA"
-    }
+    City = "London",
+    Entries =
+    [
+        new DayEntry { Date = "2026-03-25", HighC = 14.5, LowC = 7.2, Condition = "Partly cloudy" },
+        new DayEntry { Date = "2026-03-26", HighC = 16.0, LowC = 8.1, Condition = "Sunny" },
+        new DayEntry { Date = "2026-03-27", HighC = 12.3, LowC = 6.9, Condition = "Rain" }
+    ]
 };
 
-var orderBytes = ProtobufEncoder.Encode(order);
-var decodedOrder = ProtobufEncoder.Decode<Order>(orderBytes);
-Console.WriteLine($"\nOrder #{decodedOrder.OrderId}: £{decodedOrder.Total}, Ship to: {decodedOrder.ShippingAddress.City}");
+var forecastBytes = ProtobufEncoder.Encode(forecast);
+var decodedForecast = ProtobufEncoder.Decode<WeatherForecast>(forecastBytes);
+Console.WriteLine($"\nForecast for {decodedForecast.City}: {decodedForecast.Entries.Count} day(s)");
+foreach (var day in decodedForecast.Entries)
+    Console.WriteLine($"  {day.Date}  {day.LowC}–{day.HighC} C  {day.Condition}");
 
-// ── 3. Streaming (length-delimited) ─────────────────────────────────────────
+// Length-delimited streaming — write multiple messages, read them back.
 
-Console.WriteLine("\n--- Streaming ---");
+Console.WriteLine("\nStreaming three forecasts into a MemoryStream...");
 
 using var stream = new MemoryStream();
-
-// Write three messages
 for (int i = 1; i <= 3; i++)
-{
-    var msg = new Person { Id = i, Name = $"User-{i}", Email = $"user{i}@example.com" };
-    ProtobufEncoder.WriteDelimitedMessage(msg, stream);
-}
+    ProtobufEncoder.WriteDelimitedMessage(new WeatherForecast { City = $"City-{i}" }, stream);
 
-Console.WriteLine($"Wrote 3 delimited messages ({stream.Length} bytes total)");
+Console.WriteLine($"Wrote {stream.Length} bytes total");
 
-// Read them back
 stream.Position = 0;
-foreach (var msg in ProtobufEncoder.ReadDelimitedMessages<Person>(stream))
-{
-    Console.WriteLine($"  Read: Id={msg.Id}, Name={msg.Name}");
-}
+foreach (var msg in ProtobufEncoder.ReadDelimitedMessages<WeatherForecast>(stream))
+    Console.WriteLine($"  Read back: {msg.City}");
 
-// ── 4. Static (pre-compiled) encoder for repeated use ───────────────────────
+// Static (pre-compiled) encoder for hot paths.
 
-Console.WriteLine("\n--- Static Encoder ---");
+Console.WriteLine("\nStatic encoder round-trip...");
+var staticMsg = ProtobufEncoder.CreateStaticMessage<WeatherRequest>();
+var fastBytes = staticMsg.Encode(request);
+var fastDecoded = staticMsg.Decode(fastBytes);
+Console.WriteLine($"  {fastDecoded.City}, {fastDecoded.Days} day(s) — {fastBytes.Length} bytes");
 
-var staticMessage = ProtobufEncoder.CreateStaticMessage<Person>();
-var fastBytes = staticMessage.Encode(person);
-var fastDecoded = staticMessage.Decode(fastBytes);
-Console.WriteLine($"Static roundtrip: {fastDecoded.Name} ({fastBytes.Length} bytes)");
+// The IWeatherService interface (in Services/) declares the gRPC contract.
 
-Console.WriteLine("\nDone! Explore the models below to see how attributes work.");
+Console.WriteLine("\nService: IWeatherService (see Services/IWeatherService.cs)");
+Console.WriteLine("  GetForecast(WeatherRequest) -> WeatherForecast   [Unary]");
+Console.WriteLine("  StreamForecasts(WeatherRequest) -> stream        [ServerStreaming]");
 
-// ============================================================================
-// Models
-// ============================================================================
-
-[ProtoContract]
-public class Person
-{
-    [ProtoField(1)]
-    public int Id { get; set; }
-
-    [ProtoField(2)]
-    public string Name { get; set; } = "";
-
-    [ProtoField(3)]
-    public string Email { get; set; } = "";
-
-    [ProtoField(4)]
-    public bool IsActive { get; set; }
-}
-
-[ProtoContract]
-public class Address
-{
-    [ProtoField(1)]
-    public string Street { get; set; } = "";
-
-    [ProtoField(2)]
-    public string City { get; set; } = "";
-
-    [ProtoField(3)]
-    public string PostCode { get; set; } = "";
-}
-
-[ProtoContract]
-public class Order
-{
-    [ProtoField(1)]
-    public int OrderId { get; set; }
-
-    [ProtoField(2)]
-    public decimal Total { get; set; }
-
-    [ProtoField(3)]
-    public Address ShippingAddress { get; set; } = new();
-}
+Console.WriteLine("\nDone.");
