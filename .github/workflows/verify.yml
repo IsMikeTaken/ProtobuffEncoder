@@ -5,12 +5,12 @@ on:
     branches: [ master, development, preview ]
     paths-ignore:
       - 'docs/**'
-      - 'Writerside/**'
+      - 'writerside/**'
   push:
     branches: [ development ]
     paths-ignore:
       - 'docs/**'
-      - 'Writerside/**'
+      - 'writerside/**'
 
 jobs:
   verify:

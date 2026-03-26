@@ -5,7 +5,7 @@ on:
     branches: [ master, preview ]
     paths-ignore:
       - 'docs/**'
-      - 'Writerside/**'
+      - 'writerside/**'
   workflow_dispatch: # Allows manual trigger
 
 jobs:

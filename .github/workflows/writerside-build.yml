@@ -7,15 +7,15 @@ on:
       - master
       - develop
     paths:
-      - 'Writerside/**'
+      - 'writerside/**'
   pull_request:
     branches: [master]
     paths:
-      - 'Writerside/**'
+      - 'writerside/**'
   workflow_dispatch:
 
 env:
-  INSTANCE: Writerside/l
+  INSTANCE: writerside/l
   ARTIFACT: webHelpL2-all.zip
 
 jobs:
