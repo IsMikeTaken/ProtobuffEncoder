@@ -48,15 +48,25 @@ public static class ProtobufEncoder
     /// <summary>
     /// Asynchronously serializes an object to the given stream.
     /// </summary>
+    /// <example>
+    /// For .NET 8 or newer, this leverages efficient span abstractions internally:
+    /// <code>
+    /// await ProtobufEncoder.EncodeAsync(myMessage, networkStream);
+    /// </code>
+    /// </example>
     public static async Task EncodeAsync(object instance, Stream output, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(instance);
         ArgumentNullException.ThrowIfNull(output);
 
         // Encode into a buffer, then write asynchronously
-        var buffer = Encode(instance);
-        await output.WriteAsync(buffer, cancellationToken);
-        await output.FlushAsync(cancellationToken);
+        var encodedPayload = Encode(instance);
+#if NET8_0_OR_GREATER
+        await output.WriteAsync(encodedPayload.AsMemory(), cancellationToken).ConfigureAwait(false);
+#else
+        await output.WriteAsync(encodedPayload, 0, encodedPayload.Length, cancellationToken).ConfigureAwait(false);
+#endif
+        await output.FlushAsync(cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -75,22 +85,45 @@ public static class ProtobufEncoder
 
     /// <summary>
     /// Asynchronously writes a length-delimited message to a stream.
+    /// This uses fewer allocations in .NET 8/9 by using <see cref="System.Buffers.ArrayPool{T}"/>.
     /// </summary>
+    /// <example>
+    /// <code>
+    /// await ProtobufEncoder.WriteDelimitedMessageAsync(myMessage, networkStream);
+    /// </code>
+    /// </example>
     public static async Task WriteDelimitedMessageAsync(object instance, Stream output, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(instance);
         ArgumentNullException.ThrowIfNull(output);
 
-        var payload = Encode(instance);
+        var encodedPayload = Encode(instance);
 
+#if NET8_0_OR_GREATER
+        var lengthBuffer = System.Buffers.ArrayPool<byte>.Shared.Rent(10); // Max varint size is 10 bytes
+        try
+        {
+            using var lengthStream = new MemoryStream(lengthBuffer);
+            WriteVarint(lengthStream, (ulong)encodedPayload.Length);
+            var actualLengthSize = (int)lengthStream.Position;
+            
+            await output.WriteAsync(lengthBuffer.AsMemory(0, actualLengthSize), cancellationToken).ConfigureAwait(false);
+            await output.WriteAsync(encodedPayload.AsMemory(), cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            System.Buffers.ArrayPool<byte>.Shared.Return(lengthBuffer);
+        }
+#else
         // Write length prefix
-        using var lengthBuf = new MemoryStream();
-        WriteVarint(lengthBuf, (ulong)payload.Length);
-        await output.WriteAsync(lengthBuf.ToArray(), cancellationToken);
+        using var lengthStream = new MemoryStream();
+        WriteVarint(lengthStream, (ulong)encodedPayload.Length);
+        var lengthBytes = lengthStream.ToArray();
 
-        // Write payload
-        await output.WriteAsync(payload, cancellationToken);
-        await output.FlushAsync(cancellationToken);
+        await output.WriteAsync(lengthBytes, 0, lengthBytes.Length, cancellationToken).ConfigureAwait(false);
+        await output.WriteAsync(encodedPayload, 0, encodedPayload.Length, cancellationToken).ConfigureAwait(false);
+#endif
+        await output.FlushAsync(cancellationToken).ConfigureAwait(false);
     }
 
     #endregion
@@ -121,12 +154,17 @@ public static class ProtobufEncoder
     /// Asynchronously reads a single protobuf message from a stream.
     /// Reads all remaining bytes from the current position.
     /// </summary>
+    /// <example>
+    /// <code>
+    /// var msg = await ProtobufEncoder.DecodeAsync&lt;MyMessage&gt;(networkStream);
+    /// </code>
+    /// </example>
     public static async Task<T> DecodeAsync<T>(Stream input, CancellationToken cancellationToken = default) where T : new()
     {
         ArgumentNullException.ThrowIfNull(input);
-        using var ms = new MemoryStream();
-        await input.CopyToAsync(ms, cancellationToken);
-        return Decode<T>(ms.ToArray());
+        using var memoryStream = new MemoryStream();
+        await input.CopyToAsync(memoryStream, cancellationToken).ConfigureAwait(false);
+        return Decode<T>(memoryStream.ToArray());
     }
 
     /// <summary>
@@ -169,6 +207,14 @@ public static class ProtobufEncoder
     /// <summary>
     /// Asynchronously reads a sequence of length-delimited messages from a stream.
     /// </summary>
+    /// <example>
+    /// <code>
+    /// await foreach (var msg in ProtobufEncoder.ReadDelimitedMessagesAsync&lt;MyMessage&gt;(networkStream))
+    /// {
+    ///     Console.WriteLine(msg);
+    /// }
+    /// </code>
+    /// </example>
     public static async IAsyncEnumerable<T> ReadDelimitedMessagesAsync<T>(
         Stream input,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -177,19 +223,23 @@ public static class ProtobufEncoder
         ArgumentNullException.ThrowIfNull(input);
         while (!cancellationToken.IsCancellationRequested)
         {
-            if (!TryReadVarintFromStream(input, out ulong length))
+            if (!TryReadVarintFromStream(input, out ulong messageLength))
                 yield break;
 
-            var buffer = new byte[(int)length];
-            int totalRead = 0;
-            while (totalRead < buffer.Length)
+            var payloadBytes = new byte[(int)messageLength];
+            int totalBytesRead = 0;
+            while (totalBytesRead < payloadBytes.Length)
             {
-                int read = await input.ReadAsync(buffer.AsMemory(totalRead, buffer.Length - totalRead), cancellationToken);
-                if (read == 0) throw new InvalidOperationException("Unexpected end of stream.");
-                totalRead += read;
+#if NET8_0_OR_GREATER
+                int currentBytesRead = await input.ReadAsync(payloadBytes.AsMemory(totalBytesRead, payloadBytes.Length - totalBytesRead), cancellationToken).ConfigureAwait(false);
+#else
+                int currentBytesRead = await input.ReadAsync(payloadBytes, totalBytesRead, payloadBytes.Length - totalBytesRead, cancellationToken).ConfigureAwait(false);
+#endif
+                if (currentBytesRead == 0) throw new InvalidOperationException("Unexpected end of stream.");
+                totalBytesRead += currentBytesRead;
             }
 
-            yield return Decode<T>(buffer);
+            yield return Decode<T>(payloadBytes);
         }
     }
 

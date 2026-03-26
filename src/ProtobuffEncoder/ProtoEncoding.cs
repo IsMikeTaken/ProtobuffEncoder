@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Text;
 
 namespace ProtobuffEncoder;
@@ -7,6 +8,7 @@ namespace ProtobuffEncoder;
 /// All Unicode-capable encodings (UTF-8, UTF-16, UTF-32) fully support emoji and
 /// supplementary Unicode planes. UTF-8 is the default and the protobuf wire-format standard.
 /// </summary>
+[EditorBrowsable(EditorBrowsableState.Never)]
 public sealed class ProtoEncoding
 {
     /// <summary>

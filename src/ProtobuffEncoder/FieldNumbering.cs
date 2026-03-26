@@ -1,9 +1,12 @@
+using System.ComponentModel;
+
 namespace ProtobuffEncoder;
 
 /// <summary>
 /// Determines how field numbers are auto-assigned to properties that don't have
 /// an explicit <c>[ProtoField(N)]</c> field number.
 /// </summary>
+[EditorBrowsable(EditorBrowsableState.Never)]
 public enum FieldNumbering
 {
     /// <summary>

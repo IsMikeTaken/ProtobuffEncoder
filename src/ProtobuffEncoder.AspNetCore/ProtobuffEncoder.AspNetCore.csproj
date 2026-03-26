@@ -4,6 +4,7 @@
     <ProjectReference Include="..\ProtobuffEncoder\ProtobuffEncoder.csproj" />
     <ProjectReference Include="..\ProtobuffEncoder.WebSockets\ProtobuffEncoder.WebSockets.csproj" />
     <ProjectReference Include="..\ProtobuffEncoder.Grpc\ProtobuffEncoder.Grpc.csproj" />
+    <ProjectReference Include="..\ProtobuffEncoder.Analyzers\ProtobuffEncoder.Analyzers.csproj" PrivateAssets="none" ReferenceOutputAssembly="false" OutputItemType="Analyzer" />
   </ItemGroup>
 
   <ItemGroup>

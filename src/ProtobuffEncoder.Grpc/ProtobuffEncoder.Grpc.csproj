@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ProtobuffEncoder\ProtobuffEncoder.csproj" />
+    <ProjectReference Include="..\ProtobuffEncoder.Analyzers\ProtobuffEncoder.Analyzers.csproj" PrivateAssets="none" ReferenceOutputAssembly="false" OutputItemType="Analyzer" />
   </ItemGroup>
 
   <ItemGroup>

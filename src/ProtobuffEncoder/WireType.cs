@@ -1,8 +1,11 @@
+using System.ComponentModel;
+
 namespace ProtobuffEncoder;
 
 /// <summary>
-/// Protobuf wire types as defined in the protocol buffer encoding specification.
+/// Defines the protobuf wire types used for encoding data.
 /// </summary>
+[EditorBrowsable(EditorBrowsableState.Never)]
 public enum WireType
 {
     Varint = 0,

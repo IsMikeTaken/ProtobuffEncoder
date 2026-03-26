@@ -189,4 +189,16 @@ internal static class DiagnosticDescriptors
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         description: "The [ProtoMap] attribute is only valid on properties of type Dictionary<TKey, TValue>. Using it on other types has no effect and indicates a mistake.");
+
+    /// <summary>
+    /// PROTO016: A type used in MapProtobufSender or MapProtobufReceiver does not have [ProtoContract].
+    /// </summary>
+    public static readonly DiagnosticDescriptor MinimalApiTypeMustBeContract = new(
+        id: "PROTO016",
+        title: "Endpoint type lacks ProtoContract",
+        messageFormat: "Type '{0}' used in {1} is not marked with [ProtoContract]. If it is not registered at runtime, serialisation will fail.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: "Types used in protobuf minimal API endpoints (MapProtobufSender, MapProtobufReceiver, MapProtobufDuplex) must be serialisable. Ensure they have [ProtoContract] or are registered globally.");
 }

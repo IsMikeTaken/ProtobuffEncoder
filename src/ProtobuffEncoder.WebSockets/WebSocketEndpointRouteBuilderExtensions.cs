@@ -42,6 +42,57 @@ public static class WebSocketEndpointRouteBuilderExtensions
     }
 
     /// <summary>
+    /// Maps a protobuf WebSocket endpoint using a class derived from <see cref="ProtobufWebSocketEndpoint{TSend, TReceive}"/>.
+    /// The <typeparamref name="TEndpoint"/> must be registered in DI (Transient or Scoped).
+    /// </summary>
+    public static IEndpointConventionBuilder MapProtobufWebSocket<TEndpoint, TSend, TReceive>(
+        this IEndpointRouteBuilder endpoints,
+        string pattern)
+        where TEndpoint : ProtobufWebSocketEndpoint<TSend, TReceive>
+        where TSend : class, new()
+        where TReceive : class, new()
+    {
+        return MapProtobufWebSocket<TSend, TReceive>(endpoints, pattern, options =>
+        {
+            options.OnConnect = async conn =>
+            {
+                var scope = conn.HttpContext!.RequestServices.CreateScope();
+                conn.Items["Scope"] = scope; // store scope in connection if possible, or assume transient endpoint creation per message
+                var endpoint = scope.ServiceProvider.GetRequiredService<TEndpoint>();
+                conn.Items["Endpoint"] = endpoint;
+                await endpoint.OnConnectedAsync(conn);
+            };
+
+            options.OnMessage = async (conn, msg) =>
+            {
+                var endpoint = (TEndpoint)conn.Items["Endpoint"]!;
+                await endpoint.OnMessageReceivedAsync(conn, msg);
+            };
+
+            options.OnDisconnect = async conn =>
+            {
+                if (conn.Items.TryGetValue("Endpoint", out var epObj) && epObj is TEndpoint endpoint)
+                {
+                    await endpoint.OnDisconnectedAsync(conn);
+                }
+                
+                if (conn.Items.TryGetValue("Scope", out var scopeObj) && scopeObj is IServiceScope scope)
+                {
+                    scope.Dispose();
+                }
+            };
+            
+            options.OnError = async (conn, ex) =>
+            {
+                if (conn.Items.TryGetValue("Endpoint", out var epObj) && epObj is TEndpoint endpoint)
+                {
+                    await endpoint.OnErrorAsync(conn, ex);
+                }
+            };
+        });
+    }
+
+    /// <summary>
     /// Maps a protobuf WebSocket endpoint with a pre-built options object.
     /// </summary>
     public static IEndpointConventionBuilder MapProtobufWebSocket<TSend, TReceive>(
