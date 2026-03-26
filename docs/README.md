@@ -1,3 +1,7 @@
+We’re now live
+
+[View the live README](https://ismiketaken.github.io/ProtobuffEncoder/readme.html)
+
 # Proto ~ Buffed
 
 **ProtobuffEncoder** is a high-performance, zero-dependency protobuf serialization framework for .NET 8, 9, and 10. It provides a complete pipeline from C# attribute-driven contracts to binary wire-format encoding, streaming transport, validation, ASP.NET Core integration, gRPC services, WebSocket real-time communication, and `.proto` schema generation -- all without requiring Google.Protobuf or `protoc`.

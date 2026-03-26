@@ -16,6 +16,7 @@ env:
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
   NUGET_SOURCE: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
+  NUGET_ORG_SOURCE: https://api.nuget.org/v3/index.json
 
 permissions:
   contents: write
@@ -136,8 +137,15 @@ jobs:
       - name: Push to GitHub Packages
         run: >-
           dotnet nuget push ./nupkgs/*.nupkg
-          --api-key ${{ secrets.GITHUB_TOKEN }}
+          --api-key ${{ secrets.NUGET_GITHUB_TOKEN }}
           --source ${{ env.NUGET_SOURCE }}
+          --skip-duplicate
+
+      - name: Push to NuGet.org
+        run: >-
+          dotnet nuget push ./nupkgs/*.nupkg
+          --api-key ${{ secrets.NUGET_API_KEY }}
+          --source ${{ env.NUGET_ORG_SOURCE }}
           --skip-duplicate
 
   # ── Create GitHub Release with tag ────────────────────────
@@ -171,7 +179,7 @@ jobs:
       - name: Create tag and GitHub Release
         if: steps.tag_check.outputs.exists == 'false'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.NUGET_GITHUB_TOKEN }}
         run: |
           VERSION="${{ needs.publish.outputs.version }}"
           git tag "$VERSION"
