@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "ProtobuffEncoder.Demo.Setup.Advanced.Rest": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:62917;http://localhost:62918"
+    }
+  }
+}

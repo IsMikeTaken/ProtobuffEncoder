@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "ProtobuffEncoder.Demo.Setup.Simple.Grpc": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:55561;http://localhost:55562"
+    }
+  }
+}
