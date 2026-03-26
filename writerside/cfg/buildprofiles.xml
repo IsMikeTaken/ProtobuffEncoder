@@ -13,10 +13,6 @@
             <download-page>https://github.com/IsMikeTaken/ProtobuffEncoder</download-page>
             <showDownloadButton>true</showDownloadButton>
             <!-- Header end -->
-            
-            <!-- Footer section  -->
-            
-            <!-- Footer end -->
         </variables>
     </build-profile>
 
