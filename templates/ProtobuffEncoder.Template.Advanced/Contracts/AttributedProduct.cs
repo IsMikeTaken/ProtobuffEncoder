@@ -1,6 +1,8 @@
 using ProtobuffEncoder.Attributes;
 
-// --- Attributed contract ---
+namespace ProtobuffEncoder.Template.Advanced.Contracts;
+
+// Explicit field numbers — always take precedence over registry strategies.
 [ProtoContract]
 public class AttributedProduct
 {

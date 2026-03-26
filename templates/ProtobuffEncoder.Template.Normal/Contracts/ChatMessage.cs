@@ -1,5 +1,7 @@
 using ProtobuffEncoder.Attributes;
 
+namespace ProtobuffEncoder.Template.Normal.Contracts;
+
 [ProtoContract(DefaultEncoding = "utf-8")]
 public class ChatMessage
 {

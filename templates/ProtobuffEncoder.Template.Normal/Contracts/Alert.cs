@@ -1,5 +1,7 @@
 using ProtobuffEncoder.Attributes;
 
+namespace ProtobuffEncoder.Template.Normal.Contracts;
+
 [ProtoContract]
 public class Alert
 {

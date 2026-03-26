@@ -1,4 +1,6 @@
-// --- Auto-discovered contracts (no attributes) ---
+namespace ProtobuffEncoder.Template.Advanced.Contracts;
+
+// Auto-discovered response type for the InventoryService.
 public class StockLevel
 {
     public string Sku { get; set; } = "";

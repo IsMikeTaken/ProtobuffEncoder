@@ -1,4 +1,6 @@
-// --- Auto-discovered contracts (no attributes) ---
+namespace ProtobuffEncoder.Template.Advanced.Contracts;
+
+// No attributes — resolved via global auto-discover mode.
 public class Invoice
 {
     public string Number { get; set; } = "";

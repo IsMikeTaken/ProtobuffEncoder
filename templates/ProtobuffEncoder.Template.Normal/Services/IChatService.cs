@@ -1,4 +1,7 @@
 using ProtobuffEncoder.Attributes;
+using ProtobuffEncoder.Template.Normal.Contracts;
+
+namespace ProtobuffEncoder.Template.Normal.Services;
 
 [ProtoService("ChatService")]
 public interface IChatService

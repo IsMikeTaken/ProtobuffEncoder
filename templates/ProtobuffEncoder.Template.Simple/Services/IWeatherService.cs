@@ -1,4 +1,7 @@
 using ProtobuffEncoder.Attributes;
+using ProtobuffEncoder.Template.Simple.Contracts;
+
+namespace ProtobuffEncoder.Template.Simple.Services;
 
 [ProtoService("WeatherService")]
 public interface IWeatherService

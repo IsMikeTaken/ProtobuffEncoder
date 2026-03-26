@@ -129,4 +129,64 @@ internal static class DiagnosticDescriptors
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
         description: "The encoding name should be one recognised by System.Text.Encoding.GetEncoding(). Common values: utf-8, utf-16, utf-32, ascii, latin-1.");
+
+    /// <summary>
+    /// PROTO011: A [ProtoService] interface has no methods marked with [ProtoMethod].
+    /// </summary>
+    public static readonly DiagnosticDescriptor ServiceWithoutMethods = new(
+        id: "PROTO011",
+        title: "ProtoService has no methods",
+        messageFormat: "Interface '{0}' is marked with [ProtoService] but has no methods with [ProtoMethod]. Add at least one service method.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: "A service interface should declare at least one method annotated with [ProtoMethod] to be useful as a gRPC service.");
+
+    /// <summary>
+    /// PROTO012: A [ProtoMethod] with ServerStreaming must return IAsyncEnumerable.
+    /// </summary>
+    public static readonly DiagnosticDescriptor StreamingReturnTypeMismatch = new(
+        id: "PROTO012",
+        title: "Streaming method has wrong return type",
+        messageFormat: "Method '{0}' on service '{1}' is {2} but does not return IAsyncEnumerable<T>. Streaming methods must return IAsyncEnumerable<T>.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "ServerStreaming and DuplexStreaming methods must return IAsyncEnumerable<T>. Unary and ClientStreaming methods must return Task<T>.");
+
+    /// <summary>
+    /// PROTO013: A [ProtoInclude] field number conflicts with a [ProtoField] number on the same type.
+    /// </summary>
+    public static readonly DiagnosticDescriptor IncludeFieldNumberConflict = new(
+        id: "PROTO013",
+        title: "ProtoInclude field number conflicts with ProtoField",
+        messageFormat: "ProtoInclude field number {0} for derived type '{1}' on '{2}' conflicts with an existing ProtoField number. Each number must be unique.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "ProtoInclude field numbers share the same namespace as ProtoField numbers. A conflict causes data corruption during serialisation.");
+
+    /// <summary>
+    /// PROTO014: A [ProtoInclude] references a type that is not a subclass of the annotated type.
+    /// </summary>
+    public static readonly DiagnosticDescriptor IncludeNotDerived = new(
+        id: "PROTO014",
+        title: "ProtoInclude type is not a subclass",
+        messageFormat: "ProtoInclude on '{0}' references '{1}' which does not derive from '{0}'. The included type must be a direct or indirect subclass.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "The type specified in [ProtoInclude] must inherit from the type that carries the attribute, otherwise polymorphic deserialisation will fail.");
+
+    /// <summary>
+    /// PROTO015: A [ProtoMap] attribute is on a property that is not a Dictionary.
+    /// </summary>
+    public static readonly DiagnosticDescriptor MapOnNonDictionary = new(
+        id: "PROTO015",
+        title: "ProtoMap on non-Dictionary property",
+        messageFormat: "Property '{0}' on type '{1}' has [ProtoMap] but its type is not Dictionary<TKey, TValue>. ProtoMap only applies to dictionary properties.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "The [ProtoMap] attribute is only valid on properties of type Dictionary<TKey, TValue>. Using it on other types has no effect and indicates a mistake.");
 }

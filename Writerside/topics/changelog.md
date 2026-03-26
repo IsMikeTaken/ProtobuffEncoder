@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 ## [1.4.0] - 2026-03-25
 
 ### Added {id="v140_added"}
+- **5 new Roslyn analyser diagnostics** (PROTO011–PROTO015) bringing the total to 15 compile-time checks:
+  - `ProtoServiceAnalyzer`: PROTO011 (service with no methods), PROTO012 (streaming return type mismatch).
+  - `ProtoIncludeAnalyzer`: PROTO013 (include/field number conflict), PROTO014 (include type not derived), PROTO015 (ProtoMap on non-Dictionary).
+- **Comprehensive analyser test suite** — 38 tests covering all 15 diagnostics (PROTO001–PROTO015) with both positive and negative cases.
+- **Analyser reference documentation** — new `analyzers_reference.md` page documenting all 15 diagnostics with examples, severity, and fix guidance.
 - **GitHub Actions CI/CD workflows** — three new workflows (`ci-pr.yml`, `ci-development.yml`, `ci-release.yml`) for source projects with incremental versioning and publishing to GitHub Packages.
   - PR builds: `1.3.0-pr.<number>.<run>` preview packages.
   - Development builds: `1.3.0-dev.<run>` pre-release packages pushed to GitHub Packages.
@@ -14,7 +19,7 @@ All notable changes to this project will be documented in this file.
 - Post-test verification step that fails the build if no `.trx` result files are produced.
 
 ### Changed {id="v140_changed"}
-- **Templates rewritten** — all three console templates (Simple, Normal, Advanced) now showcase at least one `[ProtoService]` interface and two `[ProtoContract]` types each. Removed ASCII-art comment blocks in favour of natural guiding comments.
+- **Templates restructured** — all three console templates (Simple, Normal, Advanced) split into `Contracts/`, `Services/`, and `Program.cs` for clean separation. Each showcases at least one `[ProtoService]` interface and two `[ProtoContract]` types. Removed ASCII-art comment blocks in favour of natural guiding comments.
   - Simple: `WeatherRequest`, `WeatherForecast`, `DayEntry` contracts + `IWeatherService` (Unary, ServerStreaming).
   - Normal: `Team`, `SensorReading`, `Alert`, `ChatMessage`, `ChatReply` contracts + `IChatService` (Unary, DuplexStreaming).
   - Advanced: `Customer`, `Invoice`, `Product`, `InventoryQuery`, `StockLevel`, `AttributedProduct` contracts + `IInventoryService` (Unary, ServerStreaming).

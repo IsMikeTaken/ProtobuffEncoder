@@ -1,21 +1,20 @@
 // ProtobuffEncoder — Advanced Template
 //
-// Covers auto-discovery (no attributes), the ProtoRegistry, field numbering
-// strategies, assembly scanning, schema generation,
-// and mixing attributed and plain types. Also defines a service interface
-// whose request and response types are auto-discovered.
+// Auto-discovery, ProtoRegistry, field numbering strategies, assembly
+// scanning, schema generation, and mixing attributed with plain types.
+//
+// Contracts live in Contracts/, the service interface in Services/.
 //
 // Run with: dotnet run
 
 using System.Reflection;
 using ProtobuffEncoder;
 using ProtobuffEncoder.Schema;
+using ProtobuffEncoder.Template.Advanced.Contracts;
 
 Console.WriteLine("ProtobuffEncoder — Advanced Template\n");
 
-// Auto-discovery lets you serialise plain C# classes that have no attributes
-// at all. Register a type with ProtoRegistry and the resolver assigns field
-// numbers based on the chosen strategy.
+// Auto-discovery — register a plain class, no attributes needed.
 
 ProtoRegistry.Register<Customer>(FieldNumbering.Alphabetical);
 
@@ -31,8 +30,7 @@ var decodedCustomer = ProtobufEncoder.Decode<Customer>(customerBytes);
 Console.WriteLine($"Customer: {decodedCustomer.Name}, credit=£{decodedCustomer.CreditLimit}");
 Console.WriteLine($"  Registered: {ProtoRegistry.IsRegistered(typeof(Customer))}");
 
-// Assembly scanning finds every public class with at least one public
-// read/write property and registers it in one call.
+// Assembly scanning — register every public class in one call.
 
 Console.WriteLine("\nAssembly scanning...");
 ProtoRegistry.Reset();
@@ -41,9 +39,7 @@ Console.WriteLine($"  Registered {count} type(s) from this assembly");
 Console.WriteLine($"  Customer:  {ProtoRegistry.IsRegistered(typeof(Customer))}");
 Console.WriteLine($"  Invoice:   {ProtoRegistry.IsRegistered(typeof(Invoice))}");
 
-// Global auto-discover mode means any class can be serialised without
-// explicit registration. Combined with a default field numbering strategy,
-// this is the zero-ceremony option.
+// Global auto-discover — any class is serialisable without registration.
 
 Console.WriteLine("\nGlobal auto-discover...");
 ProtoRegistry.Reset();
@@ -66,8 +62,7 @@ var decodedInvoice = ProtobufEncoder.Decode<Invoice>(invoiceBytes);
 Console.WriteLine($"  Invoice {decodedInvoice.Number}: {decodedInvoice.Currency} {decodedInvoice.Amount}");
 Console.WriteLine($"  Resolvable (auto): {ProtoRegistry.IsResolvable(typeof(Invoice))}");
 
-// The three field numbering strategies control how the resolver assigns
-// protobuf field numbers to properties that lack a [ProtoField] attribute.
+// Field numbering strategies.
 
 Console.WriteLine("\nField numbering strategies...");
 
@@ -91,8 +86,7 @@ ProtoRegistry.Register<Product>();
 var b3 = ProtobufEncoder.Encode(product);
 Console.WriteLine($"  TypeThenAlphabetical: {b3.Length} bytes  (scalars first, then alphabetical)");
 
-// Per-type overrides let you mix strategies within the same application.
-// Useful when different teams own different contracts.
+// Per-type overrides.
 
 ProtoRegistry.Reset();
 ProtoRegistry.Register<Product>(FieldNumbering.Alphabetical);
@@ -100,9 +94,7 @@ ProtoRegistry.Register<Customer>(FieldNumbering.DeclarationOrder);
 Console.WriteLine("\n  Product  -> Alphabetical");
 Console.WriteLine("  Customer -> DeclarationOrder");
 
-// When you mix attributes with auto-discovery, the attributes always win.
-// The AttributedProduct below has explicit field numbers that override
-// whatever strategy the registry would otherwise apply.
+// Mixed: attributed types always keep their explicit field numbers.
 
 Console.WriteLine("\nMixed: attributed + auto-discovered...");
 ProtoRegistry.Reset();
@@ -118,14 +110,11 @@ var plainBytes = ProtobufEncoder.Encode(plain);
 var decodedPlain = ProtobufEncoder.Decode<Customer>(plainBytes);
 Console.WriteLine($"  Auto-discovered: {decodedPlain.Name}");
 
-// ProtoSchemaGenerator produces a .proto definition from any resolvable
-// type. This is useful for interop with other languages and tooling.
+// Schema generation.
 
 Console.WriteLine("\nSchema generation...");
 var schema = ProtoSchemaGenerator.Generate(typeof(AttributedProduct));
 Console.WriteLine(schema);
-
-// GenerateAll scans an assembly and returns one .proto string per type.
 
 Console.WriteLine("Assembly-wide schema generation...");
 var allSchemas = ProtoSchemaGenerator.GenerateAll(Assembly.GetExecutingAssembly());
@@ -133,16 +122,10 @@ Console.WriteLine($"  Generated {allSchemas.Count} .proto file(s):");
 foreach (var (key, content) in allSchemas)
     Console.WriteLine($"    {key} ({content.Length} chars)");
 
-// The service interface below uses auto-discovered request/response types.
-// InventoryQuery and StockLevel have no attributes — the registry handles
-// them. The service interface itself still uses [ProtoService] so the gRPC
-// layer can discover and map it.
+// The IInventoryService interface (in Services/) uses auto-discovered types.
 
-Console.WriteLine("\nService interface declared: IInventoryService");
+Console.WriteLine("\nService: IInventoryService (see Services/IInventoryService.cs)");
 Console.WriteLine("  CheckStock(InventoryQuery) -> StockLevel              [Unary]");
 Console.WriteLine("  WatchStock(InventoryQuery) -> stream of StockLevel    [ServerStreaming]");
 
 Console.WriteLine("\nDone.");
-
-
-

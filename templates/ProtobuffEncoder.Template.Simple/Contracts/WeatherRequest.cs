@@ -1,5 +1,7 @@
 using ProtobuffEncoder.Attributes;
 
+namespace ProtobuffEncoder.Template.Simple.Contracts;
+
 [ProtoContract]
 public class WeatherRequest
 {

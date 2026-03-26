@@ -1,6 +1,9 @@
 using ProtobuffEncoder.Attributes;
+using ProtobuffEncoder.Template.Advanced.Contracts;
 
-// --- Service (uses auto-discovered types as request/response) ---
+namespace ProtobuffEncoder.Template.Advanced.Services;
+
+// Service interface with auto-discovered request/response types.
 [ProtoService("InventoryService")]
 public interface IInventoryService
 {

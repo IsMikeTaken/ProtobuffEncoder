@@ -1,19 +1,18 @@
 // ProtobuffEncoder — Normal Template
 //
-// Builds on the Simple template with collections, maps, nullable fields,
-// OneOf groups, custom text encoding, ProtoValue for bare values, and
-// ProtoMessage for dynamic schema-less messages. Also defines a chat
-// service interface with multiple method types.
+// Collections, maps, nullable fields, OneOf groups, custom encoding,
+// ProtoValue, ProtoMessage, and a chat service interface.
+//
+// Contracts live in Contracts/, the service interface in Services/.
 //
 // Run with: dotnet run
 
 using ProtobuffEncoder;
+using ProtobuffEncoder.Template.Normal.Contracts;
 
 Console.WriteLine("ProtobuffEncoder — Normal Template\n");
 
-// Collections and maps are first-class. Team contains a List<string> for
-// members and a Dictionary<string,int> for scores. Mark dictionaries with
-// [ProtoMap] alongside a [ProtoField] number.
+// Collections and maps.
 
 var team = new Team
 {
@@ -21,9 +20,7 @@ var team = new Team
     Members = ["Alice", "Bob", "Charlie"],
     Scores = new Dictionary<string, int>
     {
-        ["Alice"] = 95,
-        ["Bob"] = 87,
-        ["Charlie"] = 92
+        ["Alice"] = 95, ["Bob"] = 87, ["Charlie"] = 92
     }
 };
 
@@ -34,9 +31,7 @@ Console.WriteLine($"Team: {decodedTeam.Name}, {decodedTeam.Members.Count} member
 foreach (var (name, score) in decodedTeam.Scores)
     Console.WriteLine($"  {name}: {score}");
 
-// Nullable fields are omitted from the wire when null, saving space. The
-// IsRequired flag on SensorId causes the encoder to always include it,
-// even when the value is the type's default.
+// Nullable and required fields.
 
 Console.WriteLine("\nNullable and required fields...");
 
@@ -52,9 +47,7 @@ var readingBytes = ProtobufEncoder.Encode(reading);
 var decodedReading = ProtobufEncoder.Decode<SensorReading>(readingBytes);
 Console.WriteLine($"  Sensor {decodedReading.SensorId}: {decodedReading.Value}, margin={decodedReading.ErrorMargin?.ToString() ?? "N/A"}");
 
-// OneOf groups model mutually exclusive fields. Only one member of the
-// "channel" group is serialized per message. Set Email and leave the rest
-// null to see how it round-trips.
+// OneOf groups — mutually exclusive fields.
 
 Console.WriteLine("\nOneOf groups...");
 
@@ -69,8 +62,7 @@ var alertBytes = ProtobufEncoder.Encode(alert);
 var decodedAlert = ProtobufEncoder.Decode<Alert>(alertBytes);
 Console.WriteLine($"  Alert #{decodedAlert.Id}: via email={decodedAlert.Email}, sms={decodedAlert.Sms ?? "(none)"}");
 
-// Custom text encoding on a contract enables full emoji support. Set
-// DefaultEncoding to "utf-8" on the contract and emoji round-trips cleanly.
+// Custom encoding with emoji.
 
 Console.WriteLine("\nCustom encoding with emoji...");
 
@@ -84,8 +76,7 @@ var chatBytes = ProtobufEncoder.Encode(chat);
 var decodedChat = ProtobufEncoder.Decode<ChatMessage>(chatBytes);
 Console.WriteLine($"  {decodedChat.Author}: {decodedChat.Text}");
 
-// ProtoValue encodes and decodes standalone values without a contract.
-// Useful for configuration flags, counters, or single-field payloads.
+// ProtoValue — bare values without a contract.
 
 Console.WriteLine("\nProtoValue (bare values)...");
 
@@ -99,9 +90,7 @@ Console.WriteLine($"  int:    {ProtoValue.DecodeInt32(encInt)}");
 Console.WriteLine($"  guid:   {ProtoValue.DecodeGuid(encGuid)}");
 Console.WriteLine($"  date:   {ProtoValue.DecodeDateTime(encDate):yyyy-MM-dd HH:mm:ss}");
 
-// ProtoMessage builds messages dynamically without any contract class.
-// Fields are set by number and retrieved by number. Nested ProtoMessages
-// are supported too.
+// ProtoMessage — dynamic schema-less messages.
 
 Console.WriteLine("\nProtoMessage (dynamic, no contract needed)...");
 
@@ -121,11 +110,9 @@ Console.WriteLine($"  Field 1: {decodedMsg.GetString(1)}");
 Console.WriteLine($"  Field 2: {decodedMsg.Get<int>(2)}");
 Console.WriteLine($"  Field 5 (nested): {decodedMsg.GetMessage(5)?.GetString(1)}");
 
-// The service interface below defines a chat service with Unary and
-// DuplexStreaming methods. You would implement and host this through the
-// gRPC integration package.
+// The IChatService interface (in Services/) declares Unary and DuplexStreaming.
 
-Console.WriteLine("\nService interface declared: IChatService");
+Console.WriteLine("\nService: IChatService (see Services/IChatService.cs)");
 Console.WriteLine("  Send(ChatMessage)    -> ChatReply        [Unary]");
 Console.WriteLine("  LiveChat(stream)     -> stream           [DuplexStreaming]");
 
