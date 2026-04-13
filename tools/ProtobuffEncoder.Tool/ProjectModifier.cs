@@ -6,46 +6,42 @@ internal static class ProjectModifier
 {
     /// <summary>
     /// Adds <c>&lt;Content Include="..." CopyToOutputDirectory="PreserveNewest" /&gt;</c> entries
-    /// for each generated .proto file.  Paths already present in the project are skipped.
+    /// for each generated .proto file. Entries already present (case-insensitive) are skipped.
+    /// Files are grouped by directory into separate <c>&lt;ItemGroup&gt;</c> blocks.
     /// </summary>
     public static void AppendToCsproj(
         string csprojPath,
         IReadOnlyList<(string RelativePath, string AbsolutePath)> generated)
     {
+        if (generated.Count == 0) return;
+
         var doc  = XDocument.Load(csprojPath);
         var root = doc.Root;
         if (root is null) return;
 
-        var ns         = root.GetDefaultNamespace();
-        var csprojDir  = Path.GetDirectoryName(Path.GetFullPath(csprojPath))!;
+        var ns = root.GetDefaultNamespace();
 
         var existingIncludes = root
             .Descendants(ns + "Content")
             .Concat(root.Descendants(ns + "None"))
-            .Select(e => NormaliseRelative(e.Attribute("Include")?.Value))
+            .Select(e => e.Attribute("Include")?.Value)
             .Where(v => v is not null)
+            .Select(v => Normalise(v!))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+        // Filter to new-only entries using the caller-supplied relative path.
         var toAdd = generated
-            .Select(g =>
-            {
-                var rel = NormaliseRelative(Path.GetRelativePath(csprojDir, g.AbsolutePath))!;
-                return (rel, already: existingIncludes.Contains(rel));
-            })
-            .Where(x => !x.already)
-            .Select(x => x.rel)
+            .Where(g => !existingIncludes.Contains(Normalise(g.RelativePath)))
+            .Select(g => g.RelativePath)
             .ToList();
 
         if (toAdd.Count == 0) return;
 
-        // Group by directory so we can emit tidy ItemGroup blocks
-        var byDir = toAdd.GroupBy(p => Path.GetDirectoryName(p) ?? "");
-
-        foreach (var group in byDir)
+        foreach (var group in toAdd.GroupBy(p => Path.GetDirectoryName(p) ?? ""))
         {
             var itemGroup = new XElement(ns + "ItemGroup");
 
-            foreach (var rel in group.OrderBy(p => p))
+            foreach (var rel in group.OrderBy(p => p, StringComparer.OrdinalIgnoreCase))
             {
                 itemGroup.Add(new XElement(ns + "Content",
                     new XAttribute("Include", rel.Replace('/', '\\')),
@@ -58,6 +54,6 @@ internal static class ProjectModifier
         doc.Save(csprojPath);
     }
 
-    private static string? NormaliseRelative(string? path) =>
-        path?.Replace('\\', '/');
+    // Normalise slashes so forward/back variants compare equal.
+    private static string Normalise(string path) => path.Replace('\\', '/');
 }

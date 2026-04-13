@@ -1,20 +1,17 @@
 namespace ProtobuffEncoder.Attributes;
 
 /// <summary>
-/// Assembly-level attribute that configures how the <c>ProtobuffEncoder.Tool</c> generates
-/// and places .proto files for this assembly.
+/// Assembly-level attribute that sets the root output path for generated .proto files.
+/// Pair with one or more <see cref="ProtoRouteAttribute"/> declarations to route types
+/// into subfolders.
 /// </summary>
 /// <example>
-/// Place in any .cs file (commonly <c>AssemblyInfo.cs</c> or <c>ProtoConfig.cs</c>):
 /// <code>
-/// [assembly: ProtoToolOptions(
-///     ProtoPath = "Contracts/Proto",
-///     Routes = [
-///         new ProtoTypeRoute("requests",  "Request", "Query"),
-///         new ProtoTypeRoute("responses", "Response", "Result"),
-///         new ProtoTypeRoute("messages",  "Message", "Event"),
-///     ]
-/// )]
+/// [assembly: ProtoToolOptions(ProtoPath = "Contracts/Proto")]
+/// [assembly: ProtoRoute("requests",  "Request", "Query")]
+/// [assembly: ProtoRoute("responses", "Response", "Result")]
+/// [assembly: ProtoRoute("messages",  "Message",  "Event", "Notification")]
+/// [assembly: ProtoRoute("services",  "Service")]
 /// </code>
 /// </example>
 [AttributeUsage(AttributeTargets.Assembly)]
@@ -22,14 +19,7 @@ public sealed class ProtoToolOptionsAttribute : Attribute
 {
     /// <summary>
     /// Root output folder for generated .proto files, relative to the project directory.
-    /// Defaults to <c>"Protos"</c> when not set.
+    /// Defaults to <c>"Contracts/Proto"</c> when not set.
     /// </summary>
-    public string ProtoPath { get; set; } = "Protos";
-
-    /// <summary>
-    /// Routing rules that map type-name patterns to subfolders inside <see cref="ProtoPath"/>.
-    /// Types that match no rule land directly in <see cref="ProtoPath"/>.
-    /// Rules are evaluated in declaration order; first match wins.
-    /// </summary>
-    public ProtoTypeRoute[] Routes { get; set; } = [];
+    public string ProtoPath { get; set; } = "Contracts/Proto";
 }

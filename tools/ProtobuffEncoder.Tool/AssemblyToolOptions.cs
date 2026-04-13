@@ -3,61 +3,57 @@ using ProtobuffEncoder.Attributes;
 
 namespace ProtobuffEncoder.Tool;
 
-/// <summary>
-/// Reads <see cref="ProtoToolOptionsAttribute"/> from a loaded assembly and exposes
-/// the resolved <see cref="ProtoPath"/> and routing logic used during generation.
-/// </summary>
 internal sealed class AssemblyToolOptions
 {
-    public string ProtoPath { get; }
-    private readonly ProtoTypeRoute[] _routes;
+    private const string DefaultProtoPath = "Contracts/Proto";
 
-    private AssemblyToolOptions(string protoPath, ProtoTypeRoute[] routes)
+    public string ProtoPath { get; }
+    private readonly ProtoRouteAttribute[] _routes;
+
+    private AssemblyToolOptions(string protoPath, ProtoRouteAttribute[] routes)
     {
         ProtoPath = protoPath;
-        _routes = routes;
+        _routes   = routes;
     }
 
     public static AssemblyToolOptions Read(Assembly assembly)
     {
-        var attr = assembly.GetCustomAttribute<ProtoToolOptionsAttribute>();
-        if (attr is null)
-            return new AssemblyToolOptions("Protos", []);
+        var protoPath = assembly.GetCustomAttribute<ProtoToolOptionsAttribute>() is { } opts
+            ? NormalisePath(opts.ProtoPath)
+            : DefaultProtoPath;
 
-        return new AssemblyToolOptions(
-            NormalisePath(attr.ProtoPath),
-            attr.Routes ?? []);
+        var routes = assembly.GetCustomAttributes<ProtoRouteAttribute>().ToArray();
+
+        return new AssemblyToolOptions(protoPath, routes);
     }
 
     /// <summary>
-    /// Returns the output path for a generated file whose base name is
-    /// <paramref name="protoFileName"/> (e.g. <c>"weather.proto"</c>).
-    /// The path is relative to the project directory and incorporates any
-    /// version subfolder already embedded in <paramref name="protoFileName"/>.
+    /// Builds the output path for a generated file.
+    /// Layout: {ProtoPath}/{routeFolder?}/{versionDir?}/{filename}
+    /// <paramref name="protoFileName"/> may already carry a version prefix, e.g. <c>"v2/weather.proto"</c>.
     /// </summary>
     public string ResolveOutputPath(string protoFileName, string primaryTypeName)
     {
-        // protoFileName may already contain a version dir, e.g. "v2/weather.proto"
-        var dir = Path.GetDirectoryName(protoFileName) ?? "";
+        var dir  = Path.GetDirectoryName(protoFileName) ?? "";
         var file = Path.GetFileName(protoFileName);
 
-        var routeFolder = MatchRoute(primaryTypeName);
+        // Build path segments in order: root / route / version-dir / file
+        var capacity = 2 + (string.IsNullOrEmpty(dir) ? 0 : 1) + 1;
+        var segments = new List<string>(capacity) { ProtoPath };
 
-        var segments = new List<string> { ProtoPath };
-        if (!string.IsNullOrEmpty(dir))
-            segments.Add(dir);
-        if (!string.IsNullOrEmpty(routeFolder))
-            segments.Add(routeFolder);
+        var route = MatchRoute(primaryTypeName);
+        if (route is not null) segments.Add(route);
+        if (!string.IsNullOrEmpty(dir)) segments.Add(dir);
+        segments.Add(file);
 
-        return Path.Combine([.. segments, file]);
+        return Path.Combine([.. segments]);
     }
 
     private string? MatchRoute(string typeName)
     {
         foreach (var route in _routes)
         {
-            if (route.Matches(typeName))
-                return route.Folder;
+            if (route.Matches(typeName)) return route.Folder;
         }
         return null;
     }

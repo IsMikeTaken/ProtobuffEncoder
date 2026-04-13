@@ -27,22 +27,33 @@ dotnet run --project tools/ProtobuffEncoder.Tool -- <assembly-path> [output-dir]
 ## Usage
 
 ```
-proto-gen <assembly-path> [output-dir] [csproj-path] [options]
+proto-gen [assembly-path] [output-dir] [csproj-path] [options]
 ```
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `assembly-path` | Yes | Path to the compiled `.dll` containing `[ProtoContract]` / `[ProtoService]` types |
-| `output-dir` | No | Override the base output directory (default: from `[ProtoToolOptions]`, fallback `Protos/`) |
+| `assembly-path` | No* | Path to the compiled `.dll` containing `[ProtoContract]` / `[ProtoService]` types |
+| `output-dir` | No | Override the base output directory (default: from `[ProtoToolOptions]`, fallback `Contracts/Proto/`) |
 | `csproj-path` | No | `.csproj` file to auto-append `<Content>` references for all generated files |
-| `--verbose` | No | Show per-file message count, service count, and import count |
-| `--dry-run` | No | Print what would be written without touching the filesystem |
-| `--help` / `-h` | No | Display usage information |
+
+*Required unless `--auto` is used.
+
+### Options
+
+| Flag | Description |
+|------|-------------|
+| `--auto` | Guided mode: discovers assembly, project directory, and `.csproj` automatically |
+| `--verbose` | Show per-file message count, service count, and import count |
+| `--dry-run` | Print what would be written without touching the filesystem |
+| `--help` / `-h` | Display usage information |
 
 ### Examples
 
 ```bash
-# Minimal — uses [ProtoToolOptions] from the assembly (or defaults to Protos/)
+# Guided — prompts for assembly selection and whether to update the project file
+proto-gen --auto
+
+# Minimal — uses [ProtoToolOptions] from the assembly (or defaults to Contracts/Proto/)
 proto-gen ./bin/Release/net10.0/MyApp.Contracts.dll
 
 # Override output directory
@@ -67,37 +78,33 @@ Done. Generated 3 .proto file(s).
 
 ## Assembly-Level Configuration
 
-Place `[assembly: ProtoToolOptions(...)]` in any `.cs` file in your project (commonly
-`Properties/AssemblyInfo.cs` or a dedicated `ProtoConfig.cs`). The tool reads it at generation
-time — no MSBuild integration or code-generation step required.
+Place `[assembly: ProtoToolOptions]` and `[assembly: ProtoRoute]` in any `.cs` file in your project
+(commonly `Properties/AssemblyInfo.cs` or a dedicated `ProtoConfig.cs`).
+The tool reads these at generation time — no MSBuild integration or code-generation step required.
 
 ```C#
-[assembly: ProtoToolOptions(
-    ProtoPath = "Contracts/Proto",
-    Routes = [
-        new ProtoTypeRoute("requests",  "Request", "Query"),
-        new ProtoTypeRoute("responses", "Response", "Result"),
-        new ProtoTypeRoute("messages",  "Message",  "Event", "Notification"),
-        new ProtoTypeRoute("services",  "Service"),
-    ]
-)]
+[assembly: ProtoToolOptions(ProtoPath = "Contracts/Proto")]
+[assembly: ProtoRoute("requests",  "Request", "Query")]
+[assembly: ProtoRoute("responses", "Response", "Result")]
+[assembly: ProtoRoute("messages",  "Message",  "Event", "Notification")]
+[assembly: ProtoRoute("services",  "Service")]
 ```
 
 ### ProtoToolOptionsAttribute
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `ProtoPath` | `string` | `"Protos"` | Root output folder for `.proto` files, relative to the project directory |
-| `Routes` | `ProtoTypeRoute[]` | `[]` | Routing rules applied to type names; first match wins |
+| `ProtoPath` | `string` | `"Contracts/Proto"` | Root output folder for `.proto` files, relative to the project directory |
 
-### ProtoTypeRoute
+### ProtoRouteAttribute
 
-Each `ProtoTypeRoute` maps one or more name tokens to a subfolder inside `ProtoPath`.
+Each `[assembly: ProtoRoute]` maps one or more name tokens to a subfolder inside `ProtoPath`.
 A type matches when its unqualified name **starts with** or **ends with** any of the tokens
 (case-insensitive). Types that match no rule land directly in `ProtoPath`.
+Rules are evaluated in declaration order; first match wins.
 
 ```C#
-new ProtoTypeRoute("requests", "Request", "Query")
+[assembly: ProtoRoute("requests", "Request", "Query")]
 ```
 
 | Parameter | Description |
@@ -173,7 +180,7 @@ service OrderProcessingService {
 
 ### Phase 4 — Routing & Output
 
-File keys are passed through the `[ProtoToolOptions]` routing rules to produce final output paths,
+File keys are passed through the `[ProtoRoute]` rules to produce final output paths,
 then written to disk. The `.csproj` patcher adds `<Content>` entries grouped by directory.
 
 ## Attribute System Reference
@@ -301,8 +308,9 @@ Groups properties into a `oneof` union.
 
 ## ProjectModifier
 
-When `csproj-path` is provided, the tool adds `<Content Include="..." CopyToOutputDirectory="PreserveNewest" />`
-entries for each generated file. Entries already present (case-insensitive) are skipped.
+When `csproj-path` is provided (or selected in `--auto` mode), the tool adds
+`<Content Include="..." CopyToOutputDirectory="PreserveNewest" />` entries for each generated file.
+Entries already present (case-insensitive) are skipped.
 Files are grouped by directory into separate `<ItemGroup>` blocks.
 
 ```xml
@@ -320,16 +328,12 @@ Files are grouped by directory into separate `<ItemGroup>` blocks.
 
 ## End-to-End Example
 
-Assembly attribute in `ProtoConfig.cs`:
+Configuration in `ProtoConfig.cs`:
 
 ```C#
-[assembly: ProtoToolOptions(
-    ProtoPath = "Contracts/Proto",
-    Routes = [
-        new ProtoTypeRoute("requests",  "Request"),
-        new ProtoTypeRoute("responses", "Response"),
-    ]
-)]
+[assembly: ProtoToolOptions(ProtoPath = "Contracts/Proto")]
+[assembly: ProtoRoute("requests",  "Request")]
+[assembly: ProtoRoute("responses", "Response")]
 ```
 
 Types:
@@ -366,6 +370,30 @@ Output:
              0 message(s), 1 service(s), 2 import(s)
   Updated:   MyApp.csproj
 Done. Generated 3 .proto file(s).
+```
+
+## Guided Mode (--auto)
+
+When no assembly path is supplied, `--auto` walks you through generation interactively:
+
+1. Scans the current directory for compiled `.dll` files and presents a numbered list
+2. Walks up the directory tree to locate the project root (first folder containing a `.csproj`)
+3. Applies `[ProtoToolOptions]` / `[ProtoRoute]` configuration from the loaded assembly
+4. Prompts whether to update the discovered `.csproj` with `<Content>` entries
+
+```bash
+proto-gen --auto
+
+Select the assembly to scan:
+  [1] bin/Release/net10.0/MyApp.Contracts.dll
+  [2] bin/Release/net10.0/MyApp.dll
+Choice [1-2] (default: 1): 1
+
+  Generated: Contracts/Proto/requests/v1/myapp_contracts.proto
+  Generated: Contracts/Proto/responses/v1/myapp_contracts.proto
+  Update MyApp.Contracts.csproj with <Content> entries? [Y/n]: y
+  Updated:   MyApp.Contracts.csproj
+Done. Generated 2 .proto file(s).
 ```
 
 ## Multi-Target Support

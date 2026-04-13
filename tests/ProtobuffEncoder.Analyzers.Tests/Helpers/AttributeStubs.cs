@@ -76,6 +76,24 @@ internal static class AttributeStubs
                 public ProtoMethodType MethodType { get; }
                 public ProtoMethodAttribute(ProtoMethodType methodType) { MethodType = methodType; }
             }
+
+            [System.AttributeUsage(System.AttributeTargets.Assembly)]
+            public sealed class ProtoToolOptionsAttribute : System.Attribute
+            {
+                public string ProtoPath { get; set; } = "Contracts/Proto";
+            }
+
+            [System.AttributeUsage(System.AttributeTargets.Assembly, AllowMultiple = true)]
+            public sealed class ProtoRouteAttribute : System.Attribute
+            {
+                public string Folder { get; }
+                public string[] Tokens { get; }
+                public ProtoRouteAttribute(string folder, params string[] tokens)
+                {
+                    Folder = folder;
+                    Tokens = tokens;
+                }
+            }
         }
         """;
 }
