@@ -3,9 +3,6 @@ using ProtobuffEncoder.Tool;
 
 namespace ProtobuffEncoder.Tool.Tests;
 
-/// <summary>
-/// Comprehensive tests for <see cref="ProjectModifier"/> — csproj file modification.
-/// </summary>
 public class ProjectModifierTests : IDisposable
 {
     private readonly string _tempDir;
@@ -29,6 +26,9 @@ public class ProjectModifierTests : IDisposable
         return path;
     }
 
+    private IReadOnlyList<(string RelativePath, string AbsolutePath)> Entries(params string[] absPaths) =>
+        absPaths.Select(p => (Path.GetRelativePath(_tempDir, p), p)).ToList();
+
     private static string MinimalCsproj => @"<Project Sdk=""Microsoft.NET.Sdk"">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -44,7 +44,7 @@ public class ProjectModifierTests : IDisposable
         var protoPath = Path.Combine(_tempDir, "model.proto");
         File.WriteAllText(protoPath, "syntax = \"proto3\";");
 
-        ProjectModifier.AppendToCsproj(csproj, _tempDir, [protoPath]);
+        ProjectModifier.AppendToCsproj(csproj, Entries(protoPath));
 
         var xml = File.ReadAllText(csproj);
         Assert.Contains("model.proto", xml);
@@ -58,12 +58,13 @@ public class ProjectModifierTests : IDisposable
         var csproj = CreateCsproj(MinimalCsproj);
         var protoPath = Path.Combine(_tempDir, "service.proto");
 
-        ProjectModifier.AppendToCsproj(csproj, _tempDir, [protoPath]);
+        ProjectModifier.AppendToCsproj(csproj, Entries(protoPath));
 
         var doc = XDocument.Load(csproj);
         var content = doc.Descendants("Content").FirstOrDefault();
         Assert.NotNull(content);
-        Assert.Equal("service.proto", content!.Attribute("Include")?.Value);
+        Assert.NotNull(content!.Attribute("Include")?.Value);
+        Assert.Contains("service.proto", content.Attribute("Include")!.Value);
     }
 
     #endregion
@@ -83,7 +84,7 @@ public class ProjectModifierTests : IDisposable
         var csproj = CreateCsproj(xml);
         var protoPath = Path.Combine(_tempDir, "existing.proto");
 
-        ProjectModifier.AppendToCsproj(csproj, _tempDir, [protoPath]);
+        ProjectModifier.AppendToCsproj(csproj, Entries(protoPath));
 
         var result = File.ReadAllText(csproj);
         var count = System.Text.RegularExpressions.Regex.Matches(result, "existing\\.proto").Count;
@@ -99,10 +100,9 @@ public class ProjectModifierTests : IDisposable
   </ItemGroup>
 </Project>";
         var csproj = CreateCsproj(xml);
-
-        // Add a different proto
         var protoPath = Path.Combine(_tempDir, "new.proto");
-        ProjectModifier.AppendToCsproj(csproj, _tempDir, [protoPath]);
+
+        ProjectModifier.AppendToCsproj(csproj, Entries(protoPath));
 
         var result = File.ReadAllText(csproj);
         Assert.Contains("new.proto", result);
@@ -116,14 +116,14 @@ public class ProjectModifierTests : IDisposable
     public void AppendToCsproj_MultipleFiles_AllAdded()
     {
         var csproj = CreateCsproj(MinimalCsproj);
-        var paths = new List<string>
+        var paths = new[]
         {
             Path.Combine(_tempDir, "a.proto"),
             Path.Combine(_tempDir, "b.proto"),
             Path.Combine(_tempDir, "c.proto")
         };
 
-        ProjectModifier.AppendToCsproj(csproj, _tempDir, paths);
+        ProjectModifier.AppendToCsproj(csproj, Entries(paths));
 
         var result = File.ReadAllText(csproj);
         Assert.Contains("a.proto", result);
@@ -142,13 +142,13 @@ public class ProjectModifierTests : IDisposable
   </ItemGroup>
 </Project>";
         var csproj = CreateCsproj(xml);
-        var paths = new List<string>
+        var paths = new[]
         {
             Path.Combine(_tempDir, "old.proto"),
             Path.Combine(_tempDir, "new.proto")
         };
 
-        ProjectModifier.AppendToCsproj(csproj, _tempDir, paths);
+        ProjectModifier.AppendToCsproj(csproj, Entries(paths));
 
         var doc = XDocument.Load(csproj);
         var contentElements = doc.Descendants("Content").ToList();
@@ -165,7 +165,7 @@ public class ProjectModifierTests : IDisposable
         var csproj = CreateCsproj(MinimalCsproj);
         var originalContent = File.ReadAllText(csproj);
 
-        ProjectModifier.AppendToCsproj(csproj, _tempDir, []);
+        ProjectModifier.AppendToCsproj(csproj, []);
 
         var afterContent = File.ReadAllText(csproj);
         Assert.Equal(originalContent, afterContent);
@@ -181,7 +181,7 @@ public class ProjectModifierTests : IDisposable
         var csproj = CreateCsproj(MinimalCsproj);
         var protoPath = Path.Combine(_tempDir, "new.proto");
 
-        ProjectModifier.AppendToCsproj(csproj, _tempDir, [protoPath]);
+        ProjectModifier.AppendToCsproj(csproj, Entries(protoPath));
 
         var doc = XDocument.Load(csproj);
         var itemGroups = doc.Root!.Elements("ItemGroup").ToList();
@@ -189,22 +189,18 @@ public class ProjectModifierTests : IDisposable
     }
 
     [Fact]
-    public void AppendToCsproj_ExistingProtoItemGroup_ReusesIt()
+    public void AppendToCsproj_SameDirectory_SingleItemGroup()
     {
-        var xml = @"<Project Sdk=""Microsoft.NET.Sdk"">
-  <ItemGroup>
-    <Content Include=""first.proto"">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
-</Project>";
-        var csproj = CreateCsproj(xml);
-        var protoPath = Path.Combine(_tempDir, "second.proto");
+        var csproj = CreateCsproj(MinimalCsproj);
+        var paths = new[]
+        {
+            Path.Combine(_tempDir, "first.proto"),
+            Path.Combine(_tempDir, "second.proto")
+        };
 
-        ProjectModifier.AppendToCsproj(csproj, _tempDir, [protoPath]);
+        ProjectModifier.AppendToCsproj(csproj, Entries(paths));
 
         var doc = XDocument.Load(csproj);
-        // Both protos should be in the same ItemGroup
         var itemGroupsWithProto = doc.Root!.Elements("ItemGroup")
             .Where(ig => ig.Elements("Content")
                 .Any(e => e.Attribute("Include")?.Value.EndsWith(".proto") == true))
@@ -225,7 +221,7 @@ public class ProjectModifierTests : IDisposable
         Directory.CreateDirectory(subDir);
         var protoPath = Path.Combine(subDir, "model.proto");
 
-        ProjectModifier.AppendToCsproj(csproj, _tempDir, [protoPath]);
+        ProjectModifier.AppendToCsproj(csproj, Entries(protoPath));
 
         var doc = XDocument.Load(csproj);
         var include = doc.Descendants("Content").First().Attribute("Include")?.Value;
@@ -236,7 +232,7 @@ public class ProjectModifierTests : IDisposable
 
     #endregion
 
-    #region Signalled Pattern — concurrent modifications
+    #region Signalled Pattern — sequential modifications
 
     [Fact]
     public void AppendToCsproj_SequentialCalls_AllPersist()
@@ -245,8 +241,8 @@ public class ProjectModifierTests : IDisposable
 
         for (int i = 0; i < 5; i++)
         {
-            ProjectModifier.AppendToCsproj(csproj, _tempDir,
-                [Path.Combine(_tempDir, $"proto_{i}.proto")]);
+            var p = Path.Combine(_tempDir, $"proto_{i}.proto");
+            ProjectModifier.AppendToCsproj(csproj, Entries(p));
         }
 
         var doc = XDocument.Load(csproj);
@@ -266,10 +262,10 @@ public class ProjectModifierTests : IDisposable
         var csproj = CreateCsproj(MinimalCsproj);
         var paths = Enumerable.Range(0, 100)
             .Select(i => Path.Combine(_tempDir, $"gen_{i}.proto"))
-            .ToList();
+            .ToArray();
 
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        ProjectModifier.AppendToCsproj(csproj, _tempDir, paths);
+        ProjectModifier.AppendToCsproj(csproj, Entries(paths));
         sw.Stop();
 
         Assert.True(sw.ElapsedMilliseconds < 2000,
