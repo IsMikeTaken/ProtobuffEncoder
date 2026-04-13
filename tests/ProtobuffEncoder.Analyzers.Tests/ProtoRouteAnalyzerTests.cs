@@ -1,6 +1,6 @@
 using Microsoft.CodeAnalysis.Testing;
-using Xunit;
 using ProtobuffEncoder.Analyzers.Tests.Helpers;
+using Xunit;
 using VerifyCS = Microsoft.CodeAnalysis.CSharp.Testing.CSharpAnalyzerVerifier<
     ProtobuffEncoder.Analyzers.ProtoRouteAnalyzer,
     Microsoft.CodeAnalysis.Testing.DefaultVerifier>;
@@ -9,59 +9,69 @@ namespace ProtobuffEncoder.Analyzers.Tests;
 
 public class ProtoRouteAnalyzerTests
 {
-    // Assembly-level attributes can't be inside a namespace block, so the `using`
-    // directive must come BEFORE the stubs (which declare a namespace).
-    private static string Wrap(string code) =>
-        "using ProtobuffEncoder.Attributes;\n" + AttributeStubs.Source + "\n" + code;
+    // Assembly-level [assembly: ...] attributes cannot appear after a namespace
+    // declaration in the same file (CS1730). The stubs are therefore injected as a
+    // *second* source file so the test file stays clean: using → assembly attributes.
+    private static Microsoft.CodeAnalysis.CSharp.Testing.CSharpAnalyzerTest<ProtoRouteAnalyzer, DefaultVerifier>
+        MakeTest(string testCode, params DiagnosticResult[] expected)
+    {
+        var test = new Microsoft.CodeAnalysis.CSharp.Testing.CSharpAnalyzerTest<
+            ProtoRouteAnalyzer, DefaultVerifier>
+        {
+            TestState =
+            {
+                Sources =
+                {
+                    // File 1: the actual test source (using → assembly attrs only).
+                    testCode,
+                    // File 2: attribute stubs in their own compilation unit.
+                    ("AttributeStubs.cs", AttributeStubs.Source),
+                },
+            },
+        };
+        foreach (var d in expected)
+            test.ExpectedDiagnostics.Add(d);
+        return test;
+    }
 
     // ── PROTO016: Empty folder name ──
 
     [Fact]
     public async Task PROTO016_EmptyFolder_Reports()
     {
-        var test = Wrap("""
+        var test = MakeTest(
+            """
+            using ProtobuffEncoder.Attributes;
+
             [{|#0:assembly: ProtoRoute("", "Request")|}]
-            """);
+            """,
+            VerifyCS.Diagnostic("PROTO016").WithLocation(0).WithArguments("TestProject"));
 
-        var expected = VerifyCS.Diagnostic("PROTO016")
-            .WithLocation(0)
-            .WithArguments("TestProject");
-
-        await new Microsoft.CodeAnalysis.CSharp.Testing.CSharpAnalyzerTest<
-            ProtoRouteAnalyzer, DefaultVerifier>
-        {
-            TestCode = test,
-            ExpectedDiagnostics = { expected },
-        }.RunAsync();
+        await test.RunAsync();
     }
 
     [Fact]
     public async Task PROTO016_WhitespaceFolder_Reports()
     {
-        var test = Wrap("""
+        var test = MakeTest(
+            """
+            using ProtobuffEncoder.Attributes;
+
             [{|#0:assembly: ProtoRoute("   ", "Request")|}]
-            """);
+            """,
+            VerifyCS.Diagnostic("PROTO016").WithLocation(0).WithArguments("TestProject"));
 
-        var expected = VerifyCS.Diagnostic("PROTO016")
-            .WithLocation(0)
-            .WithArguments("TestProject");
-
-        await new Microsoft.CodeAnalysis.CSharp.Testing.CSharpAnalyzerTest<
-            ProtoRouteAnalyzer, DefaultVerifier>
-        {
-            TestCode = test,
-            ExpectedDiagnostics = { expected },
-        }.RunAsync();
+        await test.RunAsync();
     }
 
     [Fact]
     public async Task PROTO016_ValidFolder_NoDiagnostic()
     {
-        var test = Wrap("""
-            [assembly: ProtoRoute("requests", "Request")]
-            """);
+        await MakeTest("""
+            using ProtobuffEncoder.Attributes;
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
+            [assembly: ProtoRoute("requests", "Request")]
+            """).RunAsync();
     }
 
     // ── PROTO017: No tokens ──
@@ -69,40 +79,35 @@ public class ProtoRouteAnalyzerTests
     [Fact]
     public async Task PROTO017_NoTokens_Reports()
     {
-        var test = Wrap("""
+        var test = MakeTest(
+            """
+            using ProtobuffEncoder.Attributes;
+
             [{|#0:assembly: ProtoRoute("requests")|}]
-            """);
+            """,
+            VerifyCS.Diagnostic("PROTO017").WithLocation(0).WithArguments("requests", "TestProject"));
 
-        var expected = VerifyCS.Diagnostic("PROTO017")
-            .WithLocation(0)
-            .WithArguments("requests", "TestProject");
-
-        await new Microsoft.CodeAnalysis.CSharp.Testing.CSharpAnalyzerTest<
-            ProtoRouteAnalyzer, DefaultVerifier>
-        {
-            TestCode = test,
-            ExpectedDiagnostics = { expected },
-        }.RunAsync();
+        await test.RunAsync();
     }
 
     [Fact]
     public async Task PROTO017_SingleToken_NoDiagnostic()
     {
-        var test = Wrap("""
-            [assembly: ProtoRoute("requests", "Request")]
-            """);
+        await MakeTest("""
+            using ProtobuffEncoder.Attributes;
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
+            [assembly: ProtoRoute("requests", "Request")]
+            """).RunAsync();
     }
 
     [Fact]
     public async Task PROTO017_MultipleTokens_NoDiagnostic()
     {
-        var test = Wrap("""
-            [assembly: ProtoRoute("messages", "Message", "Event", "Notification")]
-            """);
+        await MakeTest("""
+            using ProtobuffEncoder.Attributes;
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
+            [assembly: ProtoRoute("messages", "Message", "Event", "Notification")]
+            """).RunAsync();
     }
 
     // ── Combined: multiple routes, some valid, some not ──
@@ -110,34 +115,30 @@ public class ProtoRouteAnalyzerTests
     [Fact]
     public async Task PROTO016_And_PROTO017_BothInSameAssembly_BothReport()
     {
-        var test = Wrap("""
+        var test = MakeTest(
+            """
+            using ProtobuffEncoder.Attributes;
+
             [{|#0:assembly: ProtoRoute("", "Request")|}]
             [{|#1:assembly: ProtoRoute("services")|}]
-            """);
+            """,
+            VerifyCS.Diagnostic("PROTO016").WithLocation(0).WithArguments("TestProject"),
+            VerifyCS.Diagnostic("PROTO017").WithLocation(1).WithArguments("services", "TestProject"));
 
-        await new Microsoft.CodeAnalysis.CSharp.Testing.CSharpAnalyzerTest<
-            ProtoRouteAnalyzer, DefaultVerifier>
-        {
-            TestCode = test,
-            ExpectedDiagnostics =
-            {
-                VerifyCS.Diagnostic("PROTO016").WithLocation(0).WithArguments("TestProject"),
-                VerifyCS.Diagnostic("PROTO017").WithLocation(1).WithArguments("services", "TestProject"),
-            },
-        }.RunAsync();
+        await test.RunAsync();
     }
 
     [Fact]
     public async Task ValidRoutes_NoDiagnostic()
     {
-        var test = Wrap("""
+        await MakeTest("""
+            using ProtobuffEncoder.Attributes;
+
             [assembly: ProtoToolOptions(ProtoPath = "Contracts/Proto")]
             [assembly: ProtoRoute("requests",  "Request", "Query")]
             [assembly: ProtoRoute("responses", "Response", "Result")]
             [assembly: ProtoRoute("messages",  "Message", "Event")]
             [assembly: ProtoRoute("services",  "Service")]
-            """);
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
+            """).RunAsync();
     }
 }
