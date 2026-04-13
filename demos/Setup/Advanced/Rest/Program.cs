@@ -11,21 +11,20 @@
 //  exactly what the resolver produces for each registered type.
 // ──────────────────────────────────────────────────────────────
 
-using System.Reflection;
 using ProtobuffEncoder;
-using ProtobuffEncoder.AspNetCore;
 using ProtobuffEncoder.AspNetCore.Setup;
 using ProtobuffEncoder.Attributes;
-using ProtobuffEncoder.Schema;
+using ProtobuffEncoder.Demo.Setup.Advanced.Rest;
 using ProtobuffEncoder.Demo.Setup.Shared;
+using ProtobuffEncoder.Schema;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddProtobuffEncoder(options =>
-{
-    options.EnableMvcFormatters = true;
-})
-.WithRestFormatters();
+    {
+        options.EnableMvcFormatters = true;
+    })
+    .WithRestFormatters();
 
 var app = builder.Build();
 
@@ -122,10 +121,10 @@ app.MapPost("/api/schema-decode", async (HttpContext context) =>
 // ── Standard endpoints for auto-discovered types ─────────────
 
 app.MapPost("/api/customer", (Customer customer) =>
-    new DemoResponse { Message = $"Received customer: {customer.Name}, {customer.Email}" });
+                new DemoResponse { Message = $"Received customer: {customer.Name}, {customer.Email}" });
 
 app.MapPost("/api/invoice", (Invoice invoice) =>
-    new DemoResponse { Message = $"Invoice #{invoice.Number}: {invoice.LineItems.Count} items" });
+                new DemoResponse { Message = $"Invoice #{invoice.Number}: {invoice.LineItems.Count} items" });
 
 Console.WriteLine("── REST Endpoints ──────────────────────────────");
 Console.WriteLine("  POST /api/customer       — auto-discovered type");
@@ -165,7 +164,9 @@ static void PrintSchemaFor<T>(string label)
     Console.WriteLine();
 }
 
-// ─────────────────────────────────────────────────────────────
+namespace ProtobuffEncoder.Demo.Setup.Advanced.Rest
+{
+    // ─────────────────────────────────────────────────────────────
 //  MODELS — plain classes, no [ProtoContract] attributes.
 //  The resolver assigns field numbers based on the strategy.
 // ─────────────────────────────────────────────────────────────
@@ -176,12 +177,12 @@ static void PrintSchemaFor<T>(string label)
 //     bool   IsActive = 2;
 //     string Name = 3;       ← N comes after I
 //   }
-public class Customer
-{
-    public string Name { get; set; } = "";
-    public string Email { get; set; } = "";
-    public bool IsActive { get; set; } = true;
-}
+    public class Customer
+    {
+        public string Name { get; set; } = "";
+        public string Email { get; set; } = "";
+        public bool IsActive { get; set; } = true;
+    }
 
 // Expected schema output (DeclarationOrder numbering):
 //   message Invoice {
@@ -190,13 +191,13 @@ public class Customer
 //     repeated ... LineItems = 3;
 //     double       Total = 4;      ← declared last
 //   }
-public class Invoice
-{
-    public string Number { get; set; } = "";
-    public string CustomerName { get; set; } = "";
-    public List<string> LineItems { get; set; } = [];
-    public double Total { get; set; }
-}
+    public class Invoice
+    {
+        public string Number { get; set; } = "";
+        public string CustomerName { get; set; } = "";
+        public List<string> LineItems { get; set; } = [];
+        public double Total { get; set; }
+    }
 
 // Expected schema output (TypeThenAlphabetical — scalars, then collections):
 //   message Product {
@@ -205,13 +206,13 @@ public class Invoice
 //     double       Price = 3;       ← scalar, P
 //     repeated ... Tags = 4;        ← collection comes last
 //   }
-public class Product
-{
-    public string Name { get; set; } = "";
-    public double Price { get; set; }
-    public string Category { get; set; } = "";
-    public List<string> Tags { get; set; } = [];
-}
+    public class Product
+    {
+        public string Name { get; set; } = "";
+        public double Price { get; set; }
+        public string Category { get; set; } = "";
+        public List<string> Tags { get; set; } = [];
+    }
 
 // ─────────────────────────────────────────────────────────────
 //  POLYMORPHISM — [ProtoInclude] maps derived types to field numbers.
@@ -226,23 +227,24 @@ public class Product
 //   message Circle { double Radius = 1; }
 //   message Rectangle { double Width = 1; double Height = 2; }
 
-[ProtoContract]
-[ProtoInclude(10, typeof(Circle))]
-[ProtoInclude(11, typeof(Rectangle))]
-public class Shape
-{
-    [ProtoField(1)] public string Name { get; set; } = "";
-}
+    [ProtoContract]
+    [ProtoInclude(10, typeof(Circle))]
+    [ProtoInclude(11, typeof(Rectangle))]
+    public class Shape
+    {
+        [ProtoField(1)] public string Name { get; set; } = "";
+    }
 
-[ProtoContract]
-public class Circle : Shape
-{
-    [ProtoField(1)] public double Radius { get; set; }
-}
+    [ProtoContract]
+    public class Circle : Shape
+    {
+        [ProtoField(1)] public double Radius { get; set; }
+    }
 
-[ProtoContract]
-public class Rectangle : Shape
-{
-    [ProtoField(1)] public double Width { get; set; }
-    [ProtoField(2)] public double Height { get; set; }
+    [ProtoContract]
+    public class Rectangle : Shape
+    {
+        [ProtoField(1)] public double Width { get; set; }
+        [ProtoField(2)] public double Height { get; set; }
+    }
 }

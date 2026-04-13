@@ -1,3 +1,5 @@
+namespace ProtobuffEncoder.Demo.Console;
+
 public class CliOptions
 {
     public bool Verbose { get; set; }

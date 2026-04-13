@@ -5,10 +5,9 @@
 //  marshalling and endpoint discovery.
 // ──────────────────────────────────────────────────────────────
 
-using ProtobuffEncoder.AspNetCore;
 using ProtobuffEncoder.AspNetCore.Setup;
-using ProtobuffEncoder.Grpc;
 using ProtobuffEncoder.Demo.Setup.Shared;
+using ProtobuffEncoder.Demo.Setup.Simple.Grpc;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -31,23 +30,26 @@ app.Run();
 //  contract defined in the Shared project.
 // ─────────────────────────────────────────────────────────────
 
-public class DemoGrpcServiceImpl : IDemoGrpcService
+namespace ProtobuffEncoder.Demo.Setup.Simple.Grpc
 {
-    public Task<DemoResponse> Echo(DemoRequest request)
+    public class DemoGrpcServiceImpl : IDemoGrpcService
     {
-        return Task.FromResult(new DemoResponse
+        public Task<DemoResponse> Echo(DemoRequest request)
         {
-            Message = $"gRPC Echo: {request.Name}, value={request.Value}"
-        });
-    }
+            return Task.FromResult(new DemoResponse
+            {
+                Message = $"gRPC Echo: {request.Name}, value={request.Value}"
+            });
+        }
 
-    public Task<OrderConfirmation> PlaceOrder(OrderRequest request)
-    {
-        return Task.FromResult(new OrderConfirmation
+        public Task<OrderConfirmation> PlaceOrder(OrderRequest request)
         {
-            OrderId = Guid.NewGuid().ToString("N")[..8],
-            Total = request.Quantity * request.UnitPrice,
-            Status = request.Quantity > 100 ? "Pending Approval" : "Confirmed"
-        });
+            return Task.FromResult(new OrderConfirmation
+            {
+                OrderId = Guid.NewGuid().ToString("N")[..8],
+                Total = request.Quantity * request.UnitPrice,
+                Status = request.Quantity > 100 ? "Pending Approval" : "Confirmed"
+            });
+        }
     }
 }

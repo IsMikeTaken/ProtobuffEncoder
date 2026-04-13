@@ -1,13 +1,13 @@
 using System.Diagnostics;
-using ProtobuffEncoder;
-using ProtobuffEncoder.Console;
+
+namespace ProtobuffEncoder.Demo.Console;
 
 public static class StreamingShowcase
 {
     public static async Task RunAsync(ActivitySource tracer, CancellationToken token, CliOptions options)
     {
         using var activity = tracer.StartActivity("AsyncStreaming");
-        if (!options.Silent) Console.WriteLine("\n--- Async Streamed Messages ---");
+        if (!options.Silent) System.Console.WriteLine("\n--- Async Streamed Messages ---");
         var sw = Stopwatch.StartNew();
 
         await using var asyncStream = new MemoryStream();
@@ -26,12 +26,12 @@ public static class StreamingShowcase
         await foreach (var msg in ProtobufEncoder.ReadDelimitedMessagesAsync<Person>(asyncStream).WithCancellation(token))
         {
             msgCount++;
-            if (!options.Silent) Console.WriteLine($"  Received: {msg.Name}, age={msg.Age}");
+            if (!options.Silent) System.Console.WriteLine($"  Received: {msg.Name}, age={msg.Age}");
         }
 
         sw.Stop();
         activity?.SetTag("messages.processed", msgCount);
         activity?.SetTag("bytes.total", asyncStream.Length);
-        if (!options.Silent) Console.WriteLine($"  Stream processing complete. {msgCount} msgs | {asyncStream.Length} bytes | Took: {sw.ElapsedMilliseconds}ms");
+        if (!options.Silent) System.Console.WriteLine($"  Stream processing complete. {msgCount} msgs | {asyncStream.Length} bytes | Took: {sw.ElapsedMilliseconds}ms");
     }
 }

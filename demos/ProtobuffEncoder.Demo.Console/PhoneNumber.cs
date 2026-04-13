@@ -1,6 +1,6 @@
 using ProtobuffEncoder.Attributes;
 
-namespace ProtobuffEncoder.Console;
+namespace ProtobuffEncoder.Demo.Console;
 
 [ProtoContract]
 public class PhoneNumber

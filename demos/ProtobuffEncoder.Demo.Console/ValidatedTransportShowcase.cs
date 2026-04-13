@@ -1,13 +1,14 @@
 using System.Diagnostics;
-using ProtobuffEncoder.Console;
 using ProtobuffEncoder.Transport;
+
+namespace ProtobuffEncoder.Demo.Console;
 
 public static class ValidatedTransportShowcase
 {
     public static async Task RunAsync(ActivitySource tracer, CancellationToken token, CliOptions options)
     {
         using var activity = tracer.StartActivity("ValidatedTransport");
-        if (!options.Silent) Console.WriteLine("\n--- Validated Transport ---");
+        if (!options.Silent) System.Console.WriteLine("\n--- Validated Transport ---");
         var sw = Stopwatch.StartNew();
 
         await using var validStream = new MemoryStream();
@@ -28,11 +29,11 @@ public static class ValidatedTransportShowcase
         }
         catch (MessageValidationException ex)
         {
-            if (!options.Silent) Console.WriteLine($"  [Validation Blocked] {ex.Message}");
+            if (!options.Silent) System.Console.WriteLine($"  [Validation Blocked] {ex.Message}");
         }
 
         sw.Stop();
         activity?.SetTag("bytes.written", validStream.Length);
-        if (!options.Silent) Console.WriteLine($"  Validated logic executed | Processed: {validStream.Length} bytes | Took: {sw.ElapsedMilliseconds}ms");
+        if (!options.Silent) System.Console.WriteLine($"  Validated logic executed | Processed: {validStream.Length} bytes | Took: {sw.ElapsedMilliseconds}ms");
     }
 }

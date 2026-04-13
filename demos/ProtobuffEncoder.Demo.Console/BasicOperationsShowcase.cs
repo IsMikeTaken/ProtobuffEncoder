@@ -1,13 +1,13 @@
 using System.Diagnostics;
-using ProtobuffEncoder;
-using ProtobuffEncoder.Console;
+
+namespace ProtobuffEncoder.Demo.Console;
 
 public static class BasicOperationsShowcase
 {
     public static async Task RunAsync(ActivitySource tracer, CancellationToken token, CliOptions options)
     {
         using var activity = tracer.StartActivity("BasicEncodeDecode");
-        if (!options.Silent) Console.WriteLine("--- Basic Encode/Decode ---");
+        if (!options.Silent) System.Console.WriteLine("--- Basic Encode/Decode ---");
         var sw = Stopwatch.StartNew();
 
         var person = new Person
@@ -28,7 +28,7 @@ public static class BasicOperationsShowcase
         var decoded = ProtobufEncoder.Decode<Person>(encoded);
 
         sw.Stop();
-        if (!options.Silent) Console.WriteLine($"  Success: {decoded.Name} | Size: {encoded.Length} bytes | Took: {sw.ElapsedMilliseconds}ms");
+        if (!options.Silent) System.Console.WriteLine($"  Success: {decoded.Name} | Size: {encoded.Length} bytes | Took: {sw.ElapsedMilliseconds}ms");
 
         // Static Compile
         using var staticActivity = tracer.StartActivity("StaticCompileEncode");
@@ -40,6 +40,6 @@ public static class BasicOperationsShowcase
 
         staticSw.Stop();
         staticActivity?.SetTag("bytes.encoded", fast.Length);
-        if (!options.Silent) Console.WriteLine($"  Static Success: {back.Name} | Size: {fast.Length} bytes | Took: {staticSw.ElapsedMilliseconds}ms");
+        if (!options.Silent) System.Console.WriteLine($"  Static Success: {back.Name} | Size: {fast.Length} bytes | Took: {staticSw.ElapsedMilliseconds}ms");
     }
 }

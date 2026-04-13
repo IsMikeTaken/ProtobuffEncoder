@@ -12,11 +12,11 @@
 // ──────────────────────────────────────────────────────────────
 
 using ProtobuffEncoder;
-using ProtobuffEncoder.Attributes;
+using ProtobuffEncoder.Demo.Setup.Advanced.WebSockets;
+using ProtobuffEncoder.Demo.Setup.Shared;
 using ProtobuffEncoder.Schema;
 using ProtobuffEncoder.Transport;
 using ProtobuffEncoder.WebSockets;
-using ProtobuffEncoder.Demo.Setup.Shared;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -183,7 +183,9 @@ static void PrintSchema<T>(string label)
     Console.WriteLine();
 }
 
-// ─────────────────────────────────────────────────────────────
+namespace ProtobuffEncoder.Demo.Setup.Advanced.WebSockets
+{
+    // ─────────────────────────────────────────────────────────────
 //  AUTO-DISCOVERED MODELS — no [ProtoContract] needed.
 //  The resolver assigns field numbers alphabetically.
 // ─────────────────────────────────────────────────────────────
@@ -194,20 +196,21 @@ static void PrintSchema<T>(string label)
 //     string Unit = 2;       ← U
 //     double Value = 3;      ← V
 //   }
-public class SensorReading
-{
-    public string SensorId { get; set; } = "";
-    public double Value { get; set; }
-    public string Unit { get; set; } = "";
-}
+    public class SensorReading
+    {
+        public string SensorId { get; set; } = "";
+        public double Value { get; set; }
+        public string Unit { get; set; } = "";
+    }
 
 // Expected resolver output (Alphabetical):
 //   message SensorCommand {
 //     int32  IntervalMs = 1;  ← I
 //     string SensorId = 2;    ← S
 //   }
-public class SensorCommand
-{
-    public string SensorId { get; set; } = "";
-    public int IntervalMs { get; set; } = 1000;
+    public class SensorCommand
+    {
+        public string SensorId { get; set; } = "";
+        public int IntervalMs { get; set; } = 1000;
+    }
 }

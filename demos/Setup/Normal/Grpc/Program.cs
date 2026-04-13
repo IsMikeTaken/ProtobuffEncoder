@@ -6,11 +6,9 @@
 //    • Options for global behaviour control
 // ──────────────────────────────────────────────────────────────
 
-using ProtobuffEncoder.AspNetCore;
 using ProtobuffEncoder.AspNetCore.Setup;
-using ProtobuffEncoder.Grpc;
-using ProtobuffEncoder.Transport;
 using ProtobuffEncoder.Demo.Setup.Shared;
+using ProtobuffEncoder.Transport;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -45,26 +43,29 @@ app.Run();
 //  Service implementation — auto-discovered via AddServiceAssembly.
 // ─────────────────────────────────────────────────────────────
 
-public class DemoGrpcService : IDemoGrpcService
+namespace ProtobuffEncoder.Demo.Setup.Normal.Grpc
 {
-    public Task<DemoResponse> Echo(DemoRequest request)
+    public class DemoGrpcService : IDemoGrpcService
     {
-        Console.WriteLine($"[gRPC] Echo({request.Name}, {request.Value})");
-        return Task.FromResult(new DemoResponse
+        public Task<DemoResponse> Echo(DemoRequest request)
         {
-            Message = $"gRPC Echo: {request.Name}, value={request.Value}"
-        });
-    }
+            Console.WriteLine($"[gRPC] Echo({request.Name}, {request.Value})");
+            return Task.FromResult(new DemoResponse
+            {
+                Message = $"gRPC Echo: {request.Name}, value={request.Value}"
+            });
+        }
 
-    public Task<OrderConfirmation> PlaceOrder(OrderRequest request)
-    {
-        Console.WriteLine($"[gRPC] PlaceOrder({request.ProductName}, qty={request.Quantity})");
-        var total = request.Quantity * request.UnitPrice;
-        return Task.FromResult(new OrderConfirmation
+        public Task<OrderConfirmation> PlaceOrder(OrderRequest request)
         {
-            OrderId = Guid.NewGuid().ToString("N")[..8],
-            Total = total,
-            Status = total > 1000 ? "Pending Approval" : "Confirmed"
-        });
+            Console.WriteLine($"[gRPC] PlaceOrder({request.ProductName}, qty={request.Quantity})");
+            var total = request.Quantity * request.UnitPrice;
+            return Task.FromResult(new OrderConfirmation
+            {
+                OrderId = Guid.NewGuid().ToString("N")[..8],
+                Total = total,
+                Status = total > 1000 ? "Pending Approval" : "Confirmed"
+            });
+        }
     }
 }
