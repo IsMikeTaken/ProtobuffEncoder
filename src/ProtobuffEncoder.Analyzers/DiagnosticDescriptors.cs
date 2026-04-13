@@ -200,7 +200,8 @@ internal static class DiagnosticDescriptors
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
-        description: "The first argument of [ProtoRoute] is the subfolder name used when placing generated .proto files. An empty value makes the route impossible to apply and indicates a misconfiguration.");
+        description: "The first argument of [ProtoRoute] is the subfolder name used when placing generated .proto files. An empty value makes the route impossible to apply and indicates a misconfiguration.",
+        customTags: [WellKnownDiagnosticTags.CompilationEnd]);
 
     /// <summary>
     /// PROTO017: An [assembly: ProtoRoute] declares no tokens to match against.
@@ -212,5 +213,6 @@ internal static class DiagnosticDescriptors
         category: Category,
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
-        description: "A [ProtoRoute] with no tokens will never route any type into its folder. Either add one or more name tokens or remove the attribute.");
+        description: "A [ProtoRoute] with no tokens will never route any type into its folder. Either add one or more name tokens or remove the attribute.",
+        customTags: [WellKnownDiagnosticTags.CompilationEnd]);
 }

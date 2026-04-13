@@ -102,7 +102,7 @@ public class CommonTypesTests
         // Assert
         Assert.Equal(original.GuidValue, decoded.GuidValue);
         Assert.Equal(original.DecimalValue, decoded.DecimalValue);
-        Assert.Equal(original.DateTimeValue.Value.Ticks, decoded.DateTimeValue.Value.Ticks);
+        Assert.Equal(original.DateTimeValue!.Value.Ticks, decoded.DateTimeValue!.Value.Ticks);
         Assert.Equal(original.NIntValue, decoded.NIntValue);
     }
 
