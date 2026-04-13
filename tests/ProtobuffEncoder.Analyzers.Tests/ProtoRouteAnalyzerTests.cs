@@ -9,8 +9,10 @@ namespace ProtobuffEncoder.Analyzers.Tests;
 
 public class ProtoRouteAnalyzerTests
 {
-    // Prepend stubs so the analyzer can resolve the fully-qualified attribute name.
-    private static string Wrap(string code) => AttributeStubs.Source + "\n" + code;
+    // Assembly-level attributes can't be inside a namespace block, so the `using`
+    // directive must come BEFORE the stubs (which declare a namespace).
+    private static string Wrap(string code) =>
+        "using ProtobuffEncoder.Attributes;\n" + AttributeStubs.Source + "\n" + code;
 
     // ── PROTO016: Empty folder name ──
 
@@ -18,8 +20,6 @@ public class ProtoRouteAnalyzerTests
     public async Task PROTO016_EmptyFolder_Reports()
     {
         var test = Wrap("""
-            using ProtobuffEncoder.Attributes;
-
             [{|#0:assembly: ProtoRoute("", "Request")|}]
             """);
 
@@ -39,8 +39,6 @@ public class ProtoRouteAnalyzerTests
     public async Task PROTO016_WhitespaceFolder_Reports()
     {
         var test = Wrap("""
-            using ProtobuffEncoder.Attributes;
-
             [{|#0:assembly: ProtoRoute("   ", "Request")|}]
             """);
 
@@ -60,8 +58,6 @@ public class ProtoRouteAnalyzerTests
     public async Task PROTO016_ValidFolder_NoDiagnostic()
     {
         var test = Wrap("""
-            using ProtobuffEncoder.Attributes;
-
             [assembly: ProtoRoute("requests", "Request")]
             """);
 
@@ -74,8 +70,6 @@ public class ProtoRouteAnalyzerTests
     public async Task PROTO017_NoTokens_Reports()
     {
         var test = Wrap("""
-            using ProtobuffEncoder.Attributes;
-
             [{|#0:assembly: ProtoRoute("requests")|}]
             """);
 
@@ -95,8 +89,6 @@ public class ProtoRouteAnalyzerTests
     public async Task PROTO017_SingleToken_NoDiagnostic()
     {
         var test = Wrap("""
-            using ProtobuffEncoder.Attributes;
-
             [assembly: ProtoRoute("requests", "Request")]
             """);
 
@@ -107,8 +99,6 @@ public class ProtoRouteAnalyzerTests
     public async Task PROTO017_MultipleTokens_NoDiagnostic()
     {
         var test = Wrap("""
-            using ProtobuffEncoder.Attributes;
-
             [assembly: ProtoRoute("messages", "Message", "Event", "Notification")]
             """);
 
@@ -121,8 +111,6 @@ public class ProtoRouteAnalyzerTests
     public async Task PROTO016_And_PROTO017_BothInSameAssembly_BothReport()
     {
         var test = Wrap("""
-            using ProtobuffEncoder.Attributes;
-
             [{|#0:assembly: ProtoRoute("", "Request")|}]
             [{|#1:assembly: ProtoRoute("services")|}]
             """);
@@ -143,8 +131,6 @@ public class ProtoRouteAnalyzerTests
     public async Task ValidRoutes_NoDiagnostic()
     {
         var test = Wrap("""
-            using ProtobuffEncoder.Attributes;
-
             [assembly: ProtoToolOptions(ProtoPath = "Contracts/Proto")]
             [assembly: ProtoRoute("requests",  "Request", "Query")]
             [assembly: ProtoRoute("responses", "Response", "Result")]
