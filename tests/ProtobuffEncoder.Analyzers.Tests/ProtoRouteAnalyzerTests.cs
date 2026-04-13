@@ -12,6 +12,11 @@ public class ProtoRouteAnalyzerTests
     // Assembly-level [assembly: ...] attributes cannot appear after a namespace
     // declaration in the same file (CS1730). The stubs are therefore injected as a
     // *second* source file so the test file stays clean: using → assembly attributes.
+    //
+    // Location note: ApplicationSyntaxReference.GetSyntax() for an assembly attribute
+    // returns the AttributeSyntax node (e.g. "ProtoRoute(...)"), which starts AFTER
+    // the "assembly: " target specifier. Markers must wrap only the attribute name
+    // and arguments, not the surrounding brackets or "assembly:" prefix.
     private static Microsoft.CodeAnalysis.CSharp.Testing.CSharpAnalyzerTest<ProtoRouteAnalyzer, DefaultVerifier>
         MakeTest(string testCode, params DiagnosticResult[] expected)
     {
@@ -43,7 +48,7 @@ public class ProtoRouteAnalyzerTests
             """
             using ProtobuffEncoder.Attributes;
 
-            [{|#0:assembly: ProtoRoute("", "Request")|}]
+            [assembly: {|#0:ProtoRoute("", "Request")|}]
             """,
             VerifyCS.Diagnostic("PROTO016").WithLocation(0).WithArguments("TestProject"));
 
@@ -57,7 +62,7 @@ public class ProtoRouteAnalyzerTests
             """
             using ProtobuffEncoder.Attributes;
 
-            [{|#0:assembly: ProtoRoute("   ", "Request")|}]
+            [assembly: {|#0:ProtoRoute("   ", "Request")|}]
             """,
             VerifyCS.Diagnostic("PROTO016").WithLocation(0).WithArguments("TestProject"));
 
@@ -83,7 +88,7 @@ public class ProtoRouteAnalyzerTests
             """
             using ProtobuffEncoder.Attributes;
 
-            [{|#0:assembly: ProtoRoute("requests")|}]
+            [assembly: {|#0:ProtoRoute("requests")|}]
             """,
             VerifyCS.Diagnostic("PROTO017").WithLocation(0).WithArguments("requests", "TestProject"));
 
@@ -119,8 +124,8 @@ public class ProtoRouteAnalyzerTests
             """
             using ProtobuffEncoder.Attributes;
 
-            [{|#0:assembly: ProtoRoute("", "Request")|}]
-            [{|#1:assembly: ProtoRoute("services")|}]
+            [assembly: {|#0:ProtoRoute("", "Request")|}]
+            [assembly: {|#1:ProtoRoute("services")|}]
             """,
             VerifyCS.Diagnostic("PROTO016").WithLocation(0).WithArguments("TestProject"),
             VerifyCS.Diagnostic("PROTO017").WithLocation(1).WithArguments("services", "TestProject"));
