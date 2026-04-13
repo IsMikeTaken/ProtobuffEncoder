@@ -99,7 +99,7 @@ jobs:
 
       - name: Pack with PR version suffix
         run: |
-          for project in src/*/*.csproj; do
+          for project in src/*/*.csproj tools/*/*.csproj; do
             echo "Packing $project..."
             dotnet pack "$project" --configuration Release \
               -p:VersionSuffix="pr.${{ github.event.pull_request.number }}.${{ github.run_number }}" \

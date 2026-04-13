@@ -1,15 +1,25 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <ItemGroup>
-    <ProjectReference Include="..\..\src\ProtobuffEncoder\ProtobuffEncoder.csproj" />
-  </ItemGroup>
-
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFrameworks>net10.0;net9.0;net8.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+
+    <!-- NuGet global tool packaging -->
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>proto-gen</ToolCommandName>
+    <IsPackable>true</IsPackable>
+
+    <!-- Package metadata (version + authors come from Directory.Build.props) -->
+    <PackageId>ProtobuffEncoder.Tool</PackageId>
+    <Description>CLI tool that scans compiled .NET assemblies for [ProtoContract] and [ProtoService] types, generates .proto schema files with configurable output routing, and optionally patches .csproj files to include the generated output.</Description>
+    <PackageTags>protobuf;proto;grpc;schema;codegen;tool</PackageTags>
   </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ProtobuffEncoder\ProtobuffEncoder.csproj" />
+  </ItemGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="ProtobuffEncoder.Tool.Tests" />
