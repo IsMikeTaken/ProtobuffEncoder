@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="ProtobuffEncoder.Tests" />
+    <InternalsVisibleTo Include="ProtobuffEncoder.Tool" />
   </ItemGroup>
 
 </Project>

@@ -104,7 +104,7 @@ jobs:
 
       - name: Pack with dev version suffix
         run: |
-          for project in src/*/*.csproj; do
+          for project in src/*/*.csproj tools/*/*.csproj; do
             echo "Packing $project..."
             dotnet pack "$project" --configuration Release \
               -p:VersionSuffix="dev.${{ github.run_number }}" \

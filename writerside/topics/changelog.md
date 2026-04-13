@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.0] - 2026-04-13
+
+### Added {id="v150_added"}
+- **`proto-gen` CLI tool** (`ProtobuffEncoder.Tool`) packaged as a .NET global tool installable via `dotnet tool install --global ProtobuffEncoder.Tool`. Supports `net8.0`, `net9.0`, and `net10.0`.
+- **Assembly-level output configuration** — `[assembly: ProtoToolOptions(ProtoPath = "...", Routes = [...])]` lets each project declare where generated `.proto` files should land without any MSBuild integration.
+- **`ProtoTypeRoute`** — maps one or more name tokens (prefix or suffix, case-insensitive) to a subfolder inside `ProtoPath`. First-match wins; unmatched types fall back to the root `ProtoPath`.
+- **`--dry-run` flag** — prints what would be written without touching the filesystem, useful for CI validation.
+- **Optional `output-dir` argument** — when omitted, the tool reads `ProtoPath` from the assembly's `[ProtoToolOptions]` attribute and falls back to `Protos/`.
+
+### Changed {id="v150_changed"}
+- **CI workflows extended** — all three workflows (`ci-pr.yml`, `ci-development.yml`, `ci-release.yml`) now pack `tools/*/*.csproj` alongside `src/*/*.csproj`, so the `proto-gen` tool is included in every NuGet publish step.
+- **`cli_tool.md` rewritten** — new sections covering installation as a global tool, the `[ProtoToolOptions]` / `ProtoTypeRoute` configuration system, routing table with prefix/suffix examples, updated command reference with `--dry-run`, and a complete end-to-end example showing routed output paths.
+- Version bumped from `1.4.0` to `1.5.0` in `Directory.Build.props`.
+
 ## [1.4.0] - 2026-03-25
 
 ### Added {id="v140_added"}

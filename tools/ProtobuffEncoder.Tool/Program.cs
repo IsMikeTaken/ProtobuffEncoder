@@ -1,45 +1,39 @@
 using System.Reflection;
-using System.Xml.Linq;
 using ProtobuffEncoder.Schema;
 using ProtobuffEncoder.Tool;
 
-// Usage: dotnet run -- <assembly-path> <proto-output-dir> [csproj-path] [--verbose]
-if (args.Length < 2 || args.Contains("--help") || args.Contains("-h"))
+if (args.Length < 1 || args.Contains("--help") || args.Contains("-h"))
 {
-    Console.Error.WriteLine("Usage: ProtobuffEncoder.Tool <assembly-path> <proto-output-dir> [csproj-path] [--verbose]");
-    Console.Error.WriteLine();
-    Console.Error.WriteLine("  assembly-path     Path to the compiled DLL containing [ProtoContract] types");
-    Console.Error.WriteLine("  proto-output-dir  Directory to write generated .proto files");
-    Console.Error.WriteLine("  csproj-path       (optional) .csproj file to auto-append proto file references");
-    Console.Error.WriteLine("  --verbose         Show import relationships and service details");
-    Console.Error.WriteLine();
-    Console.Error.WriteLine("Features:");
-    Console.Error.WriteLine("  - Auto-generates .proto files from [ProtoContract] types");
-    Console.Error.WriteLine("  - Auto-generates service definitions from [ProtoService] interfaces");
-    Console.Error.WriteLine("  - Auto-resolves cross-file imports when types reference other files");
-    Console.Error.WriteLine("  - Version-based directory structure (v1/, v2/, etc.)");
-    if (args.Length < 2)
-        return 1;
-    return 0;
+    PrintUsage();
+    return args.Length < 1 ? 1 : 0;
 }
 
-var positionalArgs = args.Where(a => !a.StartsWith("--")).ToArray();
+var positional = args.Where(a => !a.StartsWith("--")).ToArray();
 bool verbose = args.Contains("--verbose");
+bool dryRun  = args.Contains("--dry-run");
 
-var assemblyPath = Path.GetFullPath(positionalArgs[0]);
-var outputDir = Path.GetFullPath(positionalArgs[1]);
-var csprojPath = positionalArgs.Length >= 3 ? Path.GetFullPath(positionalArgs[2]) : null;
+var assemblyPath = Path.GetFullPath(positional[0]);
+// output-dir and csproj are optional — the assembly attribute drives defaults
+var explicitOutputDir = positional.Length >= 2 ? Path.GetFullPath(positional[1]) : null;
+var csprojPath        = positional.Length >= 3 ? Path.GetFullPath(positional[2]) : null;
 
 if (!File.Exists(assemblyPath))
 {
-    Console.Error.WriteLine($"Assembly not found: {assemblyPath}");
+    Console.Error.WriteLine($"error: assembly not found: {assemblyPath}");
     return 1;
 }
 
-// Load the assembly
 var assembly = Assembly.LoadFrom(assemblyPath);
+var toolOptions = AssemblyToolOptions.Read(assembly);
 
-// Generate all .proto files (with auto-import resolution)
+// If no explicit output dir, derive it from the assembly location + ProtoPath
+var projectDir = explicitOutputDir is not null
+    ? Path.GetDirectoryName(Path.GetFullPath(explicitOutputDir)) ?? Directory.GetCurrentDirectory()
+    : Path.GetDirectoryName(assemblyPath) ?? Directory.GetCurrentDirectory();
+
+var baseOutputDir = explicitOutputDir
+    ?? Path.Combine(projectDir, toolOptions.ProtoPath);
+
 var protoFiles = ProtoSchemaGenerator.GenerateAll(assembly);
 
 if (protoFiles.Count == 0)
@@ -48,37 +42,86 @@ if (protoFiles.Count == 0)
     return 0;
 }
 
-// Write to a directory
-var generatedPaths = ProtoSchemaGenerator.GenerateToDirectory(assembly, outputDir);
+// Determine primary type names per file key so we can apply routing
+var primaryTypeNames = ResolvePrimaryTypeNames(assembly, protoFiles.Keys);
 
-foreach (var path in generatedPaths)
-{
-    Console.WriteLine($"  Generated: {Path.GetRelativePath(outputDir, path)}");
-}
+var written = new List<(string RelativePath, string AbsolutePath)>();
 
-// Show import/service details in verbose mode
-if (verbose)
+foreach (var (fileKey, content) in protoFiles.OrderBy(kv => kv.Key))
 {
-    Console.WriteLine();
-    foreach (var (filename, content) in protoFiles.OrderBy(kv => kv.Key))
+    var primaryType = primaryTypeNames.TryGetValue(fileKey, out var name) ? name : fileKey;
+    var relPath = toolOptions.ResolveOutputPath(fileKey, primaryType);
+    var absPath = Path.GetFullPath(Path.Combine(projectDir, relPath));
+
+    if (dryRun)
     {
-        var importCount = content.Split('\n').Count(l => l.TrimStart().StartsWith("import "));
-        var serviceCount = content.Split('\n').Count(l => l.TrimStart().StartsWith("service "));
-        var messageCount = content.Split('\n').Count(l => l.TrimStart().StartsWith("message "));
+        Console.WriteLine($"  [dry-run] would write: {relPath}");
+        continue;
+    }
 
-        if (importCount > 0 || serviceCount > 0)
-        {
-            Console.WriteLine($"  {filename}: {messageCount} message(s), {serviceCount} service(s), {importCount} import(s)");
-        }
+    Directory.CreateDirectory(Path.GetDirectoryName(absPath)!);
+    File.WriteAllText(absPath, content);
+    written.Add((relPath, absPath));
+
+    Console.WriteLine($"  Generated: {relPath}");
+
+    if (verbose)
+    {
+        var lines    = content.Split('\n');
+        var imports  = lines.Count(l => l.TrimStart().StartsWith("import "));
+        var services = lines.Count(l => l.TrimStart().StartsWith("service "));
+        var messages = lines.Count(l => l.TrimStart().StartsWith("message "));
+        Console.WriteLine($"             {messages} message(s), {services} service(s), {imports} import(s)");
     }
 }
 
-// Auto-append to .csproj if provided
-if (csprojPath is not null && File.Exists(csprojPath))
+if (!dryRun && written.Count > 0 && csprojPath is not null && File.Exists(csprojPath))
 {
-    ProjectModifier.AppendToCsproj(csprojPath, outputDir, generatedPaths);
-    Console.WriteLine($"  Updated csproj: {csprojPath}");
+    ProjectModifier.AppendToCsproj(csprojPath, written);
+    Console.WriteLine($"  Updated:   {Path.GetRelativePath(Directory.GetCurrentDirectory(), csprojPath)}");
 }
 
-Console.WriteLine($"Done. Generated {generatedPaths.Count} .proto file(s) in {outputDir}");
+Console.WriteLine($"Done. {(dryRun ? "Would generate" : "Generated")} {protoFiles.Count} .proto file(s).");
 return 0;
+
+static void PrintUsage()
+{
+    Console.Error.WriteLine("Usage: ProtobuffEncoder.Tool <assembly-path> [output-dir] [csproj-path] [options]");
+    Console.Error.WriteLine();
+    Console.Error.WriteLine("  assembly-path   Compiled DLL with [ProtoContract] / [ProtoService] types");
+    Console.Error.WriteLine("  output-dir      Override base output directory (default: from [ProtoToolOptions])");
+    Console.Error.WriteLine("  csproj-path     .csproj to update with <Content Include=...> entries");
+    Console.Error.WriteLine();
+    Console.Error.WriteLine("Options:");
+    Console.Error.WriteLine("  --verbose       Show per-file message / service / import counts");
+    Console.Error.WriteLine("  --dry-run       Print what would be written without touching the file system");
+    Console.Error.WriteLine("  --help, -h      Show this help");
+    Console.Error.WriteLine();
+    Console.Error.WriteLine("Assembly-level configuration (place in any .cs file in your project):");
+    Console.Error.WriteLine();
+    Console.Error.WriteLine("  [assembly: ProtoToolOptions(");
+    Console.Error.WriteLine("      ProtoPath = \"Contracts/Proto\",");
+    Console.Error.WriteLine("      Routes = [");
+    Console.Error.WriteLine("          new ProtoTypeRoute(\"requests\",  \"Request\", \"Query\"),");
+    Console.Error.WriteLine("          new ProtoTypeRoute(\"responses\", \"Response\", \"Result\"),");
+    Console.Error.WriteLine("          new ProtoTypeRoute(\"messages\",  \"Message\", \"Event\"),");
+    Console.Error.WriteLine("      ]");
+    Console.Error.WriteLine("  )]");
+}
+
+static Dictionary<string, string> ResolvePrimaryTypeNames(Assembly assembly, IEnumerable<string> fileKeys)
+{
+    var keySet = fileKeys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+    var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+    foreach (var type in assembly.GetTypes())
+    {
+        var fileKey = ProtoSchemaGenerator.ResolveFileKey(type);
+        if (!keySet.Contains(fileKey) || result.ContainsKey(fileKey))
+            continue;
+
+        result[fileKey] = type.Name;
+    }
+
+    return result;
+}

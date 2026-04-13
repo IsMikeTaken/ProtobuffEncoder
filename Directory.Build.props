@@ -4,7 +4,7 @@
     <!-- ── Central version ─────────────────────────────────── -->
     <!-- Bump these when cutting a release.                     -->
     <VersionMajor>1</VersionMajor>
-    <VersionMinor>3</VersionMinor>
+    <VersionMinor>5</VersionMinor>
     <VersionPatch>0</VersionPatch>
 
     <!-- CI workflows override VersionSuffix for pre-releases.  -->

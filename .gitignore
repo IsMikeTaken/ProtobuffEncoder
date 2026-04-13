@@ -31,3 +31,6 @@ artifacts/
 *.tmp
 *.temp
 /.claude
+
+# C# Addon from VSCode
+*.lscache

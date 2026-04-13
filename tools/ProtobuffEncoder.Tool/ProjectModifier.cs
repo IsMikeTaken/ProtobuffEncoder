@@ -4,53 +4,60 @@ namespace ProtobuffEncoder.Tool;
 
 internal static class ProjectModifier
 {
-    public static void AppendToCsproj(string csprojPath, string outputDir, List<string> generatedPaths)
+    /// <summary>
+    /// Adds <c>&lt;Content Include="..." CopyToOutputDirectory="PreserveNewest" /&gt;</c> entries
+    /// for each generated .proto file.  Paths already present in the project are skipped.
+    /// </summary>
+    public static void AppendToCsproj(
+        string csprojPath,
+        IReadOnlyList<(string RelativePath, string AbsolutePath)> generated)
     {
-        var doc = XDocument.Load(csprojPath);
+        var doc  = XDocument.Load(csprojPath);
         var root = doc.Root;
         if (root is null) return;
 
-        var ns = root.GetDefaultNamespace();
-        var projectDir = Path.GetDirectoryName(csprojPath)!;
+        var ns         = root.GetDefaultNamespace();
+        var csprojDir  = Path.GetDirectoryName(Path.GetFullPath(csprojPath))!;
 
-        // Find or create the ItemGroup for proto files
-        var protoItemGroup = root.Elements(ns + "ItemGroup")
-            .FirstOrDefault(ig => ig.Elements(ns + "Content")
-                .Any(e => e.Attribute("Include")?.Value.EndsWith(".proto", StringComparison.OrdinalIgnoreCase) == true))
-            ?? root.Elements(ns + "ItemGroup")
-            .FirstOrDefault(ig => ig.Elements(ns + "None")
-                .Any(e => e.Attribute("Include")?.Value.EndsWith(".proto", StringComparison.OrdinalIgnoreCase) == true));
-
-        if (protoItemGroup is null)
-        {
-            protoItemGroup = new XElement(ns + "ItemGroup",
-                new XComment(" Auto-generated proto schemas "));
-            root.Add(protoItemGroup);
-        }
-
-        var existingIncludes = protoItemGroup.Elements()
-            .Select(e => e.Attribute("Include")?.Value)
+        var existingIncludes = root
+            .Descendants(ns + "Content")
+            .Concat(root.Descendants(ns + "None"))
+            .Select(e => NormaliseRelative(e.Attribute("Include")?.Value))
             .Where(v => v is not null)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        bool modified = false;
-        foreach (var fullPath in generatedPaths)
+        var toAdd = generated
+            .Select(g =>
+            {
+                var rel = NormaliseRelative(Path.GetRelativePath(csprojDir, g.AbsolutePath))!;
+                return (rel, already: existingIncludes.Contains(rel));
+            })
+            .Where(x => !x.already)
+            .Select(x => x.rel)
+            .ToList();
+
+        if (toAdd.Count == 0) return;
+
+        // Group by directory so we can emit tidy ItemGroup blocks
+        var byDir = toAdd.GroupBy(p => Path.GetDirectoryName(p) ?? "");
+
+        foreach (var group in byDir)
         {
-            var relativePath = Path.GetRelativePath(projectDir, fullPath).Replace('/', '\\');
+            var itemGroup = new XElement(ns + "ItemGroup");
 
-            if (existingIncludes.Contains(relativePath))
-                continue;
+            foreach (var rel in group.OrderBy(p => p))
+            {
+                itemGroup.Add(new XElement(ns + "Content",
+                    new XAttribute("Include", rel.Replace('/', '\\')),
+                    new XElement(ns + "CopyToOutputDirectory", "PreserveNewest")));
+            }
 
-            protoItemGroup.Add(new XElement(ns + "Content",
-                new XAttribute("Include", relativePath),
-                new XElement(ns + "CopyToOutputDirectory", "PreserveNewest")));
-
-            modified = true;
+            root.Add(itemGroup);
         }
 
-        if (modified)
-        {
-            doc.Save(csprojPath);
-        }
+        doc.Save(csprojPath);
     }
+
+    private static string? NormaliseRelative(string? path) =>
+        path?.Replace('\\', '/');
 }
