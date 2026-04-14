@@ -1,3 +1,5 @@
+namespace ProtobuffEncoder.Demo.Console;
+
 public static class CliParser
 {
     public static CliOptions Parse(string[] args)

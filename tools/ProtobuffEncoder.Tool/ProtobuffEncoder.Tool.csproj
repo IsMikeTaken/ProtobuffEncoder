@@ -15,6 +15,11 @@
     <PackageId>ProtobuffEncoder.Tool</PackageId>
     <Description>CLI tool that scans compiled .NET assemblies for [ProtoContract] and [ProtoService] types, generates .proto schema files with configurable output routing, and optionally patches .csproj files to include the generated output.</Description>
     <PackageTags>protobuf;proto;grpc;schema;codegen;tool</PackageTags>
+
+    <!-- Emit XML docs so IntelliSense is available when referencing internal types in tests -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Suppress doc-comment warnings for top-level statements (CS1591) -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

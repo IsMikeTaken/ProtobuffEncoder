@@ -1,3 +1,5 @@
+namespace ProtobuffEncoder.Demo.Bidirectional.Server;
+
 record WeatherJsonRequest
 {
     public string? City { get; init; }

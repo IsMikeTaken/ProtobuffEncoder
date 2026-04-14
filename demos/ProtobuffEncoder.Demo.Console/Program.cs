@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using ProtobuffEncoder.Demo.Console;
 
 // --- 1. Global Setup, CLI Args, & Telemetry ---
 var options = CliParser.Parse(args);

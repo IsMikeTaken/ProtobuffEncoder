@@ -189,4 +189,30 @@ internal static class DiagnosticDescriptors
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         description: "The [ProtoMap] attribute is only valid on properties of type Dictionary<TKey, TValue>. Using it on other types has no effect and indicates a mistake.");
+
+    /// <summary>
+    /// PROTO016: An [assembly: ProtoRoute] has an empty or whitespace-only folder name.
+    /// </summary>
+    public static readonly DiagnosticDescriptor ProtoRouteEmptyFolder = new(
+        id: "PROTO016",
+        title: "ProtoRoute has an empty folder name",
+        messageFormat: "[ProtoRoute] in assembly '{0}' has an empty or whitespace folder name — provide a non-empty subfolder such as \"requests\" or \"services\"",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "The first argument of [ProtoRoute] is the subfolder name used when placing generated .proto files. An empty value makes the route impossible to apply and indicates a misconfiguration.",
+        customTags: [WellKnownDiagnosticTags.CompilationEnd]);
+
+    /// <summary>
+    /// PROTO017: An [assembly: ProtoRoute] declares no tokens to match against.
+    /// </summary>
+    public static readonly DiagnosticDescriptor ProtoRouteNoTokens = new(
+        id: "PROTO017",
+        title: "ProtoRoute has no matching tokens",
+        messageFormat: "[ProtoRoute(\"{0}\")] in assembly '{1}' declares no tokens and will never match any type — provide at least one name token such as \"Request\" or \"Service\"",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: "A [ProtoRoute] with no tokens will never route any type into its folder. Either add one or more name tokens or remove the attribute.",
+        customTags: [WellKnownDiagnosticTags.CompilationEnd]);
 }

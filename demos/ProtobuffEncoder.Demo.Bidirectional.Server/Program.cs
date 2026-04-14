@@ -4,6 +4,7 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
 using ProtobuffEncoder.Contracts;
+using ProtobuffEncoder.Demo.Bidirectional.Server;
 using ProtobuffEncoder.Transport;
 using ProtobuffEncoder.WebSockets;
 

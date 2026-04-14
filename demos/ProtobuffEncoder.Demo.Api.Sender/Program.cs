@@ -1,5 +1,6 @@
 using ProtobuffEncoder.AspNetCore;
 using ProtobuffEncoder.Contracts;
+using ProtobuffEncoder.Demo.Api.Sender;
 
 var builder = WebApplication.CreateBuilder(args);
 

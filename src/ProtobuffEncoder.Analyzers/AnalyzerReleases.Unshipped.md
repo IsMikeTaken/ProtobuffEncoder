@@ -17,3 +17,5 @@ PROTO012 | ProtobuffEncoder | Error | ProtoServiceAnalyzer, Streaming method has
 PROTO013 | ProtobuffEncoder | Error | ProtoIncludeAnalyzer, ProtoInclude field number conflicts with ProtoField
 PROTO014 | ProtobuffEncoder | Error | ProtoIncludeAnalyzer, ProtoInclude type is not a subclass
 PROTO015 | ProtobuffEncoder | Error | ProtoIncludeAnalyzer, ProtoMap on non-Dictionary property
+PROTO016 | ProtobuffEncoder | Error | ProtoRouteAnalyzer, ProtoRoute has an empty folder name
+PROTO017 | ProtobuffEncoder | Warning | ProtoRouteAnalyzer, ProtoRoute has no matching tokens

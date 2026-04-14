@@ -1,14 +1,14 @@
 using System.Diagnostics;
-using ProtobuffEncoder;
-using ProtobuffEncoder.Console;
 using ProtobuffEncoder.Transport;
+
+namespace ProtobuffEncoder.Demo.Console;
 
 public static class DuplexTransportShowcase
 {
     public static async Task RunAsync(ActivitySource tracer, CancellationToken token, CliOptions options)
     {
         using var activity = tracer.StartActivity("BiDirectionalStreaming");
-        if (!options.Silent) Console.WriteLine("\n--- Bi-Directional Streaming ---");
+        if (!options.Silent) System.Console.WriteLine("\n--- Bi-Directional Streaming ---");
         var sw = Stopwatch.StartNew();
 
         await using var sendPipe = new MemoryStream();
@@ -34,12 +34,12 @@ public static class DuplexTransportShowcase
         await foreach (var response in duplex.ReceiveAllAsync().WithCancellation(token))
         {
             recvCount++;
-            if (!options.Silent) Console.WriteLine($"  Server Replied: {response.Name}");
+            if (!options.Silent) System.Console.WriteLine($"  Server Replied: {response.Name}");
         }
         recvActivity?.SetTag("messages.received", recvCount);
         recvActivity?.SetTag("bytes.received", recvPipe.Length);
 
         sw.Stop();
-        if (!options.Silent) Console.WriteLine($"  Duplex exchange complete | Sent: {sendPipe.Length}b | Recv: {recvPipe.Length}b | Took: {sw.ElapsedMilliseconds}ms");
+        if (!options.Silent) System.Console.WriteLine($"  Duplex exchange complete | Sent: {sendPipe.Length}b | Recv: {recvPipe.Length}b | Took: {sw.ElapsedMilliseconds}ms");
     }
 }

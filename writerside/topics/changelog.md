@@ -2,18 +2,33 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.6.0] - 2026-04-13
+
+### Added {id="v160_added"}
+- **PROTO016** — `[ProtoRoute]` with an empty or whitespace folder name (Error). Reports on the attribute itself at the call site.
+- **PROTO017** — `[ProtoRoute]` with no matching tokens so the route can never fire (Warning). Reports on the attribute itself at the call site.
+- **`ProtoRouteAnalyzer`** — new analyzer class that validates all assembly-level `[ProtoRoute]` attributes via `RegisterCompilationAction`, covering PROTO016 and PROTO017.
+- **`ProtoRouteAnalyzerTests`** — 7 tests covering empty folder, whitespace folder, no-tokens, single-token, multi-token, combined violations, and a full valid configuration.
+- `ProtoToolOptionsAttribute` and `ProtoRouteAttribute` stubs added to `AttributeStubs` in the analyzer test helpers so all analyzer tests compile correctly.
+
+### Changed {id="v160_changed"}
+- **Tool optimizations** — `AssemblyToolOptions.Read` consolidated to a single pass; `ProjectModifier.AppendToCsproj` early-exits on empty input and normalises paths in one step; `Program.cs` removes unused `baseOutputDir` variable, fixes `static` local-function placement, uses `GetValueOrDefault` for dictionary lookup, and explicit types throughout.
+- `AnalyzerReleases.Unshipped.md` updated with PROTO016 and PROTO017 entries.
+- Version bumped from `1.5.0` to `1.6.0` in `Directory.Build.props`.
+
 ## [1.5.0] - 2026-04-13
 
 ### Added {id="v150_added"}
 - **`proto-gen` CLI tool** (`ProtobuffEncoder.Tool`) packaged as a .NET global tool installable via `dotnet tool install --global ProtobuffEncoder.Tool`. Supports `net8.0`, `net9.0`, and `net10.0`.
-- **Assembly-level output configuration** — `[assembly: ProtoToolOptions(ProtoPath = "...", Routes = [...])]` lets each project declare where generated `.proto` files should land without any MSBuild integration.
-- **`ProtoTypeRoute`** — maps one or more name tokens (prefix or suffix, case-insensitive) to a subfolder inside `ProtoPath`. First-match wins; unmatched types fall back to the root `ProtoPath`.
+- **`[assembly: ProtoToolOptions(ProtoPath = "...")]`** — sets the root output folder for generated `.proto` files. Defaults to `Contracts/Proto` when absent.
+- **`[assembly: ProtoRoute("folder", "Token1", "Token2")]`** — routes types whose name starts or ends with a token into a subfolder. Multiple attributes are applied in declaration order; first match wins. Replaces the previous `ProtoTypeRoute` class approach, which violated CS0655 (non-primitive array as attribute property).
+- **`--auto` mode** — parameterless guided run: scans for compiled DLLs, walks up to the project root, applies assembly configuration, and prompts before updating the `.csproj`.
 - **`--dry-run` flag** — prints what would be written without touching the filesystem, useful for CI validation.
-- **Optional `output-dir` argument** — when omitted, the tool reads `ProtoPath` from the assembly's `[ProtoToolOptions]` attribute and falls back to `Protos/`.
 
 ### Changed {id="v150_changed"}
 - **CI workflows extended** — all three workflows (`ci-pr.yml`, `ci-development.yml`, `ci-release.yml`) now pack `tools/*/*.csproj` alongside `src/*/*.csproj`, so the `proto-gen` tool is included in every NuGet publish step.
-- **`cli_tool.md` rewritten** — new sections covering installation as a global tool, the `[ProtoToolOptions]` / `ProtoTypeRoute` configuration system, routing table with prefix/suffix examples, updated command reference with `--dry-run`, and a complete end-to-end example showing routed output paths.
+- **`[ProtoToolOptions]` default** changed from `"Protos"` to `"Contracts/Proto"` to match idiomatic project layout.
+- **`cli_tool.md` rewritten** — covers `[ProtoToolOptions]` / `[ProtoRoute]` configuration, routing table, `--auto` guided-mode walkthrough, updated installation and command reference.
 - Version bumped from `1.4.0` to `1.5.0` in `Directory.Build.props`.
 
 ## [1.4.0] - 2026-03-25

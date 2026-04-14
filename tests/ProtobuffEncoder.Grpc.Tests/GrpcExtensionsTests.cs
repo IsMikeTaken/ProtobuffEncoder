@@ -107,11 +107,10 @@ public class GrpcExtensionsTests
     public void AddProtobufGrpcClient_WithConfigure_AcceptsCallback()
     {
         var services = new ServiceCollection();
-        bool configured = false;
 
         services.AddProtobufGrpcClient<IPingService>(
             new Uri("http://localhost:5000"),
-            opts => configured = true);
+            opts => { });
 
         // Configuration is deferred until resolution, but registration should succeed
         var descriptor = services.FirstOrDefault(s => s.ServiceType == typeof(IPingService));

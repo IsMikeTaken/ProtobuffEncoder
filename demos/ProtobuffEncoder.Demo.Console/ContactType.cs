@@ -1,4 +1,4 @@
-namespace ProtobuffEncoder.Console;
+namespace ProtobuffEncoder.Demo.Console;
 
 public enum ContactType
 {

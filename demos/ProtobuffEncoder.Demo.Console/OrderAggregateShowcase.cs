@@ -1,12 +1,14 @@
 using System.Diagnostics;
 using ProtobuffEncoder.Contracts.Models;
 
+namespace ProtobuffEncoder.Demo.Console;
+
 public static class OrderAggregateShowcase
 {
     public static async Task RunAsync(ActivitySource tracer, CancellationToken token, CliOptions options)
     {
         using var activity = tracer.StartActivity("OrderAggregateShowcase");
-        Console.WriteLine("\n=== [SHOWCASE] Complex Order Aggregate ===");
+        System.Console.WriteLine("\n=== [SHOWCASE] Complex Order Aggregate ===");
 
         // 1. Arrange: Create a complex order with multiple levels
         var order = new Order
@@ -33,8 +35,8 @@ public static class OrderAggregateShowcase
             ]
         };
 
-        Console.WriteLine($"[1] Created complex order for {order.Customer.FirstName} {order.Customer.LastName}");
-        Console.WriteLine($"    Order contains {order.Items.Count} items.");
+        System.Console.WriteLine($"[1] Created complex order for {order.Customer.FirstName} {order.Customer.LastName}");
+        System.Console.WriteLine($"    Order contains {order.Items.Count} items.");
 
         // 2. Act: Serialize
         byte[] bytes;
@@ -43,7 +45,7 @@ public static class OrderAggregateShowcase
             bytes = ProtobuffEncoder.ProtobufEncoder.Encode(order);
             serializeActivity?.SetTag("payload_size", bytes.Length);
         }
-        Console.WriteLine($"[2] Serialized complex order into {bytes.Length} bytes.");
+        System.Console.WriteLine($"[2] Serialized complex order into {bytes.Length} bytes.");
 
         // 3. Act: Deserialize
         Order decodedOrder;
@@ -51,23 +53,23 @@ public static class OrderAggregateShowcase
         {
             decodedOrder = ProtobuffEncoder.ProtobufEncoder.Decode<Order>(bytes);
         }
-        Console.WriteLine($"[3] Deserialized back to Order object.");
+        System.Console.WriteLine($"[3] Deserialized back to Order object.");
 
         // 4. Assert (Visual Check)
-        Console.WriteLine($"    Decoded Status: {decodedOrder.Status}");
-        Console.WriteLine($"    Decoded Address: {decodedOrder.Customer.Address.Street}, {decodedOrder.Customer.Address.City}");
-        Console.WriteLine($"    Decoded Item 1: {decodedOrder.Items[0].ProductName} (x{decodedOrder.Items[0].Quantity})");
+        System.Console.WriteLine($"    Decoded Status: {decodedOrder.Status}");
+        System.Console.WriteLine($"    Decoded Address: {decodedOrder.Customer.Address.Street}, {decodedOrder.Customer.Address.City}");
+        System.Console.WriteLine($"    Decoded Item 1: {decodedOrder.Items[0].ProductName} (x{decodedOrder.Items[0].Quantity})");
 
         // Verify values
         if (decodedOrder.Id == order.Id && 
             decodedOrder.Customer.FirstName == order.Customer.FirstName &&
             decodedOrder.Items.Count == order.Items.Count)
         {
-            Console.WriteLine("[SUCCESS] Order aggregate round-trip successful!");
+            System.Console.WriteLine("[SUCCESS] Order aggregate round-trip successful!");
         }
         else
         {
-            Console.WriteLine("[FAILURE] Order aggregate data mismatch!");
+            System.Console.WriteLine("[FAILURE] Order aggregate data mismatch!");
         }
 
         await Task.CompletedTask;

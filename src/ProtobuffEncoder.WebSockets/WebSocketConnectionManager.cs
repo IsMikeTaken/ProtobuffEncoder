@@ -3,59 +3,103 @@ using System.Collections.Concurrent;
 namespace ProtobuffEncoder.WebSockets;
 
 /// <summary>
-/// Thread-safe tracker of all active WebSocket connections for a given endpoint type pair.
-/// Supports broadcast to all connected clients and filtered broadcast.
+/// Thread-safe registry of all active WebSocket connections for a given
+/// <typeparamref name="TSend"/> / <typeparamref name="TReceive"/> endpoint type pair.
 /// </summary>
+/// <remarks>
+/// <para>
+/// Connections are stored in a <see cref="ConcurrentDictionary{TKey,TValue}"/> so
+/// <see cref="Add"/> and <see cref="Remove"/> are lock-free.
+/// </para>
+/// <para>
+/// <see cref="BroadcastAsync(TSend,CancellationToken)"/> uses
+/// <see cref="Parallel.ForEachAsync{TSource}"/> to fan out sends concurrently on
+/// the thread-pool without the LINQ-allocation overhead of
+/// <c>Task.WhenAll(snapshot.Select(…))</c>.
+/// Failed sends are silently removed from the registry.
+/// </para>
+/// </remarks>
+/// <typeparam name="TSend">The message type sent to clients.</typeparam>
+/// <typeparam name="TReceive">The message type received from clients.</typeparam>
 public sealed class WebSocketConnectionManager<TSend, TReceive>
-    where TSend : class, new()
+    where TSend    : class, new()
     where TReceive : class, new()
 {
-    private readonly ConcurrentDictionary<string, ProtobufWebSocketConnection<TSend, TReceive>> _connections = new();
+    private readonly ConcurrentDictionary<string, ProtobufWebSocketConnection<TSend, TReceive>>
+        _connections = new();
 
-    /// <summary>Number of active connections.</summary>
+    /// <summary>Number of currently active connections.</summary>
     public int Count => _connections.Count;
 
-    /// <summary>Snapshot of all active connections.</summary>
-    public IReadOnlyCollection<ProtobufWebSocketConnection<TSend, TReceive>> Connections
-        => _connections.Values.ToList().AsReadOnly();
+    /// <summary>
+    /// A point-in-time snapshot of all active connections.
+    /// The returned list is safe to iterate after the call returns.
+    /// </summary>
+    public IReadOnlyList<ProtobufWebSocketConnection<TSend, TReceive>> Connections
+        => [.. _connections.Values];
 
-    /// <summary>Gets a connection by ID. Returns null if not found.</summary>
+    /// <summary>
+    /// Returns the connection with the given <paramref name="connectionId"/>,
+    /// or <see langword="null"/> if it is not present.
+    /// </summary>
+    /// <param name="connectionId">The connection identifier assigned at accept time.</param>
     public ProtobufWebSocketConnection<TSend, TReceive>? GetConnection(string connectionId)
         => _connections.GetValueOrDefault(connectionId);
 
     /// <summary>
-    /// Broadcasts a message to all connected clients. Thread-safe.
-    /// Failed sends are caught and those connections are removed.
+    /// Broadcasts <paramref name="message"/> to every connected client concurrently.
     /// </summary>
-    public async Task BroadcastAsync(TSend message, CancellationToken cancellationToken = default)
-    {
-        await BroadcastAsync(message, _ => true, cancellationToken);
-    }
+    /// <remarks>
+    /// Connections that throw during the send are silently removed from the registry.
+    /// </remarks>
+    /// <param name="message">The message to broadcast.</param>
+    /// <param name="cancellationToken">Propagated to each individual send.</param>
+    public Task BroadcastAsync(TSend message, CancellationToken cancellationToken = default)
+        => BroadcastAsync(message, static _ => true, cancellationToken);
 
     /// <summary>
-    /// Broadcasts a message to connections matching the predicate (e.g., exclude the sender).
+    /// Broadcasts <paramref name="message"/> to all connections that satisfy
+    /// <paramref name="predicate"/> (e.g. exclude the sender).
     /// </summary>
-    public async Task BroadcastAsync(
+    /// <remarks>
+    /// Uses <see cref="Parallel.ForEachAsync{TSource}"/> for concurrent fan-out
+    /// without allocating a LINQ projection or a <c>Task[]</c> array.
+    /// Failed sends are silently removed from the registry.
+    /// </remarks>
+    /// <param name="message">The message to broadcast.</param>
+    /// <param name="predicate">Filter applied to each connection before sending.</param>
+    /// <param name="cancellationToken">Propagated to each individual send.</param>
+    public Task BroadcastAsync(
         TSend message,
         Func<ProtobufWebSocketConnection<TSend, TReceive>, bool> predicate,
         CancellationToken cancellationToken = default)
     {
-        var snapshot = _connections.Values.Where(predicate).ToList();
+        // Take a snapshot so additions/removals during broadcast don't affect iteration.
+        var targets = _connections.Values
+            .Where(c => c.IsConnected && predicate(c))
+            .ToList();
 
-        var tasks = snapshot.Select(async conn =>
-        {
-            try
-            {
-                if (conn.IsConnected)
-                    await conn.SendAsync(message, cancellationToken);
-            }
-            catch
-            {
-                Remove(conn.ConnectionId);
-            }
-        });
+        if (targets.Count == 0)
+            return Task.CompletedTask;
 
-        await Task.WhenAll(tasks);
+        return Parallel.ForEachAsync(
+            targets,
+            new ParallelOptions
+            {
+                CancellationToken      = cancellationToken,
+                MaxDegreeOfParallelism = Environment.ProcessorCount,
+            },
+            async (conn, ct) =>
+            {
+                try
+                {
+                    await conn.SendAsync(message, ct).ConfigureAwait(false);
+                }
+                catch
+                {
+                    Remove(conn.ConnectionId);
+                }
+            });
     }
 
     internal void Add(ProtobufWebSocketConnection<TSend, TReceive> connection)

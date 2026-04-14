@@ -1,3 +1,5 @@
+namespace ProtobuffEncoder.Demo.Bidirectional.Server;
+
 public class ChatJsonMessage
 {
     public string? Source { get; set; }

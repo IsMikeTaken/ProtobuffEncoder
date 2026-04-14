@@ -11,14 +11,12 @@
 //  generated .proto schema for every discovered service and type.
 // ──────────────────────────────────────────────────────────────
 
-using System.Reflection;
 using ProtobuffEncoder;
-using ProtobuffEncoder.AspNetCore;
 using ProtobuffEncoder.AspNetCore.Setup;
 using ProtobuffEncoder.Attributes;
-using ProtobuffEncoder.Grpc;
-using ProtobuffEncoder.Schema;
+using ProtobuffEncoder.Demo.Setup.Advanced.Grpc;
 using ProtobuffEncoder.Demo.Setup.Shared;
+using ProtobuffEncoder.Schema;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -41,8 +39,8 @@ ProtoRegistry.Register<InventoryItem>(FieldNumbering.DeclarationOrder);
 
 builder.Services.AddProtobuffEncoder()
     .WithGrpc(grpc => grpc
-        .UseKestrel(httpPort: 5000, grpcPort: 5001)
-        .AddServiceAssembly(typeof(Program).Assembly));
+                  .UseKestrel(httpPort: 5000, grpcPort: 5001)
+                  .AddServiceAssembly(typeof(Program).Assembly));
 
 var app = builder.Build();
 app.MapProtobufEndpoints();
@@ -132,7 +130,9 @@ static void PrintSchema<T>(string label)
     Console.WriteLine();
 }
 
-// ─────────────────────────────────────────────────────────────
+namespace ProtobuffEncoder.Demo.Setup.Advanced.Grpc
+{
+    // ─────────────────────────────────────────────────────────────
 //  AUTO-DISCOVERED MODELS — no attributes needed.
 // ─────────────────────────────────────────────────────────────
 
@@ -143,13 +143,13 @@ static void PrintSchema<T>(string label)
 //     int32  Quantity = 3;
 //     double UnitPrice = 4;   ← declared last
 //   }
-public class InventoryItem
-{
-    public string Sku { get; set; } = "";
-    public string Name { get; set; } = "";
-    public int Quantity { get; set; }
-    public double UnitPrice { get; set; }
-}
+    public class InventoryItem
+    {
+        public string Sku { get; set; } = "";
+        public string Name { get; set; } = "";
+        public int Quantity { get; set; }
+        public double UnitPrice { get; set; }
+    }
 
 // Expected resolver output (Alphabetical, auto-discovered):
 //   message StockLevel {
@@ -158,50 +158,51 @@ public class InventoryItem
 //     string Sku = 3;         ← S
 //     string Warehouse = 4;   ← W
 //   }
-public class StockLevel
-{
-    public string Sku { get; set; } = "";
-    public string Warehouse { get; set; } = "";
-    public int Quantity { get; set; }
-    public bool InStock { get; set; }
-}
+    public class StockLevel
+    {
+        public string Sku { get; set; } = "";
+        public string Warehouse { get; set; } = "";
+        public int Quantity { get; set; }
+        public bool InStock { get; set; }
+    }
 
 // ─────────────────────────────────────────────────────────────
 //  gRPC SERVICE — uses auto-discovered types.
 // ─────────────────────────────────────────────────────────────
 
-[ProtoService("InventoryService")]
-public interface IInventoryGrpcService
-{
-    [ProtoMethod(ProtoMethodType.Unary)]
-    Task<StockLevel> CheckStock(InventoryItem request);
-}
-
-public class InventoryGrpcServiceImpl : IInventoryGrpcService
-{
-    public Task<StockLevel> CheckStock(InventoryItem request)
+    [ProtoService("InventoryService")]
+    public interface IInventoryGrpcService
     {
-        Console.WriteLine($"[gRPC] CheckStock({request.Sku})");
-        return Task.FromResult(new StockLevel
-        {
-            Sku = request.Sku,
-            Warehouse = "EU-WEST-1",
-            Quantity = request.Quantity > 0 ? request.Quantity : 100,
-            InStock = true
-        });
+        [ProtoMethod(ProtoMethodType.Unary)]
+        Task<StockLevel> CheckStock(InventoryItem request);
     }
-}
+
+    public class InventoryGrpcServiceImpl : IInventoryGrpcService
+    {
+        public Task<StockLevel> CheckStock(InventoryItem request)
+        {
+            Console.WriteLine($"[gRPC] CheckStock({request.Sku})");
+            return Task.FromResult(new StockLevel
+            {
+                Sku = request.Sku,
+                Warehouse = "EU-WEST-1",
+                Quantity = request.Quantity > 0 ? request.Quantity : 100,
+                InStock = true
+            });
+        }
+    }
 
 // Re-use the shared IDemoGrpcService contract.
-public class DemoGrpcServiceImpl : IDemoGrpcService
-{
-    public Task<DemoResponse> Echo(DemoRequest request) =>
-        Task.FromResult(new DemoResponse { Message = $"gRPC Echo: {request.Name}" });
+    public class DemoGrpcServiceImpl : IDemoGrpcService
+    {
+        public Task<DemoResponse> Echo(DemoRequest request) =>
+            Task.FromResult(new DemoResponse { Message = $"gRPC Echo: {request.Name}" });
 
-    public Task<OrderConfirmation> PlaceOrder(OrderRequest request) =>
-        Task.FromResult(new OrderConfirmation
-        {
-            OrderId = Guid.NewGuid().ToString("N")[..8],
-            Total = request.Quantity * request.UnitPrice
-        });
+        public Task<OrderConfirmation> PlaceOrder(OrderRequest request) =>
+            Task.FromResult(new OrderConfirmation
+            {
+                OrderId = Guid.NewGuid().ToString("N")[..8],
+                Total = request.Quantity * request.UnitPrice
+            });
+    }
 }
