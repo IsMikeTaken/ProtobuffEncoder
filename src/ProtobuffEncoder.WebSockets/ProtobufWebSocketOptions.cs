@@ -52,4 +52,15 @@ public sealed class ProtobufWebSocketOptions<TSend, TReceive>
     /// Called when an incoming message fails receive validation (when behavior is Skip or ReturnNull).
     /// </summary>
     public Func<ProtobufWebSocketConnection<TSend, TReceive>, TReceive, ValidationResult, Task>? OnMessageRejected { get; set; }
+
+    /// <summary>
+    /// The interval at which the server sends WebSocket keep-alive ping frames to the client.
+    /// Passed directly to <see cref="Microsoft.AspNetCore.Http.WebSocketAcceptContext.KeepAliveInterval"/>
+    /// at upgrade time so the TCP stack handles pings independently of the application message loop.
+    /// Defaults to <see cref="TimeSpan.Zero"/> (keep-alive disabled; the underlying framework default applies).
+    /// </summary>
+    /// <remarks>
+    /// Set to e.g. <c>TimeSpan.FromSeconds(30)</c> to detect silently dropped connections.
+    /// </remarks>
+    public TimeSpan KeepAliveInterval { get; set; } = TimeSpan.Zero;
 }

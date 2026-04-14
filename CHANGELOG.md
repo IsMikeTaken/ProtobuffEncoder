@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-04-14
+
+### Changed
+
+#### ASP.NET Core (`ProtobuffEncoder.AspNetCore`)
+- **`ProtobufInputFormatter`** — replaced `MemoryStream` body buffering with `PipeReader.ReadToEndAsync()`, draining the request body directly into a `ReadOnlySequence<byte>`.  For single-segment bodies (the common case) the payload is decoded from `buffer.FirstSpan` with zero extra allocations.  `reader.AdvanceTo(buffer.End)` is called in a `finally` block to correctly advance the pipe regardless of outcome.
+- **`ProtobufOutputFormatter`** — response bytes are now written through `HttpContext.Response.BodyWriter` (`PipeWriter`) instead of `Response.Body`, allowing Kestrel to flush directly from its pipe memory.  `ContentLength` is set before writing so clients and proxies can pre-allocate receive buffers.
+
+#### WebSockets (`ProtobuffEncoder.WebSockets`)
+- **`WebSocketStream`** — replaced the `MemoryStream` receive buffer with an `ArrayPool<byte>.Shared` rental strategy.  A 64 KiB frame buffer is rented per-message and returned immediately after reassembly, so no heap memory is held between messages.  The message buffer grows via re-rent (copy + return old + rent 2× larger) for large frames.  Added `IAsyncDisposable` / `DisposeAsync()` for async graceful `NormalClosure` close, avoiding a blocking `GetAwaiter().GetResult()` on the thread-pool.  All public members carry full XML documentation.
+- **`WebSocketConnectionManager`** — `BroadcastAsync` now uses `Parallel.ForEachAsync` with `MaxDegreeOfParallelism = Environment.ProcessorCount` for concurrent fan-out without a LINQ `.Select` projection or `Task[]` allocation.  A point-in-time snapshot is taken before iteration so additions/removals during broadcast do not affect the current pass.  Failed sends are silently removed from the registry.  The `Connections` property uses a collection expression (`[.. _connections.Values]`) instead of `.ToList().AsReadOnly()`.
+- **`WebSocketEndpointRouteBuilderExtensions`** — endpoint now accepts a `WebSocketAcceptContext` populated with `options.KeepAliveInterval`, configuring TCP keep-alive pings at the HTTP upgrade level.  The endpoint is decorated with `.WithDisplayName(...)` and `.DisableRequestTimeout()` so the ASP.NET Core request-timeout middleware does not kill idle long-lived connections.  Validation pipelines are built once per connection, not per message.
+- **`ProtobufWebSocketOptions`** — added `KeepAliveInterval` property (defaults to `TimeSpan.Zero`; set to e.g. `TimeSpan.FromSeconds(30)` to detect silently dropped connections).
+
+#### gRPC (`ProtobuffEncoder.Grpc`)
+- **`ProtobufMarshaller`** — switched from the legacy `byte[]`-based `Marshaller<T>` constructor to the context-based overload (`Action<T, SerializationContext>` / `Func<DeserializationContext, T>`).  The serialisation path writes into the `IBufferWriter<byte>` supplied by gRPC via `SerializationContext.GetBufferWriter()`.  The deserialisation path reads from `DeserializationContext.PayloadAsReadOnlySequence()`, taking the `FirstSpan` fast path for single-segment (small message) buffers.
+- **`ProtobufGrpcServiceMethodProvider`** — the open-generic binder methods (`BindUnary`, `BindServerStreaming`, etc.) are now closed into typed `Action` delegates exactly once per unique service/method/type combination using a static `ConcurrentDictionary` cache keyed on a `BinderKey` record struct.  Subsequent calls to `OnServiceMethodDiscovery` (hot-reload, multi-registration) pay only a dictionary lookup with no `MethodInfo.MakeGenericMethod` or `Delegate.CreateDelegate` allocation.  Unary and client-streaming handler lambdas were simplified from `async`/`await` wrappers to direct `Task<TResponse>` returns.
+
+#### Build
+- **`Directory.Build.props`** — `TieredPGO=true` applied per-TFM for net8, net9, net10.  `EnablePreviewFeatures=true` on net10 only.
+- **`GenerateDocumentationFile`** — enabled on all `src/` library projects.
+
 ## [1.3.0] - 2026-03-24
 
 ### Added

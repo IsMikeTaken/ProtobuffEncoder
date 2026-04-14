@@ -2,13 +2,39 @@ using System.Xml.Linq;
 
 namespace ProtobuffEncoder.Tool;
 
+/// <summary>
+/// Patches <c>.csproj</c> files to include generated <c>.proto</c> files
+/// as <c>&lt;Content&gt;</c> items with <c>CopyToOutputDirectory="PreserveNewest"</c>.
+/// </summary>
 internal static class ProjectModifier
 {
     /// <summary>
-    /// Adds <c>&lt;Content Include="..." CopyToOutputDirectory="PreserveNewest" /&gt;</c> entries
-    /// for each generated .proto file. Entries already present (case-insensitive) are skipped.
-    /// Files are grouped by directory into separate <c>&lt;ItemGroup&gt;</c> blocks.
+    /// Appends <c>&lt;Content Include="..." /&gt;</c> entries for each generated
+    /// <c>.proto</c> file to the given <c>.csproj</c>.
     /// </summary>
+    /// <param name="csprojPath">Absolute path to the <c>.csproj</c> file to update.</param>
+    /// <param name="generated">
+    /// Collection of <c>(RelativePath, AbsolutePath)</c> pairs for the written files.
+    /// <c>RelativePath</c> is stored as the <c>Include</c> attribute value;
+    /// <c>AbsolutePath</c> is used only to confirm the file was actually written.
+    /// </param>
+    /// <remarks>
+    /// <list type="bullet">
+    ///   <item>Entries already present in the project (case-insensitive, slash-normalised) are skipped.</item>
+    ///   <item>New entries are grouped into one <c>&lt;ItemGroup&gt;</c> per output directory and sorted alphabetically.</item>
+    ///   <item>The method is a no-op when <paramref name="generated"/> is empty or all entries already exist.</item>
+    /// </list>
+    /// </remarks>
+    /// <example>
+    /// After calling this method the project file will contain:
+    /// <code language="xml">
+    /// &lt;ItemGroup&gt;
+    ///   &lt;Content Include="Contracts\Proto\requests\weather.proto"&gt;
+    ///     &lt;CopyToOutputDirectory&gt;PreserveNewest&lt;/CopyToOutputDirectory&gt;
+    ///   &lt;/Content&gt;
+    /// &lt;/ItemGroup&gt;
+    /// </code>
+    /// </example>
     public static void AppendToCsproj(
         string csprojPath,
         IReadOnlyList<(string RelativePath, string AbsolutePath)> generated)
@@ -29,7 +55,6 @@ internal static class ProjectModifier
             .Select(v => Normalise(v!))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        // Filter to new-only entries using the caller-supplied relative path.
         var toAdd = generated
             .Where(g => !existingIncludes.Contains(Normalise(g.RelativePath)))
             .Select(g => g.RelativePath)
@@ -54,6 +79,5 @@ internal static class ProjectModifier
         doc.Save(csprojPath);
     }
 
-    // Normalise slashes so forward/back variants compare equal.
     private static string Normalise(string path) => path.Replace('\\', '/');
 }
