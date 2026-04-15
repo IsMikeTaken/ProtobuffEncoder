@@ -3,7 +3,7 @@
 	<PropertyGroup>
 		<!-- ── Central version ─────────────────────────────────── -->
 		<VersionMajor>1</VersionMajor>
-		<VersionMinor>6</VersionMinor>
+		<VersionMinor>7</VersionMinor>
 		<VersionPatch>0</VersionPatch>
 
 		<!-- CI workflows override VersionSuffix for pre-releases.  -->

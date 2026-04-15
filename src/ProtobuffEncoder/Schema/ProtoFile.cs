@@ -15,8 +15,15 @@ public sealed class ProtoFile
 
     /// <summary>
     /// Import statements referencing other .proto files that define types used in this file.
+    /// Populated by cross-file import resolution in <see cref="ProtoSchemaGenerator"/>.
     /// </summary>
     public List<string> Imports { get; set; } = [];
+
+    /// <summary>
+    /// Well-known type import paths (e.g. <c>"google/protobuf/timestamp.proto"</c>) collected
+    /// during model building.  Merged with <see cref="Imports"/> when rendering.
+    /// </summary>
+    public HashSet<string>? WellKnownImports { get; set; }
 
     public List<ProtoMessageDef> Messages { get; set; } = [];
     public List<ProtoEnumDef> Enums { get; set; } = [];

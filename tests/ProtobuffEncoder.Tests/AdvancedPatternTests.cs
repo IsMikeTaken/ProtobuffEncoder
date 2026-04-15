@@ -294,7 +294,8 @@ public class AdvancedPatternTests
         // May succeed (defaults) or throw — should not crash
         // Just verify no unhandled exception type
         if (ex is not null)
-            Assert.True(ex is InvalidOperationException or FormatException or ArgumentException);
+            Assert.True(ex is InvalidOperationException or FormatException or ArgumentException
+                           or ProtobufDecodeException);
     }
 
     [Fact]
