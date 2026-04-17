@@ -202,7 +202,7 @@ public sealed class WebSocketStream : Stream, IAsyncDisposable
 
     /// <summary>
     /// Sends a graceful <c>NormalClosure</c> close frame if the socket is open,
-    /// then releases the pooled message buffer. Prefer over <see cref="Dispose()"/>.
+    /// then releases the pooled message buffer. Prefer over synchronous disposal.
     /// </summary>
     public new async ValueTask DisposeAsync()
     {
@@ -271,3 +271,4 @@ public sealed class WebSocketStream : Stream, IAsyncDisposable
         }
     }
 }
+

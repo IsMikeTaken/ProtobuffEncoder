@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using ProtobuffEncoder.AspNetCore.Setup;
@@ -82,6 +83,48 @@ public class SetupTests
         var options = provider.GetRequiredService<ProtobufEncoderOptions>();
 
         Assert.Equal(InvalidMessageBehavior.Throw, options.DefaultInvalidMessageBehavior);
+    }
+
+    [Fact]
+    public void AddProtobuffEncoder_WithConfigurationSection_BindsOptions()
+    {
+        var services = new ServiceCollection();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ProtobuffEncoder:DefaultInvalidMessageBehavior"] = nameof(InvalidMessageBehavior.Throw),
+                ["ProtobuffEncoder:EnableMvcFormatters"] = bool.TrueString
+            })
+            .Build();
+
+        services.AddProtobuffEncoder(configuration.GetSection("ProtobuffEncoder"));
+
+        var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<ProtobufEncoderOptions>>().Value;
+        var builder = provider.GetRequiredService<ProtobufEncoderBuilder>();
+
+        Assert.Equal(InvalidMessageBehavior.Throw, options.DefaultInvalidMessageBehavior);
+        Assert.True(options.EnableMvcFormatters);
+        Assert.Contains(builder.Strategies, strategy => strategy is RestFormatterStrategy);
+    }
+
+    [Fact]
+    public void AddProtobuffEncoder_WithConfigurationRoot_UsesDefaultSectionName()
+    {
+        var services = new ServiceCollection();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ProtobuffEncoder:EnableMvcFormatters"] = bool.TrueString
+            })
+            .Build();
+
+        services.AddProtobuffEncoder(configuration);
+
+        var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<ProtobufEncoderOptions>();
+
+        Assert.True(options.EnableMvcFormatters);
     }
 
     [Fact]
@@ -192,8 +235,7 @@ public class SetupTests
     public void Setup_SimpleTier_RegistersBaseServices()
     {
         var services = new ServiceCollection();
-        
-        // Simulating Program_Simple.cs
+
         services.AddControllers().AddProtobufFormatters();
         services.AddProtobufWebSocketEndpoint<TestResponse, TestRequest>();
         services.AddGrpc();
@@ -201,7 +243,7 @@ public class SetupTests
             .WithGrpc(grpc => grpc.AddService<FakeGrpcService>());
 
         var provider = services.BuildServiceProvider();
-        
+
         Assert.NotNull(provider.GetService<ProtobufEncoderOptions>());
         Assert.NotNull(provider.GetService<WebSockets.WebSocketConnectionManager<TestResponse, TestRequest>>());
     }
@@ -210,17 +252,16 @@ public class SetupTests
     public void Setup_NormalTier_AddsValidation()
     {
         var services = new ServiceCollection();
-        
-        // Simulating Program_Normal.cs
+
         services.AddProtobuffEncoder(options => { });
-        services.AddProtobufValidation(registry => 
+        services.AddProtobufValidation(registry =>
         {
             registry.AddRule<TestRequest>(req => req.Id > 0, "Id must be positive");
         });
 
         var provider = services.BuildServiceProvider();
         var validator = provider.GetRequiredService<IProtobufValidator>();
-        
+
         var validResult = validator.Validate(new TestRequest { Id = 1 });
         var invalidResult = validator.Validate(new TestRequest { Id = 0 });
 
@@ -234,23 +275,21 @@ public class SetupTests
     {
         var services = new ServiceCollection();
         bool callbackCalled = false;
-        
-        // Simulating Program_Advanced.cs
-        services.AddProtobuffEncoder(options => 
+
+        services.AddProtobuffEncoder(options =>
         {
-            options.OnGlobalValidationFailure = (msg, result) => callbackCalled = true;
+            options.OnGlobalValidationFailure = (_, _) => callbackCalled = true;
         });
 
         var provider = services.BuildServiceProvider();
         var options = provider.GetRequiredService<IOptions<ProtobufEncoderOptions>>().Value;
-        
+
         options.OnGlobalValidationFailure?.Invoke(new object(), ValidationResult.Fail("Error"));
-        
+
         Assert.True(callbackCalled);
     }
 
     #endregion
-
 }
 
 internal class FakeGrpcService { }

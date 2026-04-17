@@ -75,23 +75,23 @@ app.MapProtobufWebSocket<SensorReading, SensorCommand>("/ws/sensors", options =>
     options.OnMessageRejected = (conn, cmd, result) =>
     {
         Console.WriteLine($"[Sensor] Rejected from {conn.ConnectionId}: {result.ErrorMessage}");
-        return conn.SendAsync(new SensorReading
+        return conn.SendDirectAsync(new SensorReading
         {
             SensorId = "SYSTEM",
             Value = 0,
             Unit = $"Error: {result.ErrorMessage}"
-        });
+        }).AsTask();
     };
 
     options.OnConnect = conn =>
     {
         Console.WriteLine($"[Sensor] Client {conn.ConnectionId} connected");
-        return conn.SendAsync(new SensorReading
+        return conn.SendDirectAsync(new SensorReading
         {
             SensorId = "SYSTEM",
             Value = 0,
             Unit = "Connected. Send a SensorCommand to start."
-        });
+        }).AsTask();
     };
 
     options.OnMessage = async (conn, command) =>
@@ -102,7 +102,7 @@ app.MapProtobufWebSocket<SensorReading, SensorCommand>("/ws/sensors", options =>
         var random = new Random();
         for (var i = 0; i < 3; i++)
         {
-            await conn.SendAsync(new SensorReading
+            await conn.SendDirectAsync(new SensorReading
             {
                 SensorId = command.SensorId,
                 Value = Math.Round(random.NextDouble() * 100, 2),
@@ -126,7 +126,7 @@ app.MapProtobufWebSocket<ChatReply, ChatMessage>("/ws/chat", options =>
     options.OnConnect = conn =>
     {
         Console.WriteLine($"[Chat] {conn.ConnectionId} joined");
-        return conn.SendAsync(new ChatReply { Text = "Welcome!", IsSystem = true });
+        return conn.SendDirectAsync(new ChatReply { Text = "Welcome!", IsSystem = true }).AsTask();
     };
 
     options.OnMessage = async (conn, msg) =>
@@ -214,3 +214,4 @@ namespace ProtobuffEncoder.Demo.Setup.Advanced.WebSockets
         public int IntervalMs { get; set; } = 1000;
     }
 }
+

@@ -1,21 +1,11 @@
-name: Verify Build and Tests
-
+# RETIRED — superseded by ci-pr.yml (pull requests) and ci-development.yml (push to develop).
+# This file is kept as a no-op so existing branch protection rules referencing
+# "Verify Build and Tests" continue to resolve without error.
+name: Verify Build and Tests (retired)
 on:
-  pull_request:
-    branches: [ master, development, preview ]
-    paths-ignore:
-      - 'docs/**'
-      - 'writerside/**'
-  push:
-    branches: [ development ]
-    paths-ignore:
-      - 'docs/**'
-      - 'writerside/**'
-
+  workflow_dispatch:
 jobs:
-  verify:
-    name: Build and Test
-    uses: ./.github/workflows/_build-test-pack.yml
-    with:
-      version_suffix: 'pr.${{ github.event.pull_request.number || github.run_number }}'
-      push_to_nuget: false
+  retired:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "This workflow is retired. See ci-pr.yml and ci-development.yml."

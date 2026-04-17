@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Collections.Frozen;
 using System.Reflection;
 using ProtobuffEncoder.Attributes;
 
@@ -13,6 +14,12 @@ internal static class ContractResolver
 {
     private static readonly ConcurrentDictionary<Type, FieldDescriptor[]> Cache = new();
 
+    /// <summary>
+    /// Field-number → descriptor lookup table per type.  Built once alongside <see cref="Cache"/>
+    /// so decode hot-paths pay only a single dictionary lookup rather than a linear scan.
+    /// </summary>
+    private static readonly ConcurrentDictionary<Type, FrozenDictionary<int, FieldDescriptor>> LookupCache = new();
+
     // Track types currently being resolved to detect and handle implicit nesting safely
     private static readonly ConcurrentDictionary<Type, bool> ImplicitlyRegistered = new();
 
@@ -20,23 +27,51 @@ internal static class ContractResolver
     {
         return Cache.GetOrAdd(type, static t =>
         {
+            FieldDescriptor[] descriptors;
+
             // Auto-discovery: if the type isn't a contract but is registered, auto-discover is on,
             // or it was implicitly registered during a parent's resolution
             if (t.GetCustomAttribute<ProtoContractAttribute>() is null
                 && (ProtoRegistry.IsRegistered(t) || ProtoRegistry.Options.AutoDiscover || ImplicitlyRegistered.ContainsKey(t)))
             {
-                return ResolveCore(t, implicitMode: true);
+                descriptors = ResolveCore(t, implicitMode: true);
             }
-            return ResolveCore(t, implicitMode: false);
+            else
+            {
+                descriptors = ResolveCore(t, implicitMode: false);
+            }
+
+            // Populate the O(1) lookup table alongside the ordered array.
+            LookupCache.TryAdd(t, descriptors.ToFrozenDictionary(d => d.FieldNumber));
+
+            return descriptors;
         });
     }
 
     /// <summary>
+    /// Returns a <see cref="FrozenDictionary{TKey,TValue}"/> mapping field numbers to
+    /// their descriptors for <paramref name="type"/>. O(1) decode hot-path lookup.
+    /// </summary>
+    internal static FrozenDictionary<int, FieldDescriptor> ResolveLookup(Type type)
+    {
+        // Ensure the ordered array (and lookup) are both populated.
+        _ = Resolve(type);
+        return LookupCache[type];
+    }
+
+    /// <summary>
     /// Resolves a type that may not have [ProtoContract] when in implicit mode.
+    /// Also populates <see cref="LookupCache"/> so <see cref="ResolveLookup"/> succeeds
+    /// for types that are only discovered through implicit nesting.
     /// </summary>
     internal static FieldDescriptor[] ResolveImplicit(Type type)
     {
-        return Cache.GetOrAdd(type, static t => ResolveCore(t, implicitMode: true));
+        return Cache.GetOrAdd(type, static t =>
+        {
+            var descriptors = ResolveCore(t, implicitMode: true);
+            LookupCache.TryAdd(t, descriptors.ToFrozenDictionary(d => d.FieldNumber));
+            return descriptors;
+        });
     }
 
     /// <summary>

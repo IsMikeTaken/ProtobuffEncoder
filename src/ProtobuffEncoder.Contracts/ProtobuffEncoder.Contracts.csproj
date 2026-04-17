@@ -4,10 +4,7 @@
     <ProjectReference Include="..\ProtobuffEncoder\ProtobuffEncoder.csproj" />
   </ItemGroup>
   <PropertyGroup>
-    <TargetFrameworks>net10.0;net9.0;net8.0</TargetFrameworks>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
   </PropertyGroup>
   <ItemGroup>
     <!-- Auto-generated proto schemas -->

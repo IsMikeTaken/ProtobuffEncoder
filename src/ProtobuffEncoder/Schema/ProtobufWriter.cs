@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Text;
 
 namespace ProtobuffEncoder.Schema;
@@ -34,19 +35,25 @@ public sealed class ProtobufWriter
     public void WriteDouble(int fieldNumber, double value)
     {
         WriteTag(fieldNumber, WireType.Fixed64);
-        _stream.Write(BitConverter.GetBytes(value));
+        Span<byte> buf = stackalloc byte[8];
+        BinaryPrimitives.WriteDoubleLittleEndian(buf, value);
+        _stream.Write(buf);
     }
 
     public void WriteFloat(int fieldNumber, float value)
     {
         WriteTag(fieldNumber, WireType.Fixed32);
-        _stream.Write(BitConverter.GetBytes(value));
+        Span<byte> buf = stackalloc byte[4];
+        BinaryPrimitives.WriteSingleLittleEndian(buf, value);
+        _stream.Write(buf);
     }
 
     public void WriteFixed64(int fieldNumber, long value)
     {
         WriteTag(fieldNumber, WireType.Fixed64);
-        _stream.Write(BitConverter.GetBytes(value));
+        Span<byte> buf = stackalloc byte[8];
+        BinaryPrimitives.WriteInt64LittleEndian(buf, value);
+        _stream.Write(buf);
     }
 
     public void WriteBytes(int fieldNumber, byte[] value)

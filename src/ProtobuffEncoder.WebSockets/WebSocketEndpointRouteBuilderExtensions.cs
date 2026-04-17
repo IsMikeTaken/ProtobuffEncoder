@@ -124,7 +124,9 @@ public static class WebSocketEndpointRouteBuilderExtensions
                     if (options.OnConnect is not null)
                         await options.OnConnect(connection);
 
+#pragma warning disable CS0618 // ReceiveAllAsync: framework call site — suppress until removal
                     await foreach (var message in connection.ReceiveAllAsync(ctx.RequestAborted))
+#pragma warning restore CS0618
                     {
                         if (receiveValidation is { HasValidators: true })
                         {

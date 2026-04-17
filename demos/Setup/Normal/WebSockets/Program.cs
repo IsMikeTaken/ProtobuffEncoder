@@ -39,23 +39,23 @@ app.MapProtobufWebSocket<ChatReply, ChatMessage>("/ws/chat", options =>
     options.OnMessageRejected = (connection, message, result) =>
     {
         Console.WriteLine($"[Rejected] {connection.ConnectionId}: {result.ErrorMessage}");
-        return connection.SendAsync(new ChatReply
+        return connection.SendDirectAsync(new ChatReply
         {
             Text = $"Your message was rejected: {result.ErrorMessage}",
             IsSystem = true
-        });
+        }).AsTask();
     };
 
     options.OnConnect = connection =>
     {
         Console.WriteLine($"[Chat] {connection.ConnectionId} joined");
-        return connection.SendAsync(new ChatReply { Text = "Welcome to the chat!", IsSystem = true });
+        return connection.SendDirectAsync(new ChatReply { Text = "Welcome to the chat!", IsSystem = true }).AsTask();
     };
 
     options.OnMessage = (connection, message) =>
     {
         Console.WriteLine($"[Chat] {message.User}: {message.Text}");
-        return connection.SendAsync(new ChatReply { Text = $"{message.User} says: {message.Text}" });
+        return connection.SendDirectAsync(new ChatReply { Text = $"{message.User} says: {message.Text}" }).AsTask();
     };
 
     options.OnError = (connection, ex) =>
@@ -76,10 +76,12 @@ app.MapProtobufWebSocket<ChatReply, ChatMessage>("/ws/chat", options =>
 app.MapProtobufWebSocket<DemoResponse, DemoRequest>("/ws/echo", options =>
 {
     options.OnMessage = (connection, request) =>
-        connection.SendAsync(new DemoResponse { Message = $"Echo: {request.Name}" });
+        connection.SendDirectAsync(new DemoResponse { Message = $"Echo: {request.Name}" }).AsTask();
 });
 
 Console.WriteLine("Normal WebSocket demo listening on:");
 Console.WriteLine("  ws://localhost:5000/ws/chat   — validated chat");
 Console.WriteLine("  ws://localhost:5000/ws/echo   — simple echo");
 app.Run();
+
+

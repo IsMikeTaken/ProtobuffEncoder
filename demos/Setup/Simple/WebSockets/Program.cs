@@ -24,11 +24,11 @@ app.MapProtobufWebSocket<ChatReply, ChatMessage>("/ws/chat", options =>
     options.OnConnect = connection =>
     {
         Console.WriteLine($"[+] Client connected: {connection.ConnectionId}");
-        return connection.SendAsync(new ChatReply
+        return connection.SendDirectAsync(new ChatReply
         {
             Text = "Welcome! Send a ChatMessage to start chatting.",
             IsSystem = true
-        });
+        }).AsTask();
     };
 
     // Called for every message received from a client.
@@ -37,11 +37,11 @@ app.MapProtobufWebSocket<ChatReply, ChatMessage>("/ws/chat", options =>
         Console.WriteLine($"[{message.User}] {message.Text}");
 
         // Echo it back with a server prefix.
-        return connection.SendAsync(new ChatReply
+        return connection.SendDirectAsync(new ChatReply
         {
             Text = $"Server received: \"{message.Text}\"",
             IsSystem = false
-        });
+        }).AsTask();
     };
 
     // Called when a client disconnects.

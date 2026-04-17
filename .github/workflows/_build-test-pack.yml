@@ -1,70 +1,192 @@
 name: Build, Test, and Pack
 
+# ── Reusable workflow ──────────────────────────────────────────────────────
+# Called by ci-development.yml, ci-pr.yml, and ci-release.yml.
+# Runs the full build-test-pack matrix across net8 / net9 / net10.
+#
+# Inputs:
+#   version_suffix   — pre-release label appended to the version (empty = stable)
+#   push_to_github   — push nupkgs to GitHub Packages
+#   push_to_nuget    — push nupkgs to NuGet.org
+#   retention_days   — how long to keep uploaded artifacts
+#
+# Secrets:
+#   NUGET_GITHUB_TOKEN — required when push_to_github is true
+#   NUGET_API_KEY      — required when push_to_nuget is true
+
 on:
   workflow_call:
     inputs:
       version_suffix:
+        description: Pre-release suffix appended to the version (empty = stable release)
         required: false
         type: string
         default: ''
+      push_to_github:
+        description: Push nupkgs to GitHub Packages
+        required: false
+        type: boolean
+        default: false
       push_to_nuget:
+        description: Push nupkgs to NuGet.org
         required: false
         type: boolean
         default: false
-      is_preview:
+      retention_days:
+        description: Artifact retention in days
         required: false
-        type: boolean
-        default: false
+        type: number
+        default: 7
     secrets:
+      NUGET_GITHUB_TOKEN:
+        required: false
       NUGET_API_KEY:
         required: false
+    outputs:
+      version:
+        description: The computed semantic version (e.g. v1.7.0 or v1.7.0-dev.42)
+        value: ${{ jobs.pack.outputs.version }}
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
 
 jobs:
-  build-test-pack:
+
+  # ── Matrix build + test ─────────────────────────────────────────────────
+  test:
+    name: test / ${{ matrix.label }}
+    runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        dotnet-version: [ '8.0.x', '9.0.x', '10.0.x' ]
+        include:
+          - framework: net8.0
+            sdk: '8.0.x'
+            label: '.NET 8 LTS'
+          - framework: net9.0
+            sdk: '9.0.x'
+            label: '.NET 9 STS'
+          - framework: net10.0
+            sdk: '10.0.x'
+            label: '.NET 10 LTS'
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup .NET
+      - name: Setup .NET SDKs (all three so multi-targeting restores correctly)
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: ${{ matrix.dotnet-version }}
-          cache: true
-          cache-dependency-path: '**/packages.lock.json'
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
 
-      - name: Restore dependencies
+      - name: Restore
         run: dotnet restore
 
-      - name: Build
+      - name: Build (Release, all TFMs)
         run: dotnet build --no-restore --configuration Release
 
-      - name: Test
-        run: |
-          # Convert '8.0.x' to 'net8.0'
-          DOTNET_VER="${{ matrix.dotnet-version }}"
-          FRAMEWORK_VER=${DOTNET_VER%.x}
-          dotnet test --no-build --configuration Release --verbosity normal --framework "net$FRAMEWORK_VER"
+      - name: Test — ${{ matrix.label }}
+        run: >-
+          dotnet test --no-build --configuration Release
+          --framework ${{ matrix.framework }}
+          --logger "trx;LogFileName=results-${{ matrix.framework }}.trx"
+          --results-directory ./TestResults
 
-      - name: Pack
+      - name: Verify test results exist
+        if: always()
         run: |
-          VERSION_SUFFIX_ARG=""
-          if [ -n "${{ inputs.version_suffix }}" ]; then
-            VERSION_SUFFIX_ARG="--version-suffix ${{ inputs.version_suffix }}"
+          echo "── Test result files ──"
+          find ./TestResults -name '*.trx' -exec echo "  ✓ {}" \; 2>/dev/null || true
+          COUNT=$(find ./TestResults -name '*.trx' 2>/dev/null | wc -l)
+          echo "Found $COUNT result file(s)"
+          if [ "$COUNT" -eq 0 ]; then
+            echo "::error::No test results for ${{ matrix.framework }} — tests may have been skipped"
+            exit 1
           fi
-          for project in src/*/*.csproj; do
-            echo "Packing $project..."
-            dotnet pack "$project" --no-build --configuration Release $VERSION_SUFFIX_ARG --output ./artifacts
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.framework }}
+          path: TestResults/*.trx
+          retention-days: ${{ inputs.retention_days }}
+
+  # ── Pack ────────────────────────────────────────────────────────────────
+  pack:
+    name: pack
+    needs: test
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET SDKs
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+
+      - name: Read version from Directory.Build.props
+        id: version
+        run: |
+          MAJOR=$(grep -oP '(?<=<VersionMajor>)\d+' Directory.Build.props)
+          MINOR=$(grep -oP '(?<=<VersionMinor>)\d+' Directory.Build.props)
+          PATCH=$(grep -oP '(?<=<VersionPatch>)\d+' Directory.Build.props)
+          SUFFIX="${{ inputs.version_suffix }}"
+          if [ -n "$SUFFIX" ]; then
+            echo "version=v${MAJOR}.${MINOR}.${PATCH}-${SUFFIX}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=v${MAJOR}.${MINOR}.${PATCH}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Pack (Release)
+        run: |
+          SUFFIX_ARG=""
+          if [ -n "${{ inputs.version_suffix }}" ]; then
+            SUFFIX_ARG="-p:VersionSuffix=${{ inputs.version_suffix }}"
+          fi
+          for project in src/*/*.csproj tools/*/*.csproj; do
+            echo "Packing $project …"
+            dotnet pack "$project" --configuration Release $SUFFIX_ARG --output ./nupkgs
           done
 
-      - name: Push to NuGet
-        if: ${{ inputs.push_to_nuget && secrets.NUGET_API_KEY != '' }}
-        run: |
-          dotnet nuget push ./artifacts/*.nupkg \
-            --api-key ${{ secrets.NUGET_API_KEY }} \
-            --source https://api.nuget.org/v3/index.json \
-            --skip-duplicate
+      - name: List packages
+        run: ls -lh ./nupkgs/*.nupkg
+
+      - name: Upload NuGet artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nupkgs
+          path: ./nupkgs/*.nupkg
+          retention-days: ${{ inputs.retention_days }}
+
+      - name: Push to GitHub Packages
+        if: ${{ inputs.push_to_github }}
+        run: >-
+          dotnet nuget push ./nupkgs/*.nupkg
+          --api-key ${{ secrets.NUGET_GITHUB_TOKEN }}
+          --source https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
+          --skip-duplicate
+
+      - name: Push to NuGet.org
+        if: ${{ inputs.push_to_nuget }}
+        run: >-
+          dotnet nuget push ./nupkgs/*.nupkg
+          --api-key ${{ secrets.NUGET_API_KEY }}
+          --source https://api.nuget.org/v3/index.json
+          --skip-duplicate

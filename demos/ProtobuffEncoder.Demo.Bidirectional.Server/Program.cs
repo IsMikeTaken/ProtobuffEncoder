@@ -38,7 +38,7 @@ app.MapProtobufWebSocket<NotificationMessage, NotificationMessage>("/ws/chat", o
 
     options.OnMessageRejected = async (conn, msg, result) =>
     {
-        await conn.SendAsync(new NotificationMessage
+        await conn.SendDirectAsync(new NotificationMessage
         {
             Source = "Server",
             Text = $"Rejected: {result.ErrorMessage}",
@@ -71,7 +71,7 @@ app.MapProtobufWebSocket<NotificationMessage, NotificationMessage>("/ws/chat", o
                     await Task.Delay(Random.Shared.Next(8000, 15000));
                     if (!conn.IsConnected) break;
 
-                    await conn.SendAsync(new NotificationMessage
+                    await conn.SendDirectAsync(new NotificationMessage
                     {
                         Source = "SystemBot",
                         Text = tips[Random.Shared.Next(tips.Length)],
@@ -116,7 +116,7 @@ app.MapProtobufWebSocket<NotificationMessage, NotificationMessage>("/ws/chat", o
         }
         else responseText = $"Ack #{count}: received \"{incoming.Text}\"";
 
-        await conn.SendAsync(new NotificationMessage
+        await conn.SendDirectAsync(new NotificationMessage
         {
             Source = "EchoBot",
             Text = responseText,
@@ -146,7 +146,7 @@ app.MapProtobufWebSocket<WeatherResponse, WeatherRequest>("/ws/weather-stream", 
         app.Logger.LogInformation("[Weather] Request: {City} for {Days} days", request.City, request.Days);
 
         // Progressive streaming: immediate ack, then full response
-        await conn.SendAsync(new WeatherResponse
+        await conn.SendDirectAsync(new WeatherResponse
         {
             City = $"[Calculating data for {request.City}...]",
             GeneratedAtUtc = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
@@ -155,7 +155,7 @@ app.MapProtobufWebSocket<WeatherResponse, WeatherRequest>("/ws/weather-stream", 
 
         await Task.Delay(Random.Shared.Next(800, 1500));
 
-        await conn.SendAsync(BuildWeatherResponse(request.City, request.Days, request.IncludeHourly));
+        await conn.SendDirectAsync(BuildWeatherResponse(request.City, request.Days, request.IncludeHourly));
     };
 
     options.OnDisconnect = conn =>
@@ -337,3 +337,5 @@ async IAsyncEnumerable<T> ReadJsonStreamAsync<T>(WebSocket ws, JsonSerializerOpt
         ArrayPool<byte>.Shared.Return(buffer);
     }
 }
+
+

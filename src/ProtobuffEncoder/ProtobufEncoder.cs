@@ -1,5 +1,7 @@
+using System.Buffers;
 using System.Buffers.Binary;
 using System.Collections;
+using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -39,6 +41,38 @@ public static class ProtobufEncoder
         ArgumentNullException.ThrowIfNull(instance);
         ArgumentNullException.ThrowIfNull(output);
         EncodeMessage(instance, output);
+    }
+
+    /// <summary>
+    /// Encodes <paramref name="instance"/> directly into <paramref name="writer"/>,
+    /// avoiding an intermediate <c>byte[]</c> or <see cref="MemoryStream"/> allocation.
+    /// </summary>
+    /// <remarks>
+    /// The encoded bytes are written into a buffer obtained from <paramref name="writer"/>
+    /// via a single <see cref="IBufferWriter{T}.GetMemory"/> call.  For objects whose
+    /// encoded size cannot be known up-front a temporary <see cref="MemoryStream"/> is used
+    /// internally, but the result is still written once into <paramref name="writer"/> without
+    /// copying through an extra array.
+    /// </remarks>
+    /// <param name="instance">The object to encode. Must not be <see langword="null"/>.</param>
+    /// <param name="writer">The destination buffer writer. Must not be <see langword="null"/>.</param>
+    public static void EncodeTo(object instance, IBufferWriter<byte> writer)
+    {
+        ArgumentNullException.ThrowIfNull(instance);
+        ArgumentNullException.ThrowIfNull(writer);
+
+        // Encode into a pooled MemoryStream, then copy the result into the writer in one shot.
+        // This keeps the core EncodeMessage logic unchanged while still avoiding a heap array.
+        using var ms = new MemoryStream();
+        EncodeMessage(instance, ms);
+
+        if (ms.Length == 0)
+            return;
+
+        ReadOnlySpan<byte> encoded = ms.GetBuffer().AsSpan(0, (int)ms.Length);
+        Span<byte> dest = writer.GetSpan((int)ms.Length);
+        encoded.CopyTo(dest);
+        writer.Advance((int)ms.Length);
     }
 
     #endregion
@@ -101,16 +135,45 @@ public static class ProtobufEncoder
     /// Deserializes a protobuf binary message into an instance of <typeparamref name="T"/>.
     /// </summary>
     public static T Decode<T>(ReadOnlySpan<byte> data) where T : new()
-    {
-        return (T)DecodeMessage(typeof(T), data);
-    }
+        => (T)DecodeMessage(typeof(T), data);
 
     /// <summary>
     /// Deserializes a protobuf binary message using the specified type.
     /// </summary>
     public static object Decode(Type type, ReadOnlySpan<byte> data)
+        => DecodeMessage(type, data);
+
+    /// <summary>
+    /// Attempts to deserialize <paramref name="data"/> into <typeparamref name="T"/>.
+    /// Returns <see langword="false"/> and sets <paramref name="error"/> when the payload
+    /// is malformed; never throws.
+    /// </summary>
+    /// <typeparam name="T">The target message type.</typeparam>
+    /// <param name="data">The raw protobuf bytes to decode.</param>
+    /// <param name="result">The decoded message, or <see langword="default"/> on failure.</param>
+    /// <param name="error">A human-readable error description, or <see langword="null"/> on success.</param>
+    /// <returns><see langword="true"/> when decoding succeeds.</returns>
+    public static bool TryDecode<T>(ReadOnlySpan<byte> data, out T? result, out string? error)
+        where T : new()
     {
-        return DecodeMessage(type, data);
+        try
+        {
+            result = Decode<T>(data);
+            error  = null;
+            return true;
+        }
+        catch (ProtobufDecodeException ex)
+        {
+            result = default;
+            error  = ex.Message;
+            return false;
+        }
+        catch (Exception ex)
+        {
+            result = default;
+            error  = ex.Message;
+            return false;
+        }
     }
 
     #endregion
@@ -491,85 +554,98 @@ public static class ProtobufEncoder
 
     #region Core decode
 
-    private static object DecodeMessage(Type type, ReadOnlySpan<byte> data)
+    /// <summary>
+    /// Maximum nesting depth for recursive message decoding.
+    /// Protobuf's own reference implementation uses 100; we use 512 to handle
+    /// deeply nested CLR object graphs while still bounding malformed payloads.
+    /// </summary>
+    private const int MaxNestingDepth = 512;
+
+    private static object DecodeMessage(Type type, ReadOnlySpan<byte> data, int depth = 0)
     {
+        if (depth > MaxNestingDepth)
+            throw new ProtobufDecodeException(
+                $"Maximum nesting depth ({MaxNestingDepth}) exceeded while decoding '{type.FullName}'. " +
+                "The payload may be malformed or contain a cyclic reference.", targetType: type);
+
         var instance = Activator.CreateInstance(type)
-            ?? throw new InvalidOperationException($"Cannot create instance of {type.FullName}.");
+            ?? throw new ProtobufDecodeException($"Cannot create instance of '{type.FullName}'.", targetType: type);
 
         var descriptors = ContractResolver.Resolve(type);
+        var lookup      = ContractResolver.ResolveLookup(type);
 
-        // For repeated fields, accumulate values in lists then assign at the end
-        var repeatedValues = new Dictionary<int, IList>();
+        // Accumulate repeated and map values; pre-size from known field count.
+        var repeatedValues = new Dictionary<int, IList>(4);
+        var mapValues      = new Dictionary<int, IDictionary>(4);
+
         foreach (var d in descriptors)
         {
-            if (d.IsCollection)
-                repeatedValues[d.FieldNumber] = CreateList(d.ElementType!);
+            if (d.IsCollection) repeatedValues[d.FieldNumber] = CreateList(d.ElementType!);
+            else if (d.IsMap)   mapValues[d.FieldNumber]      = CreateDictionary(d.MapKeyType!, d.MapValueType!);
         }
 
-        // For map fields, accumulate entries
-        var mapValues = new Dictionary<int, IDictionary>();
-        foreach (var d in descriptors)
-        {
-            if (d.IsMap)
-                mapValues[d.FieldNumber] = CreateDictionary(d.MapKeyType!, d.MapValueType!);
-        }
-
-        // Collect ProtoInclude mappings for this type
-        var includes = ContractResolver.GetIncludes(type);
-        var includeMap = new Dictionary<int, ProtoIncludeAttribute>();
+        // Collect ProtoInclude mappings for this type.
+        var includes   = ContractResolver.GetIncludes(type);
+        var includeMap = new Dictionary<int, ProtoIncludeAttribute>(includes.Length);
         foreach (var inc in includes)
             includeMap[inc.FieldNumber] = inc;
 
         int offset = 0;
         while (offset < data.Length)
         {
-            uint tag = (uint)ReadVarint(data, ref offset);
-            int fieldNumber = (int)(tag >> 3);
-            var wireType = (WireType)(tag & 0x07);
+            int  tagStart    = offset;
+            uint tag         = (uint)ReadVarintChecked(data, ref offset, type);
+            int  fieldNumber = (int)(tag >> 3);
+            var  wireType    = (WireType)(tag & 0x07);
 
-            // Check if this is a ProtoInclude derived type field
+            if (fieldNumber == 0)
+                throw new ProtobufDecodeException(
+                    "Decoded field number 0, which is not valid in protobuf.", tagStart, type);
+
+            // ProtoInclude derived-type nested message.
             if (includeMap.TryGetValue(fieldNumber, out var includeAttr))
             {
-                int length = (int)ReadVarint(data, ref offset);
+                int length = (int)ReadVarintChecked(data, ref offset, type);
+                if (length < 0 || offset + length > data.Length)
+                    throw new ProtobufDecodeException(
+                        $"Include field {fieldNumber} length {length} exceeds payload boundary.", offset, type);
+
                 var payload = data.Slice(offset, length);
                 offset += length;
 
-                // Decode the derived type's fields and apply them to the instance
-                // (instance may be a base type; we decode the derived fields into it)
                 var derivedDescriptors = GetDeclaredOnlyDescriptors(includeAttr.DerivedType);
-                ApplyDerivedFields(instance, derivedDescriptors, payload);
+                ApplyDerivedFields(instance, derivedDescriptors, payload, depth + 1);
                 continue;
             }
 
-            var field = Array.Find(descriptors, d => d.FieldNumber == fieldNumber);
-
-            if (field is null)
+            // O(1) lookup via FrozenDictionary — no linear scan.
+            if (!lookup.TryGetValue(fieldNumber, out var field))
             {
-                SkipField(data, wireType, ref offset);
+                SkipFieldChecked(data, wireType, ref offset, type);
                 continue;
             }
 
             if (field.IsMap)
             {
-                ReadMapEntry(data, field, ref offset, mapValues[fieldNumber]);
+                ReadMapEntry(data, field, ref offset, mapValues[fieldNumber], depth);
             }
             else if (field.IsCollection)
             {
-                ReadRepeatedField(data, field, wireType, ref offset, repeatedValues[fieldNumber]);
+                ReadRepeatedField(data, field, wireType, ref offset, repeatedValues[fieldNumber], depth);
             }
             else
             {
-                var value = ReadScalarValue(data, field, wireType, ref offset);
+                var value = ReadScalarValue(data, field, wireType, ref offset, depth);
                 field.Property.SetValue(instance, value);
             }
         }
 
-        // Assign collected repeated fields
+        // Assign collected repeated fields.
         foreach (var d in descriptors)
         {
             if (!d.IsCollection) continue;
 
-            var list = repeatedValues[d.FieldNumber];
+            var list     = repeatedValues[d.FieldNumber];
             var propType = d.Property.PropertyType;
 
             if (propType.IsArray)
@@ -584,16 +660,16 @@ public static class ProtobufEncoder
             }
             else
             {
-                // Try to create the concrete collection type and add items
                 var target = Activator.CreateInstance(propType) as IList
-                    ?? throw new InvalidOperationException($"Cannot populate {propType.FullName}.");
+                    ?? throw new ProtobufDecodeException(
+                        $"Cannot populate collection '{propType.FullName}'.", targetType: type);
                 foreach (var item in list)
                     target.Add(item);
                 d.Property.SetValue(instance, target);
             }
         }
 
-        // Assign collected map fields
+        // Assign collected map fields.
         foreach (var d in descriptors)
         {
             if (!d.IsMap) continue;
@@ -603,93 +679,99 @@ public static class ProtobufEncoder
         return instance;
     }
 
-    private static void ApplyDerivedFields(object instance, FieldDescriptor[] derivedDescriptors, ReadOnlySpan<byte> data)
+    private static void ApplyDerivedFields(object instance, FieldDescriptor[] derivedDescriptors, ReadOnlySpan<byte> data, int depth)
     {
+        // Build a local lookup for the derived descriptors slice.
+        var lookup = derivedDescriptors.ToFrozenDictionary(d => d.FieldNumber);
         int offset = 0;
         while (offset < data.Length)
         {
-            uint tag = (uint)ReadVarint(data, ref offset);
-            int fieldNumber = (int)(tag >> 3);
-            var wireType = (WireType)(tag & 0x07);
+            uint tag         = (uint)ReadVarintChecked(data, ref offset, instance.GetType());
+            int  fieldNumber = (int)(tag >> 3);
+            var  wireType    = (WireType)(tag & 0x07);
 
-            var field = Array.Find(derivedDescriptors, d => d.FieldNumber == fieldNumber);
-            if (field is null)
+            if (!lookup.TryGetValue(fieldNumber, out var field))
             {
-                SkipField(data, wireType, ref offset);
+                SkipFieldChecked(data, wireType, ref offset, instance.GetType());
                 continue;
             }
 
-            var value = ReadScalarValue(data, field, wireType, ref offset);
+            var value = ReadScalarValue(data, field, wireType, ref offset, depth);
             field.Property.SetValue(instance, value);
         }
     }
 
-    private static void ReadMapEntry(ReadOnlySpan<byte> data, FieldDescriptor field, ref int offset, IDictionary target)
+    private static void ReadMapEntry(ReadOnlySpan<byte> data, FieldDescriptor field, ref int offset, IDictionary target, int depth)
     {
-        // Map entry is a length-delimited message with key=1, value=2
-        int length = (int)ReadVarint(data, ref offset);
-        int end = offset + length;
+        int length = (int)ReadVarintChecked(data, ref offset, field.MapKeyType);
+        int end    = offset + length;
 
-        object? key = null;
+        if (end > data.Length)
+            throw new ProtobufDecodeException(
+                $"Map entry length {length} exceeds payload boundary.", offset, field.MapKeyType);
+
+        object? key   = null;
         object? value = null;
 
         while (offset < end)
         {
-            uint entryTag = (uint)ReadVarint(data, ref offset);
-            int entryField = (int)(entryTag >> 3);
-            var entryWire = (WireType)(entryTag & 0x07);
+            uint entryTag   = (uint)ReadVarintChecked(data, ref offset, field.MapKeyType);
+            int  entryField = (int)(entryTag >> 3);
+            var  entryWire  = (WireType)(entryTag & 0x07);
 
             if (entryField == 1)
-                key = ReadScalarForType(data, field.MapKeyType!, entryWire, ref offset);
+                key = ReadScalarForType(data, field.MapKeyType!, entryWire, ref offset, depth: depth);
             else if (entryField == 2)
-                value = ReadScalarForType(data, field.MapValueType!, entryWire, ref offset);
+                value = ReadScalarForType(data, field.MapValueType!, entryWire, ref offset, depth: depth);
             else
-                SkipField(data, entryWire, ref offset);
+                SkipFieldChecked(data, entryWire, ref offset, field.MapKeyType);
         }
 
         if (key is not null)
             target[key] = value;
     }
 
-    private static void ReadRepeatedField(ReadOnlySpan<byte> data, FieldDescriptor field, WireType wireType, ref int offset, IList target)
+    private static void ReadRepeatedField(ReadOnlySpan<byte> data, FieldDescriptor field, WireType wireType, ref int offset, IList target, int depth)
     {
-        var elementType = field.ElementType!;
+        var elementType     = field.ElementType!;
         var elementWireType = field.ElementWireType;
 
-        // Packed encoding: length-delimited blob containing packed scalars
         if (wireType == WireType.LengthDelimited && ContractResolver.IsPackable(elementWireType))
         {
-            int length = (int)ReadVarint(data, ref offset);
-            int end = offset + length;
+            int length = (int)ReadVarintChecked(data, ref offset, elementType);
+            int end    = offset + length;
+
+            if (end > data.Length)
+                throw new ProtobufDecodeException(
+                    $"Packed repeated field length {length} exceeds payload boundary.", offset, elementType);
+
             while (offset < end)
-            {
-                var value = ReadScalarForType(data, elementType, elementWireType, ref offset);
-                target.Add(value);
-            }
+                target.Add(ReadScalarForType(data, elementType, elementWireType, ref offset, depth: depth));
         }
         else
         {
-            // Non-packed: single element per tag occurrence
-            var value = ReadScalarForType(data, elementType, wireType, ref offset);
-            target.Add(value);
+            target.Add(ReadScalarForType(data, elementType, wireType, ref offset, depth: depth));
         }
     }
 
-    private static object? ReadScalarValue(ReadOnlySpan<byte> data, FieldDescriptor field, WireType wireType, ref int offset)
+    private static object? ReadScalarValue(ReadOnlySpan<byte> data, FieldDescriptor field, WireType wireType, ref int offset, int depth = 0)
     {
         var targetType = Nullable.GetUnderlyingType(field.Property.PropertyType) ?? field.Property.PropertyType;
-        return ReadScalarForType(data, targetType, wireType, ref offset, field.Encoding);
+        return ReadScalarForType(data, targetType, wireType, ref offset, field.Encoding, depth);
     }
 
-    private static object? ReadScalarForType(ReadOnlySpan<byte> data, Type targetType, WireType wireType, ref int offset, ProtoEncoding? encoding = null)
+    private static object? ReadScalarForType(ReadOnlySpan<byte> data, Type? targetType, WireType wireType, ref int offset, ProtoEncoding? encoding = null, int depth = 0)
     {
+        if (targetType is null)
+            throw new ProtobufDecodeException("Cannot decode field: target type is null.", offset);
+
         return wireType switch
         {
-            WireType.Varint => ConvertFromVarint(ReadVarint(data, ref offset), targetType),
-            WireType.Fixed32 => ReadFixed32Value(data, targetType, ref offset),
-            WireType.Fixed64 => ReadFixed64Value(data, targetType, ref offset),
-            WireType.LengthDelimited => ReadLengthDelimitedValue(data, targetType, ref offset, encoding),
-            _ => throw new NotSupportedException($"Wire type {wireType} is not supported.")
+            WireType.Varint          => ConvertFromVarint(ReadVarintChecked(data, ref offset, targetType), targetType),
+            WireType.Fixed32         => ReadFixed32Value(data, targetType, ref offset),
+            WireType.Fixed64         => ReadFixed64Value(data, targetType, ref offset),
+            WireType.LengthDelimited => ReadLengthDelimitedValue(data, targetType, ref offset, encoding, depth),
+            _ => throw new ProtobufDecodeException($"Unsupported wire type {(int)wireType}.", offset, targetType)
         };
     }
 
@@ -728,49 +810,51 @@ public static class ProtobufEncoder
 
     private static void WriteFixed32(Stream output, object value)
     {
-        byte[] bytes = value switch
+        Span<byte> buf = stackalloc byte[4];
+        switch (value)
         {
-            float f => BitConverter.GetBytes(f),
-            int i => BitConverter.GetBytes(i),
-            uint u => BitConverter.GetBytes(u),
-            _ => throw new NotSupportedException($"Cannot encode {value.GetType().Name} as fixed32.")
-        };
-        output.Write(bytes);
+            case float  f: BinaryPrimitives.WriteSingleLittleEndian(buf, f);  break;
+            case int    i: BinaryPrimitives.WriteInt32LittleEndian(buf, i);   break;
+            case uint   u: BinaryPrimitives.WriteUInt32LittleEndian(buf, u);  break;
+            default: throw new NotSupportedException($"Cannot encode {value.GetType().Name} as fixed32.");
+        }
+        output.Write(buf);
     }
 
     private static void WriteFixed64(Stream output, object value)
     {
-        byte[] bytes = value switch
+        Span<byte> buf = stackalloc byte[8];
+        switch (value)
         {
-            double d => BitConverter.GetBytes(d),
-            long l => BitConverter.GetBytes(l),
-            ulong u => BitConverter.GetBytes(u),
-            DateTime dt => BitConverter.GetBytes(dt.Ticks),
-            TimeSpan ts => BitConverter.GetBytes(ts.Ticks),
-            _ => throw new NotSupportedException($"Cannot encode {value.GetType().Name} as fixed64.")
-        };
-        output.Write(bytes);
+            case double   d:  BinaryPrimitives.WriteDoubleLittleEndian(buf, d);            break;
+            case long     l:  BinaryPrimitives.WriteInt64LittleEndian(buf, l);             break;
+            case ulong    u:  BinaryPrimitives.WriteUInt64LittleEndian(buf, u);            break;
+            case DateTime dt: BinaryPrimitives.WriteInt64LittleEndian(buf, dt.Ticks);      break;
+            case TimeSpan ts: BinaryPrimitives.WriteInt64LittleEndian(buf, ts.Ticks);      break;
+            default: throw new NotSupportedException($"Cannot encode {value.GetType().Name} as fixed64.");
+        }
+        output.Write(buf);
     }
 
     private static void WriteLengthDelimited(Stream output, object value, ProtoEncoding? encoding = null)
     {
         byte[] payload = value switch
         {
-            string s => (encoding?.Encoding ?? Encoding.UTF8).GetBytes(s),
-            byte[] b => b,
-            Guid g => g.ToByteArray(),
-            decimal d => Encoding.UTF8.GetBytes(d.ToString(CultureInfo.InvariantCulture)),
+            string s          => (encoding?.Encoding ?? Encoding.UTF8).GetBytes(s),
+            byte[] b          => b,
+            Guid g            => g.ToByteArray(),
+            decimal d         => Encoding.UTF8.GetBytes(d.ToString(CultureInfo.InvariantCulture)),
             DateTimeOffset dto => EncodeDateTimeOffset(dto),
-            DateOnly doVal => BitConverter.GetBytes(doVal.DayNumber),
-            TimeOnly toVal => BitConverter.GetBytes(toVal.Ticks),
-            Int128 i128 => EncodeInt128(i128),
-            UInt128 u128 => EncodeUInt128(u128),
-            Half h => BitConverter.GetBytes(h),
-            BigInteger bi => bi.ToByteArray(),
-            Complex c => EncodeComplex(c),
-            Version v => Encoding.UTF8.GetBytes(v.ToString()),
-            Uri u => Encoding.UTF8.GetBytes(u.AbsoluteUri),
-            _ => Encode(value) // Nested [ProtoContract] message (or implicit contract)
+            DateOnly doVal    => EncodeDateOnly(doVal),
+            TimeOnly toVal    => EncodeTimeOnly(toVal),
+            Int128 i128       => EncodeInt128(i128),
+            UInt128 u128      => EncodeUInt128(u128),
+            Half h            => EncodeHalf(h),
+            BigInteger bi     => bi.ToByteArray(),
+            Complex c         => EncodeComplex(c),
+            Version v         => Encoding.UTF8.GetBytes(v.ToString()),
+            Uri u             => Encoding.UTF8.GetBytes(u.AbsoluteUri),
+            _                 => Encode(value) // Nested [ProtoContract] message (or implicit contract)
         };
 
         WriteVarint(output, (ulong)payload.Length);
@@ -779,10 +863,31 @@ public static class ProtobufEncoder
 
     private static byte[] EncodeDateTimeOffset(DateTimeOffset dto)
     {
-        var bytes = new byte[16];
-        BitConverter.TryWriteBytes(bytes.AsSpan(0, 8), dto.Ticks);
-        BitConverter.TryWriteBytes(bytes.AsSpan(8, 8), dto.Offset.Ticks);
-        return bytes;
+        var buf = new byte[16];
+        BinaryPrimitives.WriteInt64LittleEndian(buf.AsSpan(0, 8), dto.Ticks);
+        BinaryPrimitives.WriteInt64LittleEndian(buf.AsSpan(8, 8), dto.Offset.Ticks);
+        return buf;
+    }
+
+    private static byte[] EncodeDateOnly(DateOnly d)
+    {
+        var buf = new byte[4];
+        BinaryPrimitives.WriteInt32LittleEndian(buf, d.DayNumber);
+        return buf;
+    }
+
+    private static byte[] EncodeTimeOnly(TimeOnly t)
+    {
+        var buf = new byte[8];
+        BinaryPrimitives.WriteInt64LittleEndian(buf, t.Ticks);
+        return buf;
+    }
+
+    private static byte[] EncodeHalf(Half h)
+    {
+        var buf = new byte[2];
+        BinaryPrimitives.WriteHalfLittleEndian(buf, h);
+        return buf;
     }
 
     private static byte[] EncodeInt128(Int128 val)
@@ -811,23 +916,6 @@ public static class ProtobufEncoder
 
     #region Read helpers
 
-    private static ulong ReadVarint(ReadOnlySpan<byte> data, ref int offset)
-    {
-        ulong result = 0;
-        int shift = 0;
-
-        while (offset < data.Length)
-        {
-            byte b = data[offset++];
-            result |= (ulong)(b & 0x7F) << shift;
-            if ((b & 0x80) == 0)
-                return result;
-            shift += 7;
-        }
-
-        throw new InvalidOperationException("Unexpected end of data while reading varint.");
-    }
-
     private static bool TryReadVarintFromStream(Stream stream, out ulong value)
     {
         value = 0;
@@ -850,96 +938,151 @@ public static class ProtobufEncoder
         }
     }
 
+    /// <summary>
+    /// Varint reader that throws <see cref="ProtobufDecodeException"/> on truncation or
+    /// overflow (shift past bit 63).
+    /// </summary>
+    private static ulong ReadVarintChecked(ReadOnlySpan<byte> data, ref int offset, Type? targetType)
+    {
+        ulong result = 0;
+        int   shift  = 0;
+
+        while (offset < data.Length)
+        {
+            if (shift >= 64)
+                throw new ProtobufDecodeException(
+                    "Varint overflows 64 bits — payload is malformed.", offset, targetType);
+
+            byte b = data[offset++];
+            result |= (ulong)(b & 0x7F) << shift;
+
+            if ((b & 0x80) == 0)
+                return result;
+
+            shift += 7;
+        }
+
+        throw new ProtobufDecodeException(
+            "Unexpected end of payload while reading varint.", offset, targetType);
+    }
+
     private static object ConvertFromVarint(ulong raw, Type targetType)
     {
-        if (targetType == typeof(bool)) return raw != 0;
-        if (targetType == typeof(byte)) return (byte)raw;
-        if (targetType == typeof(sbyte)) return (sbyte)(long)raw;
-        if (targetType == typeof(short)) return (short)(long)raw;
+        if (targetType == typeof(bool))   return raw != 0;
+        if (targetType == typeof(byte))   return (byte)raw;
+        if (targetType == typeof(sbyte))  return (sbyte)(long)raw;
+        if (targetType == typeof(short))  return (short)(long)raw;
         if (targetType == typeof(ushort)) return (ushort)raw;
-        if (targetType == typeof(int)) return (int)(long)raw;
-        if (targetType == typeof(uint)) return (uint)raw;
-        if (targetType == typeof(long)) return (long)raw;
-        if (targetType == typeof(ulong)) return raw;
-        if (targetType == typeof(nint)) return (nint)(long)raw;
-        if (targetType == typeof(nuint)) return (nuint)raw;
-        if (targetType.IsEnum) return Enum.ToObject(targetType, raw);
-        throw new NotSupportedException($"Cannot convert varint to {targetType.Name}.");
+        if (targetType == typeof(int))    return (int)(long)raw;
+        if (targetType == typeof(uint))   return (uint)raw;
+        if (targetType == typeof(long))   return (long)raw;
+        if (targetType == typeof(ulong))  return raw;
+        if (targetType == typeof(nint))   return (nint)(long)raw;
+        if (targetType == typeof(nuint))  return (nuint)raw;
+        if (targetType.IsEnum)            return Enum.ToObject(targetType, raw);
+        throw new ProtobufDecodeException($"Cannot convert varint to '{targetType.Name}'.", targetType: targetType);
     }
 
     private static object ReadFixed32Value(ReadOnlySpan<byte> data, Type targetType, ref int offset)
     {
-        var bytes = data.Slice(offset, 4);
+        if (offset + 4 > data.Length)
+            throw new ProtobufDecodeException(
+                $"Fixed32 read requires 4 bytes but only {data.Length - offset} remain.", offset, targetType);
+
+        var span = data.Slice(offset, 4);
         offset += 4;
-        if (targetType == typeof(float)) return BitConverter.ToSingle(bytes);
-        if (targetType == typeof(int)) return BitConverter.ToInt32(bytes);
-        if (targetType == typeof(uint)) return BitConverter.ToUInt32(bytes);
-        throw new NotSupportedException($"Cannot read fixed32 as {targetType.Name}.");
+
+        if (targetType == typeof(float)) return BinaryPrimitives.ReadSingleLittleEndian(span);
+        if (targetType == typeof(int))   return BinaryPrimitives.ReadInt32LittleEndian(span);
+        if (targetType == typeof(uint))  return BinaryPrimitives.ReadUInt32LittleEndian(span);
+        throw new ProtobufDecodeException($"Cannot read fixed32 as '{targetType.Name}'.", offset, targetType);
     }
 
     private static object ReadFixed64Value(ReadOnlySpan<byte> data, Type targetType, ref int offset)
     {
-        var bytes = data.Slice(offset, 8);
+        if (offset + 8 > data.Length)
+            throw new ProtobufDecodeException(
+                $"Fixed64 read requires 8 bytes but only {data.Length - offset} remain.", offset, targetType);
+
+        var span = data.Slice(offset, 8);
         offset += 8;
-        if (targetType == typeof(double)) return BitConverter.ToDouble(bytes);
-        if (targetType == typeof(long)) return BitConverter.ToInt64(bytes);
-        if (targetType == typeof(ulong)) return BitConverter.ToUInt64(bytes);
-        if (targetType == typeof(DateTime)) return new DateTime(BitConverter.ToInt64(bytes));
-        if (targetType == typeof(TimeSpan)) return new TimeSpan(BitConverter.ToInt64(bytes));
-        throw new NotSupportedException($"Cannot read fixed64 as {targetType.Name}.");
+
+        if (targetType == typeof(double))   return BinaryPrimitives.ReadDoubleLittleEndian(span);
+        if (targetType == typeof(long))     return BinaryPrimitives.ReadInt64LittleEndian(span);
+        if (targetType == typeof(ulong))    return BinaryPrimitives.ReadUInt64LittleEndian(span);
+        if (targetType == typeof(DateTime)) return new DateTime(BinaryPrimitives.ReadInt64LittleEndian(span));
+        if (targetType == typeof(TimeSpan)) return new TimeSpan(BinaryPrimitives.ReadInt64LittleEndian(span));
+        throw new ProtobufDecodeException($"Cannot read fixed64 as '{targetType.Name}'.", offset, targetType);
     }
 
-    private static object? ReadLengthDelimitedValue(ReadOnlySpan<byte> data, Type targetType, ref int offset, ProtoEncoding? encoding = null)
+    private static object? ReadLengthDelimitedValue(ReadOnlySpan<byte> data, Type targetType, ref int offset, ProtoEncoding? encoding = null, int depth = 0)
     {
-        int length = (int)ReadVarint(data, ref offset);
+        int length = (int)ReadVarintChecked(data, ref offset, targetType);
+
+        if (length < 0 || offset + length > data.Length)
+            throw new ProtobufDecodeException(
+                $"Length-delimited field length {length} exceeds payload boundary.", offset, targetType);
+
         var payload = data.Slice(offset, length);
         offset += length;
 
-        if (targetType == typeof(string)) return (encoding?.Encoding ?? Encoding.UTF8).GetString(payload);
-        if (targetType == typeof(byte[])) return payload.ToArray();
-        if (targetType == typeof(Guid)) return new Guid(payload);
-        if (targetType == typeof(decimal)) return decimal.Parse(Encoding.UTF8.GetString(payload), CultureInfo.InvariantCulture);
+        if (targetType == typeof(string))        return (encoding?.Encoding ?? Encoding.UTF8).GetString(payload);
+        if (targetType == typeof(byte[]))        return payload.ToArray();
+        if (targetType == typeof(Guid))          return new Guid(payload);
+        if (targetType == typeof(decimal))       return decimal.Parse(Encoding.UTF8.GetString(payload), CultureInfo.InvariantCulture);
         if (targetType == typeof(DateTimeOffset)) return DecodeDateTimeOffset(payload);
-        if (targetType == typeof(DateOnly)) return DateOnly.FromDayNumber(BitConverter.ToInt32(payload));
-        if (targetType == typeof(TimeOnly)) return new TimeOnly(BitConverter.ToInt64(payload));
-        if (targetType == typeof(Int128)) return BinaryPrimitives.ReadInt128LittleEndian(payload);
-        if (targetType == typeof(UInt128)) return BinaryPrimitives.ReadUInt128LittleEndian(payload);
-        if (targetType == typeof(Half)) return BinaryPrimitives.ReadHalfLittleEndian(payload);
-        if (targetType == typeof(BigInteger)) return new BigInteger(payload);
-        if (targetType == typeof(Complex)) return new Complex(BinaryPrimitives.ReadDoubleLittleEndian(payload.Slice(0, 8)), BinaryPrimitives.ReadDoubleLittleEndian(payload.Slice(8, 8)));
-        if (targetType == typeof(Version)) return Version.Parse(Encoding.UTF8.GetString(payload));
-        if (targetType == typeof(Uri)) return new Uri(Encoding.UTF8.GetString(payload));
+        if (targetType == typeof(DateOnly))      return DateOnly.FromDayNumber(BinaryPrimitives.ReadInt32LittleEndian(payload));
+        if (targetType == typeof(TimeOnly))      return new TimeOnly(BinaryPrimitives.ReadInt64LittleEndian(payload));
+        if (targetType == typeof(Int128))        return BinaryPrimitives.ReadInt128LittleEndian(payload);
+        if (targetType == typeof(UInt128))       return BinaryPrimitives.ReadUInt128LittleEndian(payload);
+        if (targetType == typeof(Half))          return BinaryPrimitives.ReadHalfLittleEndian(payload);
+        if (targetType == typeof(BigInteger))    return new BigInteger(payload);
+        if (targetType == typeof(Complex))       return new Complex(
+            BinaryPrimitives.ReadDoubleLittleEndian(payload.Slice(0, 8)),
+            BinaryPrimitives.ReadDoubleLittleEndian(payload.Slice(8, 8)));
+        if (targetType == typeof(Version))       return Version.Parse(Encoding.UTF8.GetString(payload));
+        if (targetType == typeof(Uri))           return new Uri(Encoding.UTF8.GetString(payload));
 
-        // Nested message
-        return DecodeMessage(targetType, payload);
+        // Nested message — recurse with incremented depth.
+        return DecodeMessage(targetType, payload, depth + 1);
     }
 
     private static DateTimeOffset DecodeDateTimeOffset(ReadOnlySpan<byte> payload)
     {
-        long ticks = BitConverter.ToInt64(payload.Slice(0, 8));
-        long offsetTicks = BitConverter.ToInt64(payload.Slice(8, 8));
+        long ticks       = BinaryPrimitives.ReadInt64LittleEndian(payload.Slice(0, 8));
+        long offsetTicks = BinaryPrimitives.ReadInt64LittleEndian(payload.Slice(8, 8));
         return new DateTimeOffset(ticks, new TimeSpan(offsetTicks));
     }
 
-    private static void SkipField(ReadOnlySpan<byte> data, WireType wireType, ref int offset)
+    /// <summary>
+    /// Skips a field of the given wire type with full bounds validation.
+    /// Throws <see cref="ProtobufDecodeException"/> on malformed wire type or truncated data.
+    /// </summary>
+    private static void SkipFieldChecked(ReadOnlySpan<byte> data, WireType wireType, ref int offset, Type? targetType)
     {
         switch (wireType)
         {
             case WireType.Varint:
-                ReadVarint(data, ref offset);
+                ReadVarintChecked(data, ref offset, targetType);
                 break;
             case WireType.Fixed64:
+                if (offset + 8 > data.Length)
+                    throw new ProtobufDecodeException("Truncated fixed64 field during skip.", offset, targetType);
                 offset += 8;
                 break;
             case WireType.Fixed32:
+                if (offset + 4 > data.Length)
+                    throw new ProtobufDecodeException("Truncated fixed32 field during skip.", offset, targetType);
                 offset += 4;
                 break;
             case WireType.LengthDelimited:
-                int length = (int)ReadVarint(data, ref offset);
-                offset += length;
+                int len = (int)ReadVarintChecked(data, ref offset, targetType);
+                if (len < 0 || offset + len > data.Length)
+                    throw new ProtobufDecodeException($"Skip: length-delimited field length {len} exceeds boundary.", offset, targetType);
+                offset += len;
                 break;
             default:
-                throw new NotSupportedException($"Cannot skip unknown wire type {wireType}.");
+                throw new ProtobufDecodeException($"Cannot skip unknown wire type {(int)wireType}.", offset, targetType);
         }
     }
 
