@@ -6,9 +6,16 @@
 		<Nullable>enable</Nullable>
 		<EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
 		<IsRoslynComponent>true</IsRoslynComponent>
+
+		<!-- Analyzer packages should not place the DLL in lib/ -->
 		<IncludeBuildOutput>false</IncludeBuildOutput>
+
+		<!-- Fine for analyzer packages if you want no dependency flow -->
 		<DevelopmentDependency>true</DevelopmentDependency>
 		<SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+
+		<!-- Optional but usually desirable -->
+		<NoPackageAnalysis>true</NoPackageAnalysis>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -19,6 +26,13 @@
 	<ItemGroup>
 		<AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
 		<AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
+	</ItemGroup>
+
+	<!-- Explicitly add the built analyzer assembly to the package -->
+	<ItemGroup>
+		<None Include="$(OutputPath)$(AssemblyName).dll"
+		      Pack="true"
+		      PackagePath="analyzers/dotnet/cs" />
 	</ItemGroup>
 
 </Project>
