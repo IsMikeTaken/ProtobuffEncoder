@@ -4,12 +4,11 @@ A high-performance Protobuf binary wire format encoder and decoder for .NET 8, 9
 
 ## Features
 
-- **High Performance**: Optimized for speed and low allocations.
-- **Multi-Targeting**: Native support for .NET 8.0, 9.0, and 10.0.
-- **Full Protobuf Support**: Scalars, nullable types, collections, maps, nested messages, oneof, inheritance, and more.
-- **Streaming**: Built-in support for length-delimited streaming.
-- **Static Message Delegates**: Pre-compiled encoders and decoders for maximum performance.
-- **AOT Friendly**: Designed with AOT compatibility in mind.
+- High-performance core encoding, decoding, and streaming primitives.
+- Multi-targeting for .NET 8.0, 9.0, and 10.0.
+- Schema generation and parsing for messages, enums, maps, oneof, and services.
+- ASP.NET Core integration for REST, WebSocket, and gRPC transports.
+- Fluent setup API with configuration-bound `ProtobufEncoderOptions` support.
 
 ## Quick Start
 
@@ -24,17 +23,27 @@ public class MyMessage
     public int Id { get; set; }
 
     [ProtoField(2)]
-    public string Name { get; set; }
+    public string Name { get; set; } = "";
 }
 
 var message = new MyMessage { Id = 1, Name = "Hello Protobuf" };
-
-// Encode
 byte[] data = ProtobufEncoder.Encode(message);
-
-// Decode
 var decoded = ProtobufEncoder.Decode<MyMessage>(data);
 ```
+
+## ASP.NET Core Setup
+
+```csharp
+using ProtobuffEncoder.AspNetCore.Setup;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddProtobuffEncoder(builder.Configuration)
+    .WithRestFormatters();
+```
+
+The configuration overload binds the default `ProtobuffEncoder` section while preserving the existing
+fluent builder for transport registration.
 
 ## Installation
 

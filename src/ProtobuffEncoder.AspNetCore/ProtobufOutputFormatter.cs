@@ -12,7 +12,7 @@ namespace ProtobuffEncoder.AspNetCore;
 /// <para>
 /// Encodes the model to a <c>byte[]</c> and writes it through
 /// <see cref="PipeWriter"/> so Kestrel can flush the data without an
-/// intermediate copy.  <see cref="HttpResponse.ContentLength"/> is set
+/// intermediate copy. Response content length is set
 /// so clients and proxies can pre-allocate receive buffers.
 /// </para>
 /// <para>
@@ -54,3 +54,4 @@ public sealed class ProtobufOutputFormatter : OutputFormatter
         await writer.WriteAsync(bytes, context.HttpContext.RequestAborted);
     }
 }
+

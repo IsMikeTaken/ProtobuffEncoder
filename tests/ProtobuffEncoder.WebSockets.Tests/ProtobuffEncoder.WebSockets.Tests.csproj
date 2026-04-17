@@ -1,10 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <IsPackable>false</IsPackable>
-    <!-- Suppress obsolete warnings in legacy-API tests — these tests intentionally exercise the v1 path -->
+    <!-- Suppress obsolete warnings — these tests intentionally exercise the deprecated v1 path -->
     <NoWarn>$(NoWarn);CS0618</NoWarn>
   </PropertyGroup>
   <ItemGroup>

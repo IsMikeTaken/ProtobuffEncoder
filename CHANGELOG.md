@@ -168,3 +168,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - gRPC and WebSocket transport layers.
 - ASP.NET Core MVC and HttpClient integration.
 - `.proto` schema auto-generation.
+

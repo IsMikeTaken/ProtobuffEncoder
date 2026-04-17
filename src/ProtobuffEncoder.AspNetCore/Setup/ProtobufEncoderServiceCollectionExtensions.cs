@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
@@ -39,22 +40,71 @@ public static class ProtobufEncoderServiceCollectionExtensions
         this IServiceCollection services,
         Action<ProtobufEncoderOptions>? configure = null)
     {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.AddOptions<ProtobufEncoderOptions>();
+        if (configure is not null)
+        {
+            services.Configure(configure);
+        }
+
         var options = new ProtobufEncoderOptions();
         configure?.Invoke(options);
+        return AddProtobuffEncoderCore(services, options);
+    }
 
-        // Register as IOptions<T> for injection
-        services.TryAddSingleton(Microsoft.Extensions.Options.Options.Create(options));
-        services.TryAddSingleton(options);
+    /// <summary>
+    /// Registers the ProtobuffEncoder framework using configuration-bound options from the provided section.
+    /// </summary>
+    /// <param name="services">The target service collection.</param>
+    /// <param name="section">The configuration section to bind to <see cref="ProtobufEncoderOptions"/>.</param>
+    /// <returns>A fluent builder for configuring transports.</returns>
+    public static ProtobufEncoderBuilder AddProtobuffEncoder(
+        this IServiceCollection services,
+        IConfigurationSection section)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(section);
+
+        services.AddOptions<ProtobufEncoderOptions>()
+            .Bind(section);
+
+        var options = new ProtobufEncoderOptions();
+        section.Bind(options);
+        return AddProtobuffEncoderCore(services, options);
+    }
+
+    /// <summary>
+    /// Registers the ProtobuffEncoder framework using a named configuration section.
+    /// </summary>
+    /// <param name="services">The target service collection.</param>
+    /// <param name="configuration">The configuration root that contains the section.</param>
+    /// <param name="sectionName">The section name. Defaults to <c>ProtobuffEncoder</c>.</param>
+    /// <returns>A fluent builder for configuring transports.</returns>
+    public static ProtobufEncoderBuilder AddProtobuffEncoder(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        string sectionName = "ProtobuffEncoder")
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        return AddProtobuffEncoder(services, configuration.GetSection(sectionName));
+    }
+
+    private static ProtobufEncoderBuilder AddProtobuffEncoderCore(
+        IServiceCollection services,
+        ProtobufEncoderOptions options)
+    {
+        services.TryAddSingleton(static serviceProvider =>
+            serviceProvider.GetRequiredService<IOptions<ProtobufEncoderOptions>>().Value);
 
         var encoderBuilder = new ProtobufEncoderBuilder(services, options);
 
-        // Auto-add REST formatters when enabled via options
         if (options.EnableMvcFormatters)
+        {
             encoderBuilder.WithRestFormatters();
+        }
 
-        // Register the builder itself so MapProtobufEndpoints() can access it
         services.TryAddSingleton(encoderBuilder);
-
         return encoderBuilder;
     }
 }

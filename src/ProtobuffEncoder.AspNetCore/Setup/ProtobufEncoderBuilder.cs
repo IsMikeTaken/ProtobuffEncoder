@@ -6,7 +6,7 @@ namespace ProtobuffEncoder.AspNetCore.Setup;
 
 /// <summary>
 /// Fluent builder for configuring the ProtobuffEncoder framework in an ASP.NET Core application.
-/// Returned by <see cref="ProtobufEncoderServiceCollectionExtensions.AddProtobuffEncoder"/>.
+/// Returned by the ProtobuffEncoder service-collection registration extensions.
 /// <para>
 /// Follows the strategy pattern: each transport (REST, WebSocket, gRPC) is an
 /// <see cref="IProtobufTransportStrategy"/> that encapsulates its own DI and endpoint setup.
@@ -109,3 +109,4 @@ public sealed class ProtobufEncoderBuilder
     /// <summary>The registered strategies (for inspection/testing).</summary>
     public IReadOnlyList<IProtobufTransportStrategy> Strategies => _strategies.AsReadOnly();
 }
+

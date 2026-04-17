@@ -13,7 +13,7 @@ namespace ProtobuffEncoder.WebSockets;
 /// </para>
 /// <para>
 /// <see cref="BroadcastAsync(TSend,CancellationToken)"/> uses
-/// <see cref="Parallel.ForEachAsync{TSource}"/> to fan out sends concurrently on
+/// <c>Parallel.ForEachAsync</c> to fan out sends concurrently on
 /// the thread-pool without the LINQ-allocation overhead of
 /// <c>Task.WhenAll(snapshot.Select(…))</c>.
 /// Failed sends are silently removed from the registry.
@@ -62,7 +62,7 @@ public sealed class WebSocketConnectionManager<TSend, TReceive>
     /// <paramref name="predicate"/> (e.g. exclude the sender).
     /// </summary>
     /// <remarks>
-    /// Uses <see cref="Parallel.ForEachAsync{TSource}"/> for concurrent fan-out
+    /// Uses <c>Parallel.ForEachAsync</c> for concurrent fan-out
     /// without allocating a LINQ projection or a <c>Task[]</c> array.
     /// Failed sends are silently removed from the registry.
     /// </remarks>
@@ -93,7 +93,7 @@ public sealed class WebSocketConnectionManager<TSend, TReceive>
             {
                 try
                 {
-                    await conn.SendAsync(message, ct).ConfigureAwait(false);
+                    await conn.SendDirectAsync(message, ct).ConfigureAwait(false);
                 }
                 catch
                 {
@@ -108,3 +108,5 @@ public sealed class WebSocketConnectionManager<TSend, TReceive>
     internal void Remove(string connectionId)
         => _connections.TryRemove(connectionId, out _);
 }
+
+

@@ -1,20 +1,11 @@
-name: Publish to NuGet
-
+# RETIRED — superseded by ci-release.yml (push to master).
+# This file is kept as a no-op so existing branch protection rules referencing
+# "Publish to NuGet" continue to resolve without error.
+name: Publish to NuGet (retired)
 on:
-  push:
-    branches: [ master, preview ]
-    paths-ignore:
-      - 'docs/**'
-      - 'writerside/**'
-  workflow_dispatch: # Allows manual trigger
-
+  workflow_dispatch:
 jobs:
-  publish:
-    name: Build, Test and Publish
-    uses: ./.github/workflows/_build-test-pack.yml
-    with:
-      version_suffix: >-
-        ${{ github.ref == 'refs/heads/master' && '' || format('beta.{0}', github.run_number) }}
-      push_to_nuget: true
-    secrets:
-      NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+  retired:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "This workflow is retired. See ci-release.yml."

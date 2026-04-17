@@ -4,7 +4,7 @@ namespace ProtobuffEncoder.WebSockets;
 
 /// <summary>
 /// Configures behavior for a protobuf WebSocket endpoint registered via
-/// <see cref="WebSocketEndpointRouteBuilderExtensions.MapProtobufWebSocket{TSend, TReceive}"/>.
+/// the WebSocket endpoint mapping extensions.
 /// </summary>
 public sealed class ProtobufWebSocketOptions<TSend, TReceive>
     where TSend : class, new()
@@ -64,3 +64,4 @@ public sealed class ProtobufWebSocketOptions<TSend, TReceive>
     /// </remarks>
     public TimeSpan KeepAliveInterval { get; set; } = TimeSpan.Zero;
 }
+

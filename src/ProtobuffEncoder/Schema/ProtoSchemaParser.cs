@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+using System.Globalization;
 
 namespace ProtobuffEncoder.Schema;
 
@@ -8,42 +8,46 @@ namespace ProtobuffEncoder.Schema;
 /// </summary>
 public static partial class ProtoSchemaParser
 {
+    /// <summary>
+    /// Parses a .proto document from an in-memory string.
+    /// </summary>
     public static ProtoFile Parse(string protoContent)
     {
+        ArgumentNullException.ThrowIfNull(protoContent);
+
         var file = new ProtoFile();
-        var lines = protoContent.Split('\n').Select(l => l.Trim()).ToList();
+        var lines = new ProtoLineCollection(protoContent);
 
-        int i = 0;
-        while (i < lines.Count)
+        int lineIndex = 0;
+        while (lineIndex < lines.Count)
         {
-            var line = lines[i];
-
-            if (line.StartsWith("syntax"))
+            var line = lines[lineIndex];
+            if (line.IsEmpty)
             {
-                var match = SyntaxRegex().Match(line);
-                if (match.Success)
-                    file.Syntax = match.Groups[1].Value;
-            }
-            else if (line.StartsWith("package"))
-            {
-                var match = PackageRegex().Match(line);
-                if (match.Success)
-                    file.Package = match.Groups[1].Value;
-            }
-            else if (line.StartsWith("message"))
-            {
-                var msg = ParseMessage(lines, ref i);
-                file.Messages.Add(msg);
-                continue; // ParseMessage advances i past the closing brace
-            }
-            else if (line.StartsWith("enum"))
-            {
-                var enumDef = ParseEnum(lines, ref i);
-                file.Enums.Add(enumDef);
+                lineIndex++;
                 continue;
             }
 
-            i++;
+            if (TryParseSyntax(line, out var syntax))
+            {
+                file.Syntax = syntax;
+            }
+            else if (TryParsePackage(line, out var packageName))
+            {
+                file.Package = packageName;
+            }
+            else if (TryParseBlockName(line, "message", out _))
+            {
+                file.Messages.Add(ParseMessage(lines, ref lineIndex));
+                continue;
+            }
+            else if (TryParseBlockName(line, "enum", out _))
+            {
+                file.Enums.Add(ParseEnum(lines, ref lineIndex));
+                continue;
+            }
+
+            lineIndex++;
         }
 
         return file;
@@ -68,176 +72,511 @@ public static partial class ProtoSchemaParser
         {
             results.Add(ParseFile(file));
         }
+
         return results;
     }
 
-    private static ProtoMessageDef ParseMessage(List<string> lines, ref int i)
+    private static ProtoMessageDef ParseMessage(ProtoLineCollection lines, ref int lineIndex)
     {
-        var match = MessageRegex().Match(lines[i]);
-        var msg = new ProtoMessageDef { Name = match.Groups[1].Value };
-        i++; // skip "message Name {"
-
-        while (i < lines.Count)
+        if (!TryParseBlockName(lines[lineIndex], "message", out var messageName))
         {
-            var line = lines[i];
-
-            if (line == "}" || line.StartsWith('}'))
-            {
-                i++;
-                return msg;
-            }
-
-            if (line.StartsWith("message"))
-            {
-                msg.NestedMessages.Add(ParseMessage(lines, ref i));
-                continue;
-            }
-
-            if (line.StartsWith("enum"))
-            {
-                msg.NestedEnums.Add(ParseEnum(lines, ref i));
-                continue;
-            }
-
-            // oneof block
-            if (line.StartsWith("oneof"))
-            {
-                var oneOf = ParseOneOf(lines, ref i);
-                msg.OneOfs.Add(oneOf);
-                continue;
-            }
-
-            // map<K, V> field
-            var mapMatch = MapFieldRegex().Match(line);
-            if (mapMatch.Success)
-            {
-                bool isDeprecated = line.Contains("[deprecated = true]");
-                msg.Fields.Add(new ProtoFieldDef
-                {
-                    IsMap = true,
-                    MapKeyType = mapMatch.Groups[1].Value,
-                    MapValueType = mapMatch.Groups[2].Value,
-                    Name = mapMatch.Groups[3].Value,
-                    FieldNumber = int.Parse(mapMatch.Groups[4].Value),
-                    IsDeprecated = isDeprecated
-                });
-                i++;
-                continue;
-            }
-
-            // Regular field
-            var fieldMatch = FieldRegex().Match(line);
-            if (fieldMatch.Success)
-            {
-                bool isRepeated = fieldMatch.Groups[1].Value == "repeated";
-                bool isOptional = fieldMatch.Groups[1].Value == "optional";
-                bool isDeprecated = line.Contains("[deprecated = true]");
-                msg.Fields.Add(new ProtoFieldDef
-                {
-                    IsRepeated = isRepeated,
-                    IsOptional = isOptional,
-                    TypeName = fieldMatch.Groups[2].Value,
-                    Name = fieldMatch.Groups[3].Value,
-                    FieldNumber = int.Parse(fieldMatch.Groups[4].Value),
-                    IsDeprecated = isDeprecated
-                });
-            }
-
-            i++;
+            throw new FormatException($"Invalid message declaration at line index {lineIndex}.");
         }
 
-        return msg;
+        var message = new ProtoMessageDef { Name = messageName };
+        lineIndex++;
+
+        while (lineIndex < lines.Count)
+        {
+            var line = lines[lineIndex];
+            if (line.IsEmpty)
+            {
+                lineIndex++;
+                continue;
+            }
+
+            if (IsClosingBrace(line))
+            {
+                lineIndex++;
+                return message;
+            }
+
+            if (TryParseBlockName(line, "message", out _))
+            {
+                message.NestedMessages.Add(ParseMessage(lines, ref lineIndex));
+                continue;
+            }
+
+            if (TryParseBlockName(line, "enum", out _))
+            {
+                message.NestedEnums.Add(ParseEnum(lines, ref lineIndex));
+                continue;
+            }
+
+            if (TryParseBlockName(line, "oneof", out _))
+            {
+                message.OneOfs.Add(ParseOneOf(lines, ref lineIndex));
+                continue;
+            }
+
+            if (TryParseMapField(line, out var mapField))
+            {
+                message.Fields.Add(mapField);
+                lineIndex++;
+                continue;
+            }
+
+            if (TryParseField(line, out var field))
+            {
+                message.Fields.Add(field);
+            }
+
+            lineIndex++;
+        }
+
+        return message;
     }
 
-    private static ProtoOneOfDef ParseOneOf(List<string> lines, ref int i)
+    private static ProtoOneOfDef ParseOneOf(ProtoLineCollection lines, ref int lineIndex)
     {
-        var match = OneOfRegex().Match(lines[i]);
-        var oneOf = new ProtoOneOfDef { Name = match.Groups[1].Value };
-        i++; // skip "oneof name {"
-
-        while (i < lines.Count)
+        if (!TryParseBlockName(lines[lineIndex], "oneof", out var oneOfName))
         {
-            var line = lines[i];
+            throw new FormatException($"Invalid oneof declaration at line index {lineIndex}.");
+        }
 
-            if (line == "}" || line.StartsWith('}'))
+        var oneOf = new ProtoOneOfDef { Name = oneOfName };
+        lineIndex++;
+
+        while (lineIndex < lines.Count)
+        {
+            var line = lines[lineIndex];
+            if (line.IsEmpty)
             {
-                i++;
+                lineIndex++;
+                continue;
+            }
+
+            if (IsClosingBrace(line))
+            {
+                lineIndex++;
                 return oneOf;
             }
 
-            var fieldMatch = FieldRegex().Match(line);
-            if (fieldMatch.Success)
+            if (TryParseField(line, out var field))
             {
-                bool isDeprecated = line.Contains("[deprecated = true]");
-                oneOf.Fields.Add(new ProtoFieldDef
-                {
-                    TypeName = fieldMatch.Groups[2].Value,
-                    Name = fieldMatch.Groups[3].Value,
-                    FieldNumber = int.Parse(fieldMatch.Groups[4].Value),
-                    OneOfGroup = oneOf.Name,
-                    IsDeprecated = isDeprecated
-                });
+                field.OneOfGroup = oneOf.Name;
+                oneOf.Fields.Add(field);
             }
 
-            i++;
+            lineIndex++;
         }
 
         return oneOf;
     }
 
-    private static ProtoEnumDef ParseEnum(List<string> lines, ref int i)
+    private static ProtoEnumDef ParseEnum(ProtoLineCollection lines, ref int lineIndex)
     {
-        var match = EnumRegex().Match(lines[i]);
-        var enumDef = new ProtoEnumDef { Name = match.Groups[1].Value };
-        i++; // skip "enum Name {"
-
-        while (i < lines.Count)
+        if (!TryParseBlockName(lines[lineIndex], "enum", out var enumName))
         {
-            var line = lines[i];
+            throw new FormatException($"Invalid enum declaration at line index {lineIndex}.");
+        }
 
-            if (line == "}" || line.StartsWith('}'))
+        var enumDef = new ProtoEnumDef { Name = enumName };
+        lineIndex++;
+
+        while (lineIndex < lines.Count)
+        {
+            var line = lines[lineIndex];
+            if (line.IsEmpty)
             {
-                i++;
+                lineIndex++;
+                continue;
+            }
+
+            if (IsClosingBrace(line))
+            {
+                lineIndex++;
                 return enumDef;
             }
 
-            var valueMatch = EnumValueRegex().Match(line);
-            if (valueMatch.Success)
+            if (TryParseEnumValue(line, out var value))
             {
-                enumDef.Values.Add(new ProtoEnumValue
-                {
-                    Name = valueMatch.Groups[1].Value,
-                    Number = int.Parse(valueMatch.Groups[2].Value)
-                });
+                enumDef.Values.Add(value);
             }
 
-            i++;
+            lineIndex++;
         }
 
         return enumDef;
     }
 
-    [GeneratedRegex(@"syntax\s*=\s*""(\w+)""\s*;")]
-    private static partial Regex SyntaxRegex();
+    private static bool TryParseSyntax(ReadOnlySpan<char> line, out string syntax)
+    {
+        syntax = string.Empty;
+        if (!TryReadAssignmentValue(line, "syntax", allowDots: false, out var value))
+        {
+            return false;
+        }
 
-    [GeneratedRegex(@"package\s+([\w.]+)\s*;")]
-    private static partial Regex PackageRegex();
+        if (value.Length >= 2 && value[0] == '"' && value[^1] == '"')
+        {
+            syntax = value[1..^1].ToString();
+            return true;
+        }
 
-    [GeneratedRegex(@"message\s+(\w+)\s*\{")]
-    private static partial Regex MessageRegex();
+        return false;
+    }
 
-    [GeneratedRegex(@"enum\s+(\w+)\s*\{")]
-    private static partial Regex EnumRegex();
+    private static bool TryParsePackage(ReadOnlySpan<char> line, out string packageName)
+    {
+        packageName = string.Empty;
+        return TryReadAssignmentValue(line, "package", allowDots: true, out var value)
+            && TryReadIdentifier(value, allowDots: true, out packageName);
+    }
 
-    [GeneratedRegex(@"oneof\s+(\w+)\s*\{")]
-    private static partial Regex OneOfRegex();
+    private static bool TryParseBlockName(ReadOnlySpan<char> line, string keyword, out string name)
+    {
+        name = string.Empty;
+        if (!TryConsumeKeyword(line, keyword, out var remainder))
+        {
+            return false;
+        }
 
-    [GeneratedRegex(@"map<\s*(\w+)\s*,\s*(\w+)\s*>\s+(\w+)\s*=\s*(\d+)\s*")]
-    private static partial Regex MapFieldRegex();
+        if (!TryReadIdentifier(remainder, allowDots: false, out name, out var tail))
+        {
+            return false;
+        }
 
-    [GeneratedRegex(@"(repeated\s+|optional\s+)?(\w+)\s+(\w+)\s*=\s*(\d+)\s*")]
-    private static partial Regex FieldRegex();
+        tail = TrimWhitespace(tail);
+        return tail.Length > 0 && tail[0] == '{';
+    }
 
-    [GeneratedRegex(@"(\w+)\s*=\s*(-?\d+)\s*;")]
-    private static partial Regex EnumValueRegex();
+    private static bool TryParseMapField(ReadOnlySpan<char> line, out ProtoFieldDef field)
+    {
+        field = null!;
+        var cursor = TrimWhitespace(line);
+        if (!TryConsumeLiteral(ref cursor, "map<"))
+        {
+            return false;
+        }
+
+        if (!TryReadIdentifier(ref cursor, allowDots: true, out var keyType))
+        {
+            return false;
+        }
+
+        if (!TryConsumeLiteral(ref cursor, ","))
+        {
+            return false;
+        }
+
+        if (!TryReadIdentifier(ref cursor, allowDots: true, out var valueType))
+        {
+            return false;
+        }
+
+        if (!TryConsumeLiteral(ref cursor, ">"))
+        {
+            return false;
+        }
+
+        if (!TryReadIdentifier(ref cursor, allowDots: false, out var name))
+        {
+            return false;
+        }
+
+        if (!TryConsumeLiteral(ref cursor, "="))
+        {
+            return false;
+        }
+
+        if (!TryReadInt32(ref cursor, out var fieldNumber))
+        {
+            return false;
+        }
+
+        field = new ProtoFieldDef
+        {
+            IsMap = true,
+            MapKeyType = keyType,
+            MapValueType = valueType,
+            Name = name,
+            FieldNumber = fieldNumber,
+            IsDeprecated = ContainsDeprecatedOption(cursor)
+        };
+
+        return true;
+    }
+
+    private static bool TryParseField(ReadOnlySpan<char> line, out ProtoFieldDef field)
+    {
+        field = null!;
+        var cursor = TrimWhitespace(line);
+
+        bool isRepeated = TryConsumeKeyword(ref cursor, "repeated");
+        bool isOptional = !isRepeated && TryConsumeKeyword(ref cursor, "optional");
+
+        if (!TryReadIdentifier(ref cursor, allowDots: true, out var typeName)
+            || !TryReadIdentifier(ref cursor, allowDots: false, out var name)
+            || !TryConsumeLiteral(ref cursor, "=")
+            || !TryReadInt32(ref cursor, out var fieldNumber))
+        {
+            return false;
+        }
+
+        field = new ProtoFieldDef
+        {
+            IsRepeated = isRepeated,
+            IsOptional = isOptional,
+            TypeName = typeName,
+            Name = name,
+            FieldNumber = fieldNumber,
+            IsDeprecated = ContainsDeprecatedOption(cursor)
+        };
+
+        return true;
+    }
+
+    private static bool TryParseEnumValue(ReadOnlySpan<char> line, out ProtoEnumValue value)
+    {
+        value = null!;
+        var cursor = TrimWhitespace(line);
+        if (!TryReadIdentifier(ref cursor, allowDots: false, out var name)
+            || !TryConsumeLiteral(ref cursor, "=")
+            || !TryReadInt32(ref cursor, out var number))
+        {
+            return false;
+        }
+
+        value = new ProtoEnumValue
+        {
+            Name = name,
+            Number = number
+        };
+
+        return true;
+    }
+
+    private static bool TryReadAssignmentValue(ReadOnlySpan<char> line, string keyword, bool allowDots, out ReadOnlySpan<char> value)
+    {
+        value = default;
+        if (!TryConsumeKeyword(line, keyword, out var remainder))
+        {
+            return false;
+        }
+
+        remainder = TrimWhitespace(remainder);
+        if (remainder.IsEmpty || remainder[0] == '=')
+        {
+            if (remainder.IsEmpty || remainder[0] != '=')
+            {
+                return false;
+            }
+
+            remainder = TrimWhitespace(remainder[1..]);
+        }
+
+        int semicolonIndex = remainder.IndexOf(';');
+        if (semicolonIndex < 0)
+        {
+            return false;
+        }
+
+        value = TrimWhitespace(remainder[..semicolonIndex]);
+        return !value.IsEmpty && (allowDots || value.IndexOf('.') < 0 || value[0] == '"');
+    }
+
+    private static bool TryConsumeKeyword(ReadOnlySpan<char> line, string keyword, out ReadOnlySpan<char> remainder)
+    {
+        remainder = default;
+        line = TrimWhitespace(line);
+        if (!line.StartsWith(keyword, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (line.Length > keyword.Length && !char.IsWhiteSpace(line[keyword.Length]))
+        {
+            return false;
+        }
+
+        remainder = line[keyword.Length..];
+        return true;
+    }
+
+    private static bool TryConsumeKeyword(ref ReadOnlySpan<char> line, string keyword)
+    {
+        if (!TryConsumeKeyword(line, keyword, out var remainder))
+        {
+            return false;
+        }
+
+        line = remainder;
+        return true;
+    }
+
+    private static bool TryConsumeLiteral(ref ReadOnlySpan<char> line, string literal)
+    {
+        line = TrimWhitespace(line);
+        if (!line.StartsWith(literal, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        line = line[literal.Length..];
+        return true;
+    }
+
+    private static bool TryReadIdentifier(ReadOnlySpan<char> line, bool allowDots, out string identifier)
+    {
+        identifier = string.Empty;
+        return TryReadIdentifier(line, allowDots, out identifier, out _);
+    }
+
+    private static bool TryReadIdentifier(ReadOnlySpan<char> line, bool allowDots, out string identifier, out ReadOnlySpan<char> remainder)
+    {
+        identifier = string.Empty;
+        remainder = default;
+        line = TrimWhitespace(line);
+        if (line.IsEmpty)
+        {
+            return false;
+        }
+
+        int length = 0;
+        while (length < line.Length && IsIdentifierCharacter(line[length], allowDots))
+        {
+            length++;
+        }
+
+        if (length == 0)
+        {
+            return false;
+        }
+
+        identifier = line[..length].ToString();
+        remainder = line[length..];
+        return true;
+    }
+
+    private static bool TryReadIdentifier(ref ReadOnlySpan<char> line, bool allowDots, out string identifier)
+    {
+        if (!TryReadIdentifier(line, allowDots, out identifier, out var remainder))
+        {
+            return false;
+        }
+
+        line = remainder;
+        return true;
+    }
+
+    private static bool TryReadInt32(ref ReadOnlySpan<char> line, out int value)
+    {
+        line = TrimWhitespace(line);
+        int length = 0;
+        if (length < line.Length && (line[length] == '-' || line[length] == '+'))
+        {
+            length++;
+        }
+
+        while (length < line.Length && char.IsAsciiDigit(line[length]))
+        {
+            length++;
+        }
+
+        if (length == 0 || (length == 1 && (line[0] == '-' || line[0] == '+')))
+        {
+            value = default;
+            return false;
+        }
+
+        if (!int.TryParse(line[..length], NumberStyles.Integer, CultureInfo.InvariantCulture, out value))
+        {
+            return false;
+        }
+
+        line = line[length..];
+        return true;
+    }
+
+    private static bool IsClosingBrace(ReadOnlySpan<char> line)
+    {
+        line = TrimWhitespace(line);
+        return !line.IsEmpty && line[0] == '}';
+    }
+
+    private static bool ContainsDeprecatedOption(ReadOnlySpan<char> line)
+        => line.IndexOf("deprecated = true", StringComparison.Ordinal) >= 0;
+
+    private static bool IsIdentifierCharacter(char character, bool allowDots)
+        => char.IsLetterOrDigit(character)
+           || character == '_'
+           || (allowDots && character == '.');
+
+    private static ReadOnlySpan<char> TrimWhitespace(ReadOnlySpan<char> value)
+    {
+        int start = 0;
+        int end = value.Length - 1;
+
+        while (start <= end && char.IsWhiteSpace(value[start]))
+        {
+            start++;
+        }
+
+        while (end >= start && char.IsWhiteSpace(value[end]))
+        {
+            end--;
+        }
+
+        return start > end ? ReadOnlySpan<char>.Empty : value[start..(end + 1)];
+    }
+
+    private readonly record struct ProtoLineSegment(int Start, int Length);
+
+    private sealed class ProtoLineCollection
+    {
+        private readonly string _content;
+        private readonly List<ProtoLineSegment> _segments;
+
+        public ProtoLineCollection(string content)
+        {
+            _content = content;
+            _segments = BuildSegments(content);
+        }
+
+        public int Count => _segments.Count;
+
+        public ReadOnlySpan<char> this[int index]
+        {
+            get
+            {
+                var segment = _segments[index];
+                return TrimWhitespace(_content.AsSpan(segment.Start, segment.Length));
+            }
+        }
+
+        private static List<ProtoLineSegment> BuildSegments(string content)
+        {
+            var segments = new List<ProtoLineSegment>();
+            int lineStart = 0;
+
+            for (int index = 0; index < content.Length; index++)
+            {
+                if (content[index] != '\n')
+                {
+                    continue;
+                }
+
+                segments.Add(new ProtoLineSegment(lineStart, index - lineStart));
+                lineStart = index + 1;
+            }
+
+            if (lineStart <= content.Length)
+            {
+                segments.Add(new ProtoLineSegment(lineStart, content.Length - lineStart));
+            }
+
+            return segments;
+        }
+    }
 }

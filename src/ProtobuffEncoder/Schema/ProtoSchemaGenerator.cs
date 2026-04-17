@@ -208,45 +208,76 @@ public static class ProtoSchemaGenerator
 
     private static void ResolveImports(Dictionary<string, ProtoFile> files, Dictionary<Type, string> typeToFileKey)
     {
+        var declaredTypes = BuildDeclaredTypeLookup(files);
+
         foreach (var (fileKey, file) in files)
         {
-            var imports = new HashSet<string>(file.WellKnownImports ?? []);
+            var imports = file.WellKnownImports is { Count: > 0 }
+                ? new HashSet<string>(file.WellKnownImports, StringComparer.Ordinal)
+                : new HashSet<string>(StringComparer.Ordinal);
 
             foreach (var msg in file.Messages)
-                CollectImportsFromMessage(msg, fileKey, typeToFileKey, files, imports);
+                CollectImportsFromMessage(msg, fileKey, typeToFileKey, declaredTypes, imports);
 
             foreach (var svc in file.Services)
             {
                 foreach (var rpc in svc.Methods)
                 {
-                    TryAddImportForTypeName(rpc.RequestTypeName,  fileKey, files, imports);
-                    TryAddImportForTypeName(rpc.ResponseTypeName, fileKey, files, imports);
+                    TryAddImportForTypeName(rpc.RequestTypeName, fileKey, declaredTypes, imports);
+                    TryAddImportForTypeName(rpc.ResponseTypeName, fileKey, declaredTypes, imports);
                 }
             }
 
-            file.Imports = imports.OrderBy(i => i).ToList();
+            file.Imports = [.. imports];
+            file.Imports.Sort(StringComparer.Ordinal);
         }
     }
 
+    private static Dictionary<string, string> BuildDeclaredTypeLookup(Dictionary<string, ProtoFile> files)
+    {
+        var declaredTypes = new Dictionary<string, string>(StringComparer.Ordinal);
+
+        foreach (var (fileKey, file) in files)
+        {
+            foreach (var message in file.Messages)
+            {
+                declaredTypes.TryAdd(message.Name, fileKey);
+            }
+
+            foreach (var enumDef in file.Enums)
+            {
+                declaredTypes.TryAdd(enumDef.Name, fileKey);
+            }
+        }
+
+        return declaredTypes;
+    }
+
     private static void CollectImportsFromMessage(ProtoMessageDef msg, string currentFileKey,
-        Dictionary<Type, string> typeToFileKey, Dictionary<string, ProtoFile> files, HashSet<string> imports)
+        Dictionary<Type, string> typeToFileKey, IReadOnlyDictionary<string, string> declaredTypes, HashSet<string> imports)
     {
         foreach (var field in msg.Fields)
         {
-            TryAddImportForTypeName(field.TypeName, currentFileKey, files, imports);
+            TryAddImportForTypeName(field.TypeName, currentFileKey, declaredTypes, imports);
             if (field.IsMap)
             {
-                TryAddImportForTypeName(field.MapKeyType,   currentFileKey, files, imports);
-                TryAddImportForTypeName(field.MapValueType, currentFileKey, files, imports);
+                TryAddImportForTypeName(field.MapKeyType, currentFileKey, declaredTypes, imports);
+                TryAddImportForTypeName(field.MapValueType, currentFileKey, declaredTypes, imports);
             }
         }
 
         foreach (var oneOf in msg.OneOfs)
+        {
             foreach (var field in oneOf.Fields)
-                TryAddImportForTypeName(field.TypeName, currentFileKey, files, imports);
+            {
+                TryAddImportForTypeName(field.TypeName, currentFileKey, declaredTypes, imports);
+            }
+        }
 
         foreach (var nested in msg.NestedMessages)
-            CollectImportsFromMessage(nested, currentFileKey, typeToFileKey, files, imports);
+        {
+            CollectImportsFromMessage(nested, currentFileKey, typeToFileKey, declaredTypes, imports);
+        }
 
         if (msg.SourceType is not null
             && typeToFileKey.TryGetValue(msg.SourceType, out var sourceFileKey)
@@ -257,23 +288,17 @@ public static class ProtoSchemaGenerator
     }
 
     private static void TryAddImportForTypeName(string? typeName, string currentFileKey,
-        Dictionary<string, ProtoFile> files, HashSet<string> imports)
+        IReadOnlyDictionary<string, string> declaredTypes, HashSet<string> imports)
     {
         if (string.IsNullOrEmpty(typeName) || IsScalarProtoType(typeName))
             return;
 
-        // Already a well-known type import path?
         if (typeName.StartsWith("google.protobuf.", StringComparison.Ordinal))
             return;
 
-        foreach (var (otherFileKey, otherFile) in files)
+        if (declaredTypes.TryGetValue(typeName, out var fileKey) && fileKey != currentFileKey)
         {
-            if (otherFileKey == currentFileKey) continue;
-            if (otherFile.Messages.Any(m => m.Name == typeName) || otherFile.Enums.Any(e => e.Name == typeName))
-            {
-                imports.Add(otherFileKey);
-                return;
-            }
+            imports.Add(fileKey);
         }
     }
 
@@ -734,17 +759,39 @@ public static class ProtoSchemaGenerator
             sb.AppendLine();
         }
 
-        // Well-known type imports always come first, then cross-file imports.
-        var allImports = (file.WellKnownImports ?? [])
-            .Concat(file.Imports)
-            .Distinct()
-            .OrderBy(static i => i)
-            .ToList();
+        var allImports = file.WellKnownImports is { Count: > 0 }
+            ? new List<string>(file.WellKnownImports.Count + file.Imports.Count)
+            : new List<string>(file.Imports.Count);
+        var seenImports = new HashSet<string>(StringComparer.Ordinal);
+
+        if (file.WellKnownImports is not null)
+        {
+            foreach (var import in file.WellKnownImports)
+            {
+                if (seenImports.Add(import))
+                {
+                    allImports.Add(import);
+                }
+            }
+        }
+
+        foreach (var import in file.Imports)
+        {
+            if (seenImports.Add(import))
+            {
+                allImports.Add(import);
+            }
+        }
+
+        allImports.Sort(StringComparer.Ordinal);
 
         if (allImports.Count > 0)
         {
             foreach (var import in allImports)
+            {
                 sb.AppendLine($"import \"{import}\";");
+            }
+
             sb.AppendLine();
         }
 
@@ -898,8 +945,7 @@ public static class ProtoSchemaGenerator
     /// </summary>
     private static string ToSnakeCase(string name)
     {
-        if (string.IsNullOrEmpty(name)) return name;
-        return Regex.Replace(name, @"(?<=[a-z0-9])([A-Z])", "_$1").ToLowerInvariant();
+        return ConvertCase(name, uppercase: false);
     }
 
     /// <summary>
@@ -907,9 +953,31 @@ public static class ProtoSchemaGenerator
     /// </summary>
     private static string ToScreamingSnakeCase(string name)
     {
-        if (string.IsNullOrEmpty(name)) return name;
-        return Regex.Replace(name, @"(?<=[a-z0-9])([A-Z])", "_$1").ToUpperInvariant();
+        return ConvertCase(name, uppercase: true);
+    }
+
+    private static string ConvertCase(string name, bool uppercase)
+    {
+        if (string.IsNullOrEmpty(name))
+        {
+            return name;
+        }
+
+        var builder = new StringBuilder(name.Length + 4);
+        for (int index = 0; index < name.Length; index++)
+        {
+            char current = name[index];
+            if (index > 0 && char.IsUpper(current) && char.IsLetterOrDigit(name[index - 1]) && !char.IsUpper(name[index - 1]))
+            {
+                builder.Append('_');
+            }
+
+            builder.Append(uppercase ? char.ToUpperInvariant(current) : char.ToLowerInvariant(current));
+        }
+
+        return builder.ToString();
     }
 
     private static string Pad(int indent) => new(' ', indent * 2);
 }
+

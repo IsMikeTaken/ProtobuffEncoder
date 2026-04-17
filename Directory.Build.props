@@ -7,16 +7,18 @@
 		<VersionPatch>0</VersionPatch>
 
 		<!-- CI workflows override VersionSuffix for pre-releases.  -->
-		<!-- Empty = stable release (e.g. 1.6.0).                   -->
-		<!-- dev.42 = development build (e.g. 1.6.0-dev.42).        -->
-		<!-- pr.7.42 = pull request build (e.g. 1.6.0-pr.7.42).    -->
+		<!-- Empty = stable release (e.g. 1.7.0).                   -->
+		<!-- dev.42 = development build (e.g. 1.7.0-dev.42).        -->
+		<!-- pr.7.42 = pull request build (e.g. 1.7.0-pr.7.42).    -->
 		<Version>$(VersionMajor).$(VersionMinor).$(VersionPatch)</Version>
 		<Version Condition="'$(VersionSuffix)' != ''">$(VersionMajor).$(VersionMinor).$(VersionPatch)-$(VersionSuffix)</Version>
 
 		<AssemblyVersion>$(VersionMajor).$(VersionMinor).$(VersionPatch).0</AssemblyVersion>
 		<FileVersion>$(VersionMajor).$(VersionMinor).$(VersionPatch).0</FileVersion>
+	</PropertyGroup>
 
-		<!-- ── Package metadata ────────────────────────────────── -->
+	<!-- ── Package metadata ────────────────────────────────────────────── -->
+	<PropertyGroup>
 		<Authors>IsMikeTaken</Authors>
 		<Company>IsMikeTaken</Company>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
@@ -25,28 +27,48 @@
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 	</PropertyGroup>
 
-	<!-- ── Per-framework performance and best-practice settings ───────────────
+	<!-- ── Shared code quality settings ───────────────────────────────── -->
+	<!-- Applied to every project that is NOT netstandard (Analyzers keep  -->
+	<!-- netstandard2.0 for broad IDE compatibility).                       -->
+	<PropertyGroup Condition="!$(TargetFramework.StartsWith('netstandard'))">
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+		<!-- Suppress benign informational warnings that aren't actionable -->
+		<NoWarn>$(NoWarn);CS1591</NoWarn>
+		<Deterministic>true</Deterministic>
+		<EmbedUntrackedSources>true</EmbedUntrackedSources>
+		<IncludeSymbols>true</IncludeSymbols>
+		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+	</PropertyGroup>
+
+	<!-- ── Shared performance / language settings ─────────────────────── -->
+	<PropertyGroup>
+		<LangVersion>latest</LangVersion>
+		<TieredPGO>true</TieredPGO>
+		<EnablePreviewFeatures>false</EnablePreviewFeatures>
+	</PropertyGroup>
+
+	<!-- ── Per-framework performance and best-practice settings ──────────
        Applied to all non-analyzer projects (TargetFramework != netstandard*).
        The Analyzers project keeps netstandard2.0 for broad IDE compatibility.
   ──────────────────────────────────────────────────────────────────────────── -->
 
-	<!-- net8 -->
+	<!-- net8 — LTS baseline -->
 	<PropertyGroup Condition="'$(TargetFramework)' == 'net8.0'">
+		<!-- FrozenCollections and System.IO.Hashing available on net8+ -->
+		<DefineConstants>$(DefineConstants);NET8_0_OR_GREATER</DefineConstants>
 	</PropertyGroup>
 
-	<!-- net9. -->
+	<!-- net9 — STS: LINQ improvements, ReadOnlySpan overloads -->
 	<PropertyGroup Condition="'$(TargetFramework)' == 'net9.0'">
+		<DefineConstants>$(DefineConstants);NET8_0_OR_GREATER;NET9_0_OR_GREATER</DefineConstants>
 	</PropertyGroup>
 
-	<!-- net10 -->
+	<!-- net10 — current feature flag constants without preview-only API opt-in -->
 	<PropertyGroup Condition="'$(TargetFramework)' == 'net10.0'">
-	</PropertyGroup>
-
-	<!-- shared framework setup -->
-	<PropertyGroup>
-		<TieredPGO>true</TieredPGO>
-		<EnablePreviewFeatures>false</EnablePreviewFeatures>
-		<LangVersion>latest</LangVersion>
+		<DefineConstants>$(DefineConstants);NET8_0_OR_GREATER;NET9_0_OR_GREATER;NET10_0_OR_GREATER</DefineConstants>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -54,3 +76,4 @@
 	</ItemGroup>
 
 </Project>
+

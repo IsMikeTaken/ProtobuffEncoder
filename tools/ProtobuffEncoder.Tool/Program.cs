@@ -34,19 +34,19 @@ internal static class Program
         if (!TryLoadAssembly(assemblyPath, out Assembly? assembly))
             return 1;
 
-        AssemblyToolOptions toolOptions = AssemblyToolOptions.Read(assembly);
+        AssemblyToolOptions toolOptions = AssemblyToolOptions.Read(assembly!);
 
         string projectDir = ResolveProjectDirectory(options, assemblyPath);
         string? csprojPath = ResolveCsprojPath(options, projectDir);
 
-        Dictionary<string, string> protoFiles = ProtoSchemaGenerator.GenerateAll(assembly);
+        Dictionary<string, string> protoFiles = ProtoSchemaGenerator.GenerateAll(assembly!);
         if (protoFiles.Count == 0)
         {
             Console.WriteLine("No [ProtoContract] or [ProtoService] types found in the assembly.");
             return 0;
         }
 
-        Dictionary<string, string> primaryTypeNames = ResolvePrimaryTypeNames(assembly, protoFiles.Keys);
+        Dictionary<string, string> primaryTypeNames = ResolvePrimaryTypeNames(assembly!, protoFiles.Keys);
         List<(string RelativePath, string AbsolutePath)> written =
             WriteProtoFiles(protoFiles, primaryTypeNames, toolOptions, projectDir, options);
 
@@ -228,7 +228,7 @@ internal static class Program
     }
 
     /// <summary>
-    /// Updates the selected project file with generated <Content> items.
+    /// Updates the selected project file with generated &lt;Content&gt; items.
     /// </summary>
     private static void UpdateProjectFileIfRequested(
         string? csprojPath,
@@ -541,7 +541,7 @@ internal static class Program
             ARGUMENTS
               assembly    Path to the compiled DLL containing [ProtoContract] / [ProtoService] types.
               output-dir  Override base output directory (default: ProtoPath from assembly attributes).
-              csproj      .csproj to patch with <Content Include="..."> entries.
+              csproj      .csproj to patch with &lt;Content Include="..."&gt; entries.
 
             OPTIONS
               --auto        Force guided/interactive mode even when arguments are provided.
@@ -588,3 +588,5 @@ internal static class Program
         bool AutoMode,
         string[] PositionalArguments);
 }
+
+

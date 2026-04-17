@@ -5,8 +5,8 @@ namespace ProtobuffEncoder.Grpc;
 
 /// <summary>
 /// Describes a single gRPC method discovered from a <see cref="ProtoServiceAttribute"/>-decorated interface.
-/// Contains the reflected metadata needed to create gRPC <see cref="Grpc.Core.Method{TRequest, TResponse}"/>
-/// descriptors and handler adapters.
+/// Contains the reflected metadata needed to create gRPC method descriptors
+/// and handler adapters.
 /// </summary>
 internal sealed class ServiceMethodDescriptor
 {
@@ -143,3 +143,4 @@ internal sealed class ServiceMethodDescriptor
         return (requestType, responseType);
     }
 }
+
