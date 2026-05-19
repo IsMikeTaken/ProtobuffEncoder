@@ -17,9 +17,9 @@ public static class ProtobufValidationServiceCollectionExtensions
     {
         var registry = new ProtobufValidationRegistry(services);
         configure(registry);
-        
+
         services.AddSingleton<IProtobufValidator, ProtobufValidator>();
-        
+
         return services;
     }
 }
@@ -41,7 +41,7 @@ public class ProtobufValidationRegistry
     /// </summary>
     public ProtobufValidationRegistry AddRule<T>(Func<T, bool> predicate, string errorMessage)
     {
-        _services.AddSingleton<IMessageValidator<T>>(new DelegateValidator<T>(msg => 
+        _services.AddSingleton<IMessageValidator<T>>(new DelegateValidator<T>(msg =>
             predicate(msg) ? ValidationResult.Success : ValidationResult.Fail(errorMessage)));
         return this;
     }

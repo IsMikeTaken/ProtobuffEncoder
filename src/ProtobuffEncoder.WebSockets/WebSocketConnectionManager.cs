@@ -22,7 +22,7 @@ namespace ProtobuffEncoder.WebSockets;
 /// <typeparam name="TSend">The message type sent to clients.</typeparam>
 /// <typeparam name="TReceive">The message type received from clients.</typeparam>
 public sealed class WebSocketConnectionManager<TSend, TReceive>
-    where TSend    : class, new()
+    where TSend : class, new()
     where TReceive : class, new()
 {
     private readonly ConcurrentDictionary<string, ProtobufWebSocketConnection<TSend, TReceive>>
@@ -86,7 +86,7 @@ public sealed class WebSocketConnectionManager<TSend, TReceive>
             targets,
             new ParallelOptions
             {
-                CancellationToken      = cancellationToken,
+                CancellationToken = cancellationToken,
                 MaxDegreeOfParallelism = Environment.ProcessorCount,
             },
             async (conn, ct) =>

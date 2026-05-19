@@ -205,7 +205,8 @@ app.MapGet("/ws/chat/json", async (HttpContext ctx) =>
                 {
                     Source = "Server",
                     Text = $"Rejected: {validation.ErrorMessage}",
-                    Level = 2, Tags = [],
+                    Level = 2,
+                    Tags = [],
                     ByteSize = encoded.Length,
                     ProcessingTimeMs = sw.Elapsed.TotalMilliseconds
                 }, ctx.RequestAborted);

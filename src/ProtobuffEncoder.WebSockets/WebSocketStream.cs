@@ -46,9 +46,9 @@ public sealed class WebSocketStream : Stream, IAsyncDisposable
 
     // Per-message reassembly state — reset at the start of each new message.
     private byte[]? _messageBuffer;  // grows as needed via ArrayPool re-rent
-    private int     _messageLength;  // bytes written into _messageBuffer
-    private int     _messagePosition;// bytes already consumed by Read callers
-    private bool    _receiveComplete;
+    private int _messageLength;  // bytes written into _messageBuffer
+    private int _messagePosition;// bytes already consumed by Read callers
+    private bool _receiveComplete;
 
     /// <summary>
     /// Initialises a new <see cref="WebSocketStream"/> wrapping <paramref name="ws"/>.
@@ -69,16 +69,16 @@ public sealed class WebSocketStream : Stream, IAsyncDisposable
     public WebSocket WebSocket => _ws;
 
     /// <summary>Always <see langword="true"/>; this stream supports reading.</summary>
-    public override bool CanRead  => true;
+    public override bool CanRead => true;
 
     /// <summary>Always <see langword="true"/>; this stream supports writing.</summary>
     public override bool CanWrite => true;
 
     /// <summary>Always <see langword="false"/>; WebSocket streams are not seekable.</summary>
-    public override bool CanSeek  => false;
+    public override bool CanSeek => false;
 
     /// <summary>Not supported. Always throws <see cref="NotSupportedException"/>.</summary>
-    public override long Length   => throw new NotSupportedException();
+    public override long Length => throw new NotSupportedException();
 
     /// <summary>Not supported. Always throws <see cref="NotSupportedException"/>.</summary>
     public override long Position
@@ -99,7 +99,7 @@ public sealed class WebSocketStream : Stream, IAsyncDisposable
         if (_messageBuffer is not null && _messagePosition < _messageLength)
         {
             int available = _messageLength - _messagePosition;
-            int toCopy    = Math.Min(available, buffer.Length);
+            int toCopy = Math.Min(available, buffer.Length);
             _messageBuffer.AsMemory(_messagePosition, toCopy).CopyTo(buffer);
             _messagePosition += toCopy;
             return toCopy;
@@ -110,7 +110,7 @@ public sealed class WebSocketStream : Stream, IAsyncDisposable
 
         // Reset reassembly state for the incoming message.
         ReturnMessageBuffer();
-        _messageLength   = 0;
+        _messageLength = 0;
         _messagePosition = 0;
 
         byte[] frameBuffer = ArrayPool<byte>.Shared.Rent(_receiveBufferSize);

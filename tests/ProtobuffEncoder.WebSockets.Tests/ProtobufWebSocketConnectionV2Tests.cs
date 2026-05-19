@@ -17,7 +17,7 @@ public class ProtobufWebSocketConnectionV2Tests
     [Fact]
     public async Task SendDirectAsync_EncodesMessageAsRawFrame()
     {
-        var ws   = new FakeWebSocket();
+        var ws = new FakeWebSocket();
         var conn = new ProtobufWebSocketConnection<Heartbeat, Heartbeat>(ws, "v2-send");
 
         var msg = new Heartbeat { Timestamp = 999L };
@@ -35,29 +35,29 @@ public class ProtobufWebSocketConnectionV2Tests
     [Fact]
     public async Task SendDirectAsync_MultipleMessages_EachIsIndependentFrame()
     {
-        var ws   = new FakeWebSocket();
+        var ws = new FakeWebSocket();
         var conn = new ProtobufWebSocketConnection<ChatMessage, ChatMessage>(ws, "v2-multi");
 
         await conn.SendDirectAsync(new ChatMessage { User = "Alice", Text = "hi" });
-        await conn.SendDirectAsync(new ChatMessage { User = "Bob",   Text = "hello" });
+        await conn.SendDirectAsync(new ChatMessage { User = "Bob", Text = "hello" });
 
         Assert.Equal(2, ws.SendCount);
 
         byte[][] frames = ws.SentMessages.ToArray();
         Assert.Equal("Alice", ProtobufEncoder.Decode<ChatMessage>(frames[0]).User);
-        Assert.Equal("Bob",   ProtobufEncoder.Decode<ChatMessage>(frames[1]).User);
+        Assert.Equal("Bob", ProtobufEncoder.Decode<ChatMessage>(frames[1]).User);
     }
 
     [Fact]
     public async Task SendDirectAsync_LargePayload_RoundTrips()
     {
-        var ws   = new FakeWebSocket();
+        var ws = new FakeWebSocket();
         var conn = new ProtobufWebSocketConnection<LargePayload, LargePayload>(ws, "v2-large");
 
         string bigData = new string('x', 128 * 1024); // 128 KiB string
         await conn.SendDirectAsync(new LargePayload { Data = bigData, SequenceNumber = 42 });
 
-        byte[] frame   = ws.SentMessages.Single();
+        byte[] frame = ws.SentMessages.Single();
         LargePayload rt = ProtobufEncoder.Decode<LargePayload>(frame);
 
         Assert.Equal(bigData, rt.Data);
@@ -67,7 +67,7 @@ public class ProtobufWebSocketConnectionV2Tests
     [Fact]
     public async Task SendDirectAsync_CancelledToken_Throws()
     {
-        var ws   = new FakeWebSocket();
+        var ws = new FakeWebSocket();
         var conn = new ProtobufWebSocketConnection<Heartbeat, Heartbeat>(ws, "v2-cancel");
         using var cts = new CancellationTokenSource();
         cts.Cancel();
@@ -81,7 +81,7 @@ public class ProtobufWebSocketConnectionV2Tests
     [Fact]
     public async Task ReceiveDirectAsync_DecodesRawFrame()
     {
-        var ws  = new FakeWebSocket();
+        var ws = new FakeWebSocket();
         var msg = new Heartbeat { Timestamp = 12345L };
         // EnqueueMessage encodes with ProtobufEncoder.Encode (no length prefix) — matches v2 framing.
         ws.EnqueueMessage(msg);
@@ -100,7 +100,7 @@ public class ProtobufWebSocketConnectionV2Tests
         var ws = new FakeWebSocket();
         ws.EnqueueClose();
 
-        var conn     = new ProtobufWebSocketConnection<Heartbeat, Heartbeat>(ws, "v2-close");
+        var conn = new ProtobufWebSocketConnection<Heartbeat, Heartbeat>(ws, "v2-close");
         Heartbeat? r = await conn.ReceiveDirectAsync();
 
         Assert.Null(r);
@@ -110,7 +110,7 @@ public class ProtobufWebSocketConnectionV2Tests
     public async Task ReceiveDirectAsync_EmptyQueue_ReturnsNull()
     {
         // FakeWebSocket with empty queue returns Close automatically.
-        var ws   = new FakeWebSocket();
+        var ws = new FakeWebSocket();
         var conn = new ProtobufWebSocketConnection<Heartbeat, Heartbeat>(ws, "v2-empty");
 
         Heartbeat? r = await conn.ReceiveDirectAsync();
@@ -122,8 +122,8 @@ public class ProtobufWebSocketConnectionV2Tests
     public async Task ReceiveDirectAsync_MultipleMessages_DecodesInOrder()
     {
         var ws = new FakeWebSocket();
-        ws.EnqueueMessage(new ChatMessage { User = "Alice", Text = "first"  });
-        ws.EnqueueMessage(new ChatMessage { User = "Bob",   Text = "second" });
+        ws.EnqueueMessage(new ChatMessage { User = "Alice", Text = "first" });
+        ws.EnqueueMessage(new ChatMessage { User = "Bob", Text = "second" });
         ws.EnqueueClose();
 
         var conn = new ProtobufWebSocketConnection<ChatMessage, ChatMessage>(ws, "v2-order");
@@ -133,7 +133,7 @@ public class ProtobufWebSocketConnectionV2Tests
         ChatMessage? m3 = await conn.ReceiveDirectAsync();
 
         Assert.Equal("Alice", m1!.User);
-        Assert.Equal("Bob",   m2!.User);
+        Assert.Equal("Bob", m2!.User);
         Assert.Null(m3);
     }
 
@@ -147,7 +147,7 @@ public class ProtobufWebSocketConnectionV2Tests
             ws.EnqueueMessage(new Heartbeat { Timestamp = i });
         ws.EnqueueClose();
 
-        var conn     = new ProtobufWebSocketConnection<Heartbeat, Heartbeat>(ws, "v2-all");
+        var conn = new ProtobufWebSocketConnection<Heartbeat, Heartbeat>(ws, "v2-all");
         var received = new List<long>();
 
         await foreach (Heartbeat msg in conn.ReceiveAllDirectAsync())
@@ -165,8 +165,8 @@ public class ProtobufWebSocketConnectionV2Tests
             ws.EnqueueMessage(new Heartbeat { Timestamp = i });
 
         using var cts = new CancellationTokenSource();
-        var conn      = new ProtobufWebSocketConnection<Heartbeat, Heartbeat>(ws, "v2-cancel-all");
-        int count     = 0;
+        var conn = new ProtobufWebSocketConnection<Heartbeat, Heartbeat>(ws, "v2-cancel-all");
+        int count = 0;
 
         // Cancellation causes the loop guard to exit cleanly — no exception propagated.
         await foreach (Heartbeat _ in conn.ReceiveAllDirectAsync(cts.Token))
@@ -187,23 +187,23 @@ public class ProtobufWebSocketConnectionV2Tests
     {
         // Simulate a loopback: capture the sent frame and re-enqueue it for receive.
         var sendWs = new FakeWebSocket();
-        var conn   = new ProtobufWebSocketConnection<ChatMessage, ChatMessage>(sendWs, "v2-rt");
+        var conn = new ProtobufWebSocketConnection<ChatMessage, ChatMessage>(sendWs, "v2-rt");
 
         var original = new ChatMessage { User = "Tester", Text = "round-trip", SentAt = 42L };
         await conn.SendDirectAsync(original);
 
         // Wire the sent frame back as a receive.
         byte[] frame = sendWs.SentMessages.Single();
-        var recvWs   = new FakeWebSocket();
+        var recvWs = new FakeWebSocket();
         recvWs.EnqueueReceive(frame);
         var recvConn = new ProtobufWebSocketConnection<ChatMessage, ChatMessage>(recvWs, "v2-rt-recv");
 
         ChatMessage? result = await recvConn.ReceiveDirectAsync();
 
         Assert.NotNull(result);
-        Assert.Equal("Tester",     result.User);
+        Assert.Equal("Tester", result.User);
         Assert.Equal("round-trip", result.Text);
-        Assert.Equal(42L,          result.SentAt);
+        Assert.Equal(42L, result.SentAt);
     }
 
     // ── Performance ───────────────────────────────────────────────────────────
@@ -211,7 +211,7 @@ public class ProtobufWebSocketConnectionV2Tests
     [Fact]
     public async Task SendDirectAsync_HighVolume_CompletesWithinBudget()
     {
-        var ws   = new FakeWebSocket();
+        var ws = new FakeWebSocket();
         var conn = new ProtobufWebSocketConnection<Heartbeat, Heartbeat>(ws, "v2-perf");
 
         var sw = System.Diagnostics.Stopwatch.StartNew();

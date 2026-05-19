@@ -49,7 +49,7 @@ public sealed class ProtoEnumValueAttribute : Attribute
     public ProtoEnumValueAttribute(int number)
     {
         Number = number;
-        Name   = null;
+        Name = null;
     }
 
     /// <param name="number">Proto field number override.</param>
@@ -57,6 +57,6 @@ public sealed class ProtoEnumValueAttribute : Attribute
     public ProtoEnumValueAttribute(int number, string name)
     {
         Number = number;
-        Name   = name;
+        Name = name;
     }
 }

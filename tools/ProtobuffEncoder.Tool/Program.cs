@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using ProtobuffEncoder.Schema;
 using ProtobuffEncoder.Tool;
 
+[Obsolete("Use the ProtobuffEncoder.SourceGenerator instead for better MSBuild integration.")]
 internal static class Program
 {
 #if NET8_0_OR_GREATER

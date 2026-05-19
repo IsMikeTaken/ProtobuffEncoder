@@ -69,27 +69,27 @@ static async Task RunChatDemo(string serverUrl, bool verbose)
 
     // Use the framework client with retry
     await using var client = new ProtobufWebSocketClient<NotificationMessage, NotificationMessage>(new ProtobufWebSocketClientOptions
+    {
+        ServerUri = new Uri($"{serverUrl}/ws/chat"),
+        RetryPolicy = new RetryPolicy { MaxRetries = 3, InitialDelay = TimeSpan.FromSeconds(1) },
+        OnConnect = () =>
         {
-            ServerUri = new Uri($"{serverUrl}/ws/chat"),
-            RetryPolicy = new RetryPolicy { MaxRetries = 3, InitialDelay = TimeSpan.FromSeconds(1) },
-            OnConnect = () =>
-            {
-                Console.WriteLine("  Connected to chat endpoint.");
-                return Task.CompletedTask;
-            },
-            OnRetry = (attempt, delay) =>
-            {
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"  [Retry] Attempt #{attempt}, waiting {delay.TotalSeconds:F1}s...");
-                Console.ResetColor();
-                return Task.CompletedTask;
-            },
-            OnError = ex =>
-            {
-                LogVerbose(verbose, $"[Error] {ex.Message}");
-                return Task.CompletedTask;
-            }
-        });
+            Console.WriteLine("  Connected to chat endpoint.");
+            return Task.CompletedTask;
+        },
+        OnRetry = (attempt, delay) =>
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"  [Retry] Attempt #{attempt}, waiting {delay.TotalSeconds:F1}s...");
+            Console.ResetColor();
+            return Task.CompletedTask;
+        },
+        OnError = ex =>
+        {
+            LogVerbose(verbose, $"[Error] {ex.Message}");
+            return Task.CompletedTask;
+        }
+    });
 
     LogVerbose(verbose, "Connecting with automatic retry...");
     await client.ConnectAsync();
@@ -196,22 +196,22 @@ static async Task RunWeatherDemo(string serverUrl, bool verbose)
 
     // Use the framework client with retry
     await using var client = new ProtobufWebSocketClient<WeatherRequest, WeatherResponse>(new ProtobufWebSocketClientOptions
+    {
+        ServerUri = new Uri($"{serverUrl}/ws/weather-stream"),
+        RetryPolicy = new RetryPolicy { MaxRetries = 3 },
+        OnConnect = () =>
         {
-            ServerUri = new Uri($"{serverUrl}/ws/weather-stream"),
-            RetryPolicy = new RetryPolicy { MaxRetries = 3 },
-            OnConnect = () =>
-            {
-                Console.WriteLine("  Connected to weather stream endpoint.");
-                return Task.CompletedTask;
-            },
-            OnRetry = (attempt, delay) =>
-            {
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"  [Retry] Attempt #{attempt}, waiting {delay.TotalSeconds:F1}s...");
-                Console.ResetColor();
-                return Task.CompletedTask;
-            }
-        });
+            Console.WriteLine("  Connected to weather stream endpoint.");
+            return Task.CompletedTask;
+        },
+        OnRetry = (attempt, delay) =>
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"  [Retry] Attempt #{attempt}, waiting {delay.TotalSeconds:F1}s...");
+            Console.ResetColor();
+            return Task.CompletedTask;
+        }
+    });
 
     LogVerbose(verbose, "Connecting...");
     await client.ConnectAsync();

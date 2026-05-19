@@ -92,7 +92,7 @@ public static class WebSocketEndpointRouteBuilderExtensions
                     KeepAliveInterval = options.KeepAliveInterval,
                 };
 
-                var ws           = await ctx.WebSockets.AcceptWebSocketAsync(acceptContext);
+                var ws = await ctx.WebSockets.AcceptWebSocketAsync(acceptContext);
                 var connectionId = Guid.NewGuid().ToString("N")[..12];
 
                 await using var connection =
@@ -104,7 +104,7 @@ public static class WebSocketEndpointRouteBuilderExtensions
                     connectionId, pattern, manager.Count);
 
                 // Build validation pipelines once per connection, not per message.
-                ValidationPipeline<TSend>?    sendValidation    = null;
+                ValidationPipeline<TSend>? sendValidation = null;
                 ValidationPipeline<TReceive>? receiveValidation = null;
 
                 if (options.ConfigureSendValidation is not null)

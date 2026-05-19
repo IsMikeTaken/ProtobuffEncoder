@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/ProtobuffEncoder.SourceGenerator/ProtobuffEncoder.SourceGenerator.csproj" />
     <Project Path="src/ProtobuffEncoder/ProtobuffEncoder.csproj" />
     <Project Path="src/ProtobuffEncoder.AspNetCore/ProtobuffEncoder.AspNetCore.csproj" />
     <Project Path="src/ProtobuffEncoder.Contracts/ProtobuffEncoder.Contracts.csproj" />
@@ -139,4 +140,5 @@
   <Folder Name="/docs/demos/">
     <File Path="docs/demos/README.md" />
   </Folder>
+  <Project Path="tests/ProtobuffEncoder.SourceGenerator.Tests/ProtobuffEncoder.SourceGenerator.Tests.csproj" />
 </Solution>

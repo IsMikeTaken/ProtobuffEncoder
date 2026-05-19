@@ -40,7 +40,7 @@ internal sealed class ProtobufGrpcServiceMethodProvider<TService> : IServiceMeth
 
         foreach (var desc in descriptors)
         {
-            var key    = new BinderKey(desc.ServiceName, desc.MethodName, desc.RequestType, desc.ResponseType, desc.MethodType);
+            var key = new BinderKey(desc.ServiceName, desc.MethodName, desc.RequestType, desc.ResponseType, desc.MethodType);
             var binder = _binderCache.GetOrAdd(key, static k => BuildBinder<TService>(k));
             binder(context, desc);
         }
@@ -57,11 +57,11 @@ internal sealed class ProtobufGrpcServiceMethodProvider<TService> : IServiceMeth
     {
         string methodName = key.MethodType switch
         {
-            ProtoMethodType.Unary            => nameof(BindUnary),
-            ProtoMethodType.ServerStreaming  => nameof(BindServerStreaming),
-            ProtoMethodType.ClientStreaming  => nameof(BindClientStreaming),
-            ProtoMethodType.DuplexStreaming  => nameof(BindDuplexStreaming),
-            _                               => throw new NotSupportedException(
+            ProtoMethodType.Unary => nameof(BindUnary),
+            ProtoMethodType.ServerStreaming => nameof(BindServerStreaming),
+            ProtoMethodType.ClientStreaming => nameof(BindClientStreaming),
+            ProtoMethodType.DuplexStreaming => nameof(BindDuplexStreaming),
+            _ => throw new NotSupportedException(
                                                   $"Method type {key.MethodType} is not supported")
         };
 
@@ -81,7 +81,7 @@ internal sealed class ProtobufGrpcServiceMethodProvider<TService> : IServiceMeth
     private static void BindUnary<TRequest, TResponse>(
         ServiceMethodProviderContext<TService> context,
         ServiceMethodDescriptor desc)
-        where TRequest  : class
+        where TRequest : class
         where TResponse : class
     {
         var grpcMethod = CreateMethod<TRequest, TResponse>(MethodType.Unary, desc);
@@ -100,7 +100,7 @@ internal sealed class ProtobufGrpcServiceMethodProvider<TService> : IServiceMeth
     private static void BindServerStreaming<TRequest, TResponse>(
         ServiceMethodProviderContext<TService> context,
         ServiceMethodDescriptor desc)
-        where TRequest  : class
+        where TRequest : class
         where TResponse : class
     {
         var grpcMethod = CreateMethod<TRequest, TResponse>(MethodType.ServerStreaming, desc);
@@ -122,7 +122,7 @@ internal sealed class ProtobufGrpcServiceMethodProvider<TService> : IServiceMeth
     private static void BindClientStreaming<TRequest, TResponse>(
         ServiceMethodProviderContext<TService> context,
         ServiceMethodDescriptor desc)
-        where TRequest  : class
+        where TRequest : class
         where TResponse : class
     {
         var grpcMethod = CreateMethod<TRequest, TResponse>(MethodType.ClientStreaming, desc);
@@ -143,7 +143,7 @@ internal sealed class ProtobufGrpcServiceMethodProvider<TService> : IServiceMeth
     private static void BindDuplexStreaming<TRequest, TResponse>(
         ServiceMethodProviderContext<TService> context,
         ServiceMethodDescriptor desc)
-        where TRequest  : class
+        where TRequest : class
         where TResponse : class
     {
         var grpcMethod = CreateMethod<TRequest, TResponse>(MethodType.DuplexStreaming, desc);
@@ -169,7 +169,7 @@ internal sealed class ProtobufGrpcServiceMethodProvider<TService> : IServiceMeth
     private static Method<TRequest, TResponse> CreateMethod<TRequest, TResponse>(
         MethodType type,
         ServiceMethodDescriptor desc)
-        where TRequest  : class
+        where TRequest : class
         where TResponse : class
         => new(type, desc.ServiceName, desc.MethodName,
             ProtobufMarshaller.Create<TRequest>(),
@@ -181,9 +181,9 @@ internal sealed class ProtobufGrpcServiceMethodProvider<TService> : IServiceMeth
     /// Value-type key for the binder delegate cache so equality checks are allocation-free.
     /// </summary>
     private readonly record struct BinderKey(
-        string           ServiceName,
-        string           MethodName,
-        Type             RequestType,
-        Type             ResponseType,
-        ProtoMethodType  MethodType);
+        string ServiceName,
+        string MethodName,
+        Type RequestType,
+        Type ResponseType,
+        ProtoMethodType MethodType);
 }

@@ -20,7 +20,9 @@ var team = new Team
     Members = ["Alice", "Bob", "Charlie"],
     Scores = new Dictionary<string, int>
     {
-        ["Alice"] = 95, ["Bob"] = 87, ["Charlie"] = 92
+        ["Alice"] = 95,
+        ["Bob"] = 87,
+        ["Charlie"] = 92
     }
 };
 

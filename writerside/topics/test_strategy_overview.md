@@ -79,7 +79,7 @@ Core library tests covering:
 | `EndpointIntegrationTests.cs` | 8 | Full server-client round-trip |
 | **Total** | **123** | |
 
-### ProtobuffEncoder.Tool.Tests (12 tests)
+### ProtobuffEncoder.SourceGenerator.Tests (12 tests)
 
 | Test File | Tests | Coverage |
 |-----------|-------|----------|

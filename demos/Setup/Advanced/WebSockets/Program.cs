@@ -186,16 +186,16 @@ static void PrintSchema<T>(string label)
 namespace ProtobuffEncoder.Demo.Setup.Advanced.WebSockets
 {
     // ─────────────────────────────────────────────────────────────
-//  AUTO-DISCOVERED MODELS — no [ProtoContract] needed.
-//  The resolver assigns field numbers alphabetically.
-// ─────────────────────────────────────────────────────────────
+    //  AUTO-DISCOVERED MODELS — no [ProtoContract] needed.
+    //  The resolver assigns field numbers alphabetically.
+    // ─────────────────────────────────────────────────────────────
 
-// Expected resolver output (Alphabetical):
-//   message SensorReading {
-//     string SensorId = 1;   ← S
-//     string Unit = 2;       ← U
-//     double Value = 3;      ← V
-//   }
+    // Expected resolver output (Alphabetical):
+    //   message SensorReading {
+    //     string SensorId = 1;   ← S
+    //     string Unit = 2;       ← U
+    //     double Value = 3;      ← V
+    //   }
     public class SensorReading
     {
         public string SensorId { get; set; } = "";
@@ -203,11 +203,11 @@ namespace ProtobuffEncoder.Demo.Setup.Advanced.WebSockets
         public string Unit { get; set; } = "";
     }
 
-// Expected resolver output (Alphabetical):
-//   message SensorCommand {
-//     int32  IntervalMs = 1;  ← I
-//     string SensorId = 2;    ← S
-//   }
+    // Expected resolver output (Alphabetical):
+    //   message SensorCommand {
+    //     int32  IntervalMs = 1;  ← I
+    //     string SensorId = 2;    ← S
+    //   }
     public class SensorCommand
     {
         public string SensorId { get; set; } = "";

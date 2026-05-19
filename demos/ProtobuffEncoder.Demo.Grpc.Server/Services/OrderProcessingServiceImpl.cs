@@ -36,7 +36,7 @@ public class OrderProcessingServiceImpl : IOrderProcessingService
     }
 
     public async IAsyncEnumerable<Order> ProcessOrdersAsync(
-        IAsyncEnumerable<Order> ordersStream, 
+        IAsyncEnumerable<Order> ordersStream,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         await foreach (var order in ordersStream.WithCancellation(ct))
@@ -44,7 +44,7 @@ public class OrderProcessingServiceImpl : IOrderProcessingService
             // Simulate processing
             order.Status = OrderStatus.Processing;
             yield return order;
-            
+
             // Advance status
             order.Status = OrderStatus.Shipped;
             yield return order;

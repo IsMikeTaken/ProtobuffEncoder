@@ -26,7 +26,7 @@ public class InsanityTests
         // Assert — Should be reasonably fast (under 200ms for 10MB on modern systems)
         Assert.NotEmpty(bytes);
         Assert.True(sw.ElapsedMilliseconds < 500, $"Serialization of 10MB took too long: {sw.ElapsedMilliseconds}ms");
-        
+
         // Act (Decode)
         sw.Restart();
         var decoded = ProtobufEncoder.Decode<SimpleMessage>(bytes);

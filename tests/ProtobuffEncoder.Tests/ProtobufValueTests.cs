@@ -14,11 +14,11 @@ public class ProtobufValueTests
         using var stream = new MemoryStream();
         using var sender = new ProtobufValueSender(stream, ownsStream: false);
         sender.Send("Hello World 🌍");
-        
+
         stream.Position = 0;
         using var receiver = new ProtobufValueReceiver(stream, ownsStream: false);
         var result = receiver.ReceiveString();
-        
+
         Assert.Equal("Hello World 🌍", result);
     }
 
@@ -28,11 +28,11 @@ public class ProtobufValueTests
         using var stream = new MemoryStream();
         using var sender = new ProtobufValueSender(stream, ownsStream: false);
         sender.Send(12345);
-        
+
         stream.Position = 0;
         using var receiver = new ProtobufValueReceiver(stream, ownsStream: false);
         var result = receiver.ReceiveInt32();
-        
+
         Assert.Equal(12345, result);
     }
 
@@ -43,11 +43,11 @@ public class ProtobufValueTests
         using var stream = new MemoryStream();
         using var sender = new ProtobufValueSender(stream, ownsStream: false);
         sender.Send(guid);
-        
+
         stream.Position = 0;
         using var receiver = new ProtobufValueReceiver(stream, ownsStream: false);
         var result = receiver.ReceiveGuid();
-        
+
         Assert.Equal(guid, result);
     }
 
@@ -58,14 +58,14 @@ public class ProtobufValueTests
         using var stream = new MemoryStream();
         await using var sender = new ProtobufValueSender(stream, ownsStream: false);
         await sender.SendManyAsync(inputs.ToAsyncEnumerable());
-        
+
         stream.Position = 0;
         await using var receiver = new ProtobufValueReceiver(stream, ownsStream: false);
         var results = new List<string>();
 
         await foreach (var s in receiver.ReceiveAllStringsAsync())
             results.Add(s);
-        
+
         Assert.Equal(inputs, results);
     }
 
@@ -74,7 +74,7 @@ public class ProtobufValueTests
     {
         using var stream = new MemoryStream();
         using var receiver = new ProtobufValueReceiver(stream, ownsStream: false);
-        
+
         Assert.Null(receiver.ReceiveString());
         Assert.Null(receiver.ReceiveInt32());
     }
@@ -84,7 +84,7 @@ public class ProtobufValueTests
     {
         using var stream = new MemoryStream(new byte[] { 0x80 }); // MSB set but no next byte
         using var receiver = new ProtobufValueReceiver(stream, ownsStream: false);
-        
+
         Assert.Throws<InvalidOperationException>(() => receiver.ReceiveInt32());
     }
 }

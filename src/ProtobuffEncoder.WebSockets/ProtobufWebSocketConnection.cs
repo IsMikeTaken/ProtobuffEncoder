@@ -23,7 +23,7 @@ namespace ProtobuffEncoder.WebSockets;
 /// <typeparam name="TSend">The message type sent to the client.</typeparam>
 /// <typeparam name="TReceive">The message type received from the client.</typeparam>
 public sealed class ProtobufWebSocketConnection<TSend, TReceive> : IAsyncDisposable
-    where TSend    : class, new()
+    where TSend : class, new()
     where TReceive : class, new()
 {
     private readonly WebSocketStream _wsStream;
@@ -32,9 +32,9 @@ public sealed class ProtobufWebSocketConnection<TSend, TReceive> : IAsyncDisposa
     internal ProtobufWebSocketConnection(WebSocket ws, string connectionId)
     {
         ConnectionId = connectionId;
-        ConnectedAt  = DateTimeOffset.UtcNow;
-        _wsStream    = new WebSocketStream(ws);
-        _duplex      = new ProtobufDuplexStream<TSend, TReceive>(_wsStream, ownsStream: true);
+        ConnectedAt = DateTimeOffset.UtcNow;
+        _wsStream = new WebSocketStream(ws);
+        _duplex = new ProtobufDuplexStream<TSend, TReceive>(_wsStream, ownsStream: true);
     }
 
     /// <summary>Unique identifier assigned at accept time.</summary>

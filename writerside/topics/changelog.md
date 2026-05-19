@@ -19,14 +19,14 @@ All notable changes to this project will be documented in this file.
 ## [1.5.0] - 2026-04-13
 
 ### Added {id="v150_added"}
-- **`proto-gen` CLI tool** (`ProtobuffEncoder.Tool`) packaged as a .NET global tool installable via `dotnet tool install --global ProtobuffEncoder.Tool`. Supports `net8.0`, `net9.0`, and `net10.0`.
+- **`Source Generator` Source Generator** (`ProtobuffEncoder.SourceGenerator`) packaged as a .NET global tool installable via `dotnet tool install --global ProtobuffEncoder.SourceGenerator`. Supports `net8.0`, `net9.0`, and `net10.0`.
 - **`[assembly: ProtoToolOptions(ProtoPath = "...")]`** — sets the root output folder for generated `.proto` files. Defaults to `Contracts/Proto` when absent.
 - **`[assembly: ProtoRoute("folder", "Token1", "Token2")]`** — routes types whose name starts or ends with a token into a subfolder. Multiple attributes are applied in declaration order; first match wins. Replaces the previous `ProtoTypeRoute` class approach, which violated CS0655 (non-primitive array as attribute property).
 - **`--auto` mode** — parameterless guided run: scans for compiled DLLs, walks up to the project root, applies assembly configuration, and prompts before updating the `.csproj`.
 - **`--dry-run` flag** — prints what would be written without touching the filesystem, useful for CI validation.
 
 ### Changed {id="v150_changed"}
-- **CI workflows extended** — all three workflows (`ci-pr.yml`, `ci-development.yml`, `ci-release.yml`) now pack `tools/*/*.csproj` alongside `src/*/*.csproj`, so the `proto-gen` tool is included in every NuGet publish step.
+- **CI workflows extended** — all three workflows (`ci-pr.yml`, `ci-development.yml`, `ci-release.yml`) now pack `tools/*/*.csproj` alongside `src/*/*.csproj`, so the `Source Generator` tool is included in every NuGet publish step.
 - **`[ProtoToolOptions]` default** changed from `"Protos"` to `"Contracts/Proto"` to match idiomatic project layout.
 - **`cli_tool.md` rewritten** — covers `[ProtoToolOptions]` / `[ProtoRoute]` configuration, routing table, `--auto` guided-mode walkthrough, updated installation and command reference.
 - Version bumped from `1.4.0` to `1.5.0` in `Directory.Build.props`.
