@@ -79,6 +79,18 @@ internal sealed class PooledMemoryStream : Stream
         if (_position > _length) _length = _position;
     }
 
+    public override System.Threading.Tasks.Task WriteAsync(byte[] buffer, int offset, int count, System.Threading.CancellationToken cancellationToken)
+    {
+        Write(buffer, offset, count);
+        return System.Threading.Tasks.Task.CompletedTask;
+    }
+
+    public override System.Threading.Tasks.ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, System.Threading.CancellationToken cancellationToken = default)
+    {
+        Write(buffer.Span);
+        return default;
+    }
+
     public override void WriteByte(byte value)
     {
         EnsureCapacity(_position + 1);
