@@ -4,9 +4,13 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
     <IsRoslynComponent>true</IsRoslynComponent>
-    <IncludeBuildOutput>false</IncludeBuildOutput>
+
     <DevelopmentDependency>true</DevelopmentDependency>
     <LangVersion>latest</LangVersion>
+    <NoPackageAnalysis>true</NoPackageAnalysis>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <!-- Add build output to lib/netstandard2.0 in the package to satisfy NuGet validation for SNUPKG -->
+    <IncludeBuildOutput>true</IncludeBuildOutput>
   </PropertyGroup>
 
   <ItemGroup>
@@ -14,11 +18,14 @@
     <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" PrivateAssets="all" />
   </ItemGroup>
 
-  <!-- Package properties -->
   <PropertyGroup>
     <PackageId>ProtobuffEncoder.SourceGenerator</PackageId>
     <Description>Source generator for ProtobuffEncoder that generates .proto files during build time without a separate CLI step.</Description>
     <PackageTags>protobuf;proto;grpc;schema;codegen;source-generator</PackageTags>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="$(OutputPath)$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+  </ItemGroup>
 
 </Project>
