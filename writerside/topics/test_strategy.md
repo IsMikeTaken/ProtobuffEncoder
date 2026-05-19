@@ -51,7 +51,7 @@ This document outlines the comprehensive testing strategy for the `ProtobuffEnco
 | `ProtobuffEncoder.AspNetCore.Tests` | 43 | Input/output formatters, HttpClient extensions (TestHost), tiered setup validation, setup builder, options, strategy registration |
 | `ProtobuffEncoder.Grpc.Tests` | 34 | Marshaller round-trips, service method discovery (all 4 types), channel extensions, DI registration |
 | `ProtobuffEncoder.WebSockets.Tests` | 123 | WebSocket stream, retry policy, connection manager, client lifecycle, endpoint integration (TestHost) |
-| `ProtobuffEncoder.Tool.Tests` | 12 | ProjectModifier csproj manipulation, duplicate prevention, subdirectory paths, batch operations |
+| `ProtobuffEncoder.SourceGenerator.Tests` | 12 | ProjectModifier csproj manipulation, duplicate prevention, subdirectory paths, batch operations |
 | **Total** | **480+** | |
 
 ## Benchmarks
@@ -86,6 +86,6 @@ dotnet test tests/ProtobuffEncoder.Tests/
 dotnet test tests/ProtobuffEncoder.AspNetCore.Tests/
 dotnet test tests/ProtobuffEncoder.Grpc.Tests/
 dotnet test tests/ProtobuffEncoder.WebSockets.Tests/
-dotnet test tests/ProtobuffEncoder.Tool.Tests/
+dotnet test tests/ProtobuffEncoder.SourceGenerator.Tests/
 ```
 

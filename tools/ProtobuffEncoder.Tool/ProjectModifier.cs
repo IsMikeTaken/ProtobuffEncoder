@@ -41,7 +41,7 @@ internal static class ProjectModifier
     {
         if (generated.Count == 0) return;
 
-        var doc  = XDocument.Load(csprojPath);
+        var doc = XDocument.Load(csprojPath);
         var root = doc.Root;
         if (root is null) return;
 

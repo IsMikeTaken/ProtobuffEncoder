@@ -35,10 +35,10 @@ public static class ProtoSchemaGenerator
     private static readonly IReadOnlyDictionary<Type, (string ProtoType, string Import)> WellKnownTypes
         = new Dictionary<Type, (string, string)>
         {
-            [typeof(DateTime)]       = ("google.protobuf.Timestamp",  "google/protobuf/timestamp.proto"),
-            [typeof(DateTimeOffset)] = ("google.protobuf.Timestamp",  "google/protobuf/timestamp.proto"),
-            [typeof(TimeSpan)]       = ("google.protobuf.Duration",   "google/protobuf/duration.proto"),
-            [typeof(object)]         = ("google.protobuf.Any",        "google/protobuf/any.proto"),
+            [typeof(DateTime)] = ("google.protobuf.Timestamp", "google/protobuf/timestamp.proto"),
+            [typeof(DateTimeOffset)] = ("google.protobuf.Timestamp", "google/protobuf/timestamp.proto"),
+            [typeof(TimeSpan)] = ("google.protobuf.Duration", "google/protobuf/duration.proto"),
+            [typeof(object)] = ("google.protobuf.Any", "google/protobuf/any.proto"),
         };
 
     // ── Public entry points ───────────────────────────────────────────────────
@@ -94,8 +94,8 @@ public static class ProtoSchemaGenerator
             var firstType = group.First();
             var file = new ProtoFile
             {
-                Syntax   = "proto3",
-                Package  = firstType.Namespace ?? "default",
+                Syntax = "proto3",
+                Package = firstType.Namespace ?? "default",
                 FilePath = group.Key
             };
 
@@ -133,7 +133,7 @@ public static class ProtoSchemaGenerator
         foreach (var (filename, content) in files)
         {
             var path = Path.Combine(outputDirectory, filename);
-            var dir  = Path.GetDirectoryName(path);
+            var dir = Path.GetDirectoryName(path);
             if (!string.IsNullOrEmpty(dir))
                 Directory.CreateDirectory(dir);
 
@@ -162,7 +162,7 @@ public static class ProtoSchemaGenerator
     internal static string ResolveFileKey(Type type)
     {
         var contractAttr = type.GetCustomAttribute<ProtoContractAttribute>();
-        var serviceAttr  = type.GetCustomAttribute<ProtoServiceAttribute>();
+        var serviceAttr = type.GetCustomAttribute<ProtoServiceAttribute>();
 
         if (serviceAttr is not null && contractAttr is null)
             return ResolveServiceFileKey(type);
@@ -315,8 +315,8 @@ public static class ProtoSchemaGenerator
     private static ProtoFile BuildProtoFile(Type type)
     {
         var file = new ProtoFile { Syntax = "proto3", Package = type.Namespace ?? "" };
-        var visited            = new HashSet<Type>();
-        var wellKnownImports   = new HashSet<string>();
+        var visited = new HashSet<Type>();
+        var wellKnownImports = new HashSet<string>();
         CollectType(type, file, visited, wellKnownImports: wellKnownImports);
         file.WellKnownImports = wellKnownImports;
         return file;
@@ -384,9 +384,9 @@ public static class ProtoSchemaGenerator
 
         var def = new ProtoEnumDef
         {
-            Name       = enumType.Name,
+            Name = enumType.Name,
             AllowAlias = enumAttr?.AllowAlias ?? false,
-            Comment    = enumAttr?.Comment,
+            Comment = enumAttr?.Comment,
         };
 
         var members = enumType.GetFields(BindingFlags.Public | BindingFlags.Static);
@@ -395,7 +395,7 @@ public static class ProtoSchemaGenerator
         bool hasExplicitZero = members.Any(m =>
         {
             int clrValue = (int)m.GetRawConstantValue()!;
-            var valAttr  = m.GetCustomAttribute<ProtoEnumValueAttribute>();
+            var valAttr = m.GetCustomAttribute<ProtoEnumValueAttribute>();
             int protoNum = valAttr?.Number ?? clrValue;
             return protoNum == 0;
         });
@@ -406,7 +406,7 @@ public static class ProtoSchemaGenerator
         {
             def.Values.Add(new ProtoEnumValue
             {
-                Name   = $"{prefix}_UNSPECIFIED",
+                Name = $"{prefix}_UNSPECIFIED",
                 Number = 0,
             });
         }
@@ -416,17 +416,17 @@ public static class ProtoSchemaGenerator
         foreach (var member in members)
         {
             int clrValue = (int)member.GetRawConstantValue()!;
-            var valAttr  = member.GetCustomAttribute<ProtoEnumValueAttribute>();
+            var valAttr = member.GetCustomAttribute<ProtoEnumValueAttribute>();
             var fieldAttr = member.GetCustomAttribute<ProtoFieldAttribute>();
 
-            int  protoNum  = valAttr?.Number ?? clrValue;
+            int protoNum = valAttr?.Number ?? clrValue;
             string protoName = valAttr?.Name ?? $"{prefix}_{ToScreamingSnakeCase(member.Name)}";
             bool isDeprecated = fieldAttr?.IsDeprecated ?? false;
 
             valueList.Add(new ProtoEnumValue
             {
-                Name         = protoName,
-                Number       = protoNum,
+                Name = protoName,
+                Number = protoNum,
                 IsDeprecated = isDeprecated,
             });
         }
@@ -447,13 +447,13 @@ public static class ProtoSchemaGenerator
         HashSet<string>? wellKnownImports = null)
     {
         var descriptors = ContractResolver.Resolve(type);
-        var contract    = type.GetCustomAttribute<ProtoContractAttribute>();
+        var contract = type.GetCustomAttribute<ProtoContractAttribute>();
 
         var msg = new ProtoMessageDef
         {
-            Name       = !string.IsNullOrEmpty(contract?.Name) ? contract.Name : type.Name,
+            Name = !string.IsNullOrEmpty(contract?.Name) ? contract.Name : type.Name,
             SourceType = type,
-            Metadata   = contract?.Metadata,
+            Metadata = contract?.Metadata,
         };
 
         var oneOfGroups = new Dictionary<string, ProtoOneOfDef>();
@@ -484,10 +484,10 @@ public static class ProtoSchemaGenerator
             CollectType(inc.DerivedType, file, visited, typeToFileKey, currentFileKey, wellKnownImports);
             msg.Fields.Add(new ProtoFieldDef
             {
-                Name        = ToSnakeCase(inc.DerivedType.Name),
+                Name = ToSnakeCase(inc.DerivedType.Name),
                 FieldNumber = inc.FieldNumber,
-                TypeName    = inc.DerivedType.Name,
-                IsOptional  = true,
+                TypeName = inc.DerivedType.Name,
+                IsOptional = true,
             });
         }
 
@@ -502,31 +502,31 @@ public static class ProtoSchemaGenerator
         {
             return new ProtoFieldDef
             {
-                Name         = field.Name,
-                FieldNumber  = field.FieldNumber,
-                IsMap        = true,
-                MapKeyType   = MapToProtoType(field.MapKeyType,   file, visited, typeToFileKey, currentFileKey, wellKnownImports),
+                Name = field.Name,
+                FieldNumber = field.FieldNumber,
+                IsMap = true,
+                MapKeyType = MapToProtoType(field.MapKeyType, file, visited, typeToFileKey, currentFileKey, wellKnownImports),
                 MapValueType = MapToProtoType(field.MapValueType, file, visited, typeToFileKey, currentFileKey, wellKnownImports),
                 IsDeprecated = field.IsDeprecated,
             };
         }
 
-        var propType   = field.Property.PropertyType;
+        var propType = field.Property.PropertyType;
         var underlying = Nullable.GetUnderlyingType(propType) ?? propType;
-        bool isOptional  = field.IsNullable;
-        bool isRepeated  = field.IsCollection;
+        bool isOptional = field.IsNullable;
+        bool isRepeated = field.IsCollection;
 
         string typeName = isRepeated && field.ElementType is not null
             ? MapToProtoType(field.ElementType, file, visited, typeToFileKey, currentFileKey, wellKnownImports)
-            : MapToProtoType(underlying,         file, visited, typeToFileKey, currentFileKey, wellKnownImports);
+            : MapToProtoType(underlying, file, visited, typeToFileKey, currentFileKey, wellKnownImports);
 
         return new ProtoFieldDef
         {
-            Name         = field.Name,
-            FieldNumber  = field.FieldNumber,
-            TypeName     = typeName,
-            IsRepeated   = isRepeated,
-            IsOptional   = isOptional,
+            Name = field.Name,
+            FieldNumber = field.FieldNumber,
+            TypeName = typeName,
+            IsRepeated = isRepeated,
+            IsOptional = isOptional,
             IsDeprecated = field.IsDeprecated,
         };
     }
@@ -539,12 +539,12 @@ public static class ProtoSchemaGenerator
     {
         var svc = new ProtoServiceDef
         {
-            Name       = attr.ServiceName,
+            Name = attr.ServiceName,
             SourceType = serviceType,
-            Metadata   = attr.Metadata ?? serviceType.GetCustomAttribute<ProtoContractAttribute>()?.Metadata,
+            Metadata = attr.Metadata ?? serviceType.GetCustomAttribute<ProtoContractAttribute>()?.Metadata,
         };
 
-        var allMethods  = serviceType.GetMethods();
+        var allMethods = serviceType.GetMethods();
         bool anyExplicit = allMethods.Any(m => m.GetCustomAttribute<ProtoMethodAttribute>() is not null);
 
         // Track generated wrapper names to avoid duplicates when multiple RPCs share types.
@@ -560,7 +560,7 @@ public static class ProtoSchemaGenerator
             var (reqType, resType) = ExtractRpcTypes(method, methodAttr.MethodType);
             string rpcName = methodAttr.Name ?? method.Name;
 
-            string baseReqName = MapToProtoType(reqType,  file, visited, typeToFileKey, currentFileKey, wellKnownImports);
+            string baseReqName = MapToProtoType(reqType, file, visited, typeToFileKey, currentFileKey, wellKnownImports);
             string baseResName = resType == typeof(void)
                 ? "google.protobuf.Empty"
                 : MapToProtoType(resType, file, visited, typeToFileKey, currentFileKey, wellKnownImports);
@@ -570,17 +570,17 @@ public static class ProtoSchemaGenerator
                 wellKnownImports?.Add("google/protobuf/empty.proto");
 
             // Proto3 best practice: every RPC gets its own FooRequest / FooResponse message.
-            string reqWrapperName = EnsureWrapper(rpcName + "Request",  baseReqName, "request",  file, usedWrapperNames);
+            string reqWrapperName = EnsureWrapper(rpcName + "Request", baseReqName, "request", file, usedWrapperNames);
             string resWrapperName = EnsureWrapper(rpcName + "Response", baseResName, "response", file, usedWrapperNames);
 
             svc.Methods.Add(new ProtoRpcDef
             {
-                Name             = rpcName,
-                MethodType       = methodAttr.MethodType,
-                RequestTypeName  = reqWrapperName,
+                Name = rpcName,
+                MethodType = methodAttr.MethodType,
+                RequestTypeName = reqWrapperName,
                 ResponseTypeName = resWrapperName,
-                IsDeprecated     = method.GetCustomAttribute<ObsoleteAttribute>() is not null,
-                Comment          = methodAttr.Name is not null ? null : $"Auto-inferred from {method.Name} signature",
+                IsDeprecated = method.GetCustomAttribute<ObsoleteAttribute>() is not null,
+                Comment = methodAttr.Name is not null ? null : $"Auto-inferred from {method.Name} signature",
             });
         }
 
@@ -612,7 +612,7 @@ public static class ProtoSchemaGenerator
 
         var wrapper = new ProtoMessageDef
         {
-            Name     = wrapperName,
+            Name = wrapperName,
             Metadata = $"Auto-generated RPC {fieldLabel} wrapper",
         };
 
@@ -621,9 +621,9 @@ public static class ProtoSchemaGenerator
         {
             wrapper.Fields.Add(new ProtoFieldDef
             {
-                Name        = "data",
+                Name = "data",
                 FieldNumber = 1,
-                TypeName    = innerTypeName,
+                TypeName = innerTypeName,
             });
         }
 
@@ -644,16 +644,16 @@ public static class ProtoSchemaGenerator
             && parameters[0].ParameterType.IsGenericType
             && parameters[0].ParameterType.GetGenericTypeDefinition() == typeof(IAsyncEnumerable<>);
 
-        Type returnType    = method.ReturnType;
-        bool streamingOut  = returnType.IsGenericType
+        Type returnType = method.ReturnType;
+        bool streamingOut = returnType.IsGenericType
             && returnType.GetGenericTypeDefinition() == typeof(IAsyncEnumerable<>);
 
         ProtoMethodType methodType = (streamingIn, streamingOut) switch
         {
-            (true,  true)  => ProtoMethodType.DuplexStreaming,
-            (true,  false) => ProtoMethodType.ClientStreaming,
-            (false, true)  => ProtoMethodType.ServerStreaming,
-            _              => ProtoMethodType.Unary,
+            (true, true) => ProtoMethodType.DuplexStreaming,
+            (true, false) => ProtoMethodType.ClientStreaming,
+            (false, true) => ProtoMethodType.ServerStreaming,
+            _ => ProtoMethodType.Unary,
         };
 
         return new ProtoMethodAttribute(methodType) { Name = method.Name };
@@ -696,15 +696,15 @@ public static class ProtoSchemaGenerator
     {
         var underlying = Nullable.GetUnderlyingType(clrType) ?? clrType;
 
-        if (underlying == typeof(bool))                              return "bool";
-        if (underlying == typeof(int)   || underlying == typeof(short)  || underlying == typeof(sbyte)) return "int32";
-        if (underlying == typeof(uint)  || underlying == typeof(ushort) || underlying == typeof(byte))  return "uint32";
-        if (underlying == typeof(long))                              return "int64";
-        if (underlying == typeof(ulong))                             return "uint64";
-        if (underlying == typeof(float))                             return "float";
-        if (underlying == typeof(double))                            return "double";
-        if (underlying == typeof(string))                            return "string";
-        if (underlying == typeof(byte[]))                            return "bytes";
+        if (underlying == typeof(bool)) return "bool";
+        if (underlying == typeof(int) || underlying == typeof(short) || underlying == typeof(sbyte)) return "int32";
+        if (underlying == typeof(uint) || underlying == typeof(ushort) || underlying == typeof(byte)) return "uint32";
+        if (underlying == typeof(long)) return "int64";
+        if (underlying == typeof(ulong)) return "uint64";
+        if (underlying == typeof(float)) return "float";
+        if (underlying == typeof(double)) return "double";
+        if (underlying == typeof(string)) return "string";
+        if (underlying == typeof(byte[])) return "bytes";
 
         // Well-known types.
         if (WellKnownTypes.TryGetValue(underlying, out var wkt))
@@ -921,7 +921,7 @@ public static class ProtoSchemaGenerator
                 sb.AppendLine($"{pad}  // {rpc.Comment}");
 
             string reqStream = rpc.MethodType is ProtoMethodType.ClientStreaming or ProtoMethodType.DuplexStreaming ? "stream " : "";
-            string resStream = rpc.MethodType is ProtoMethodType.ServerStreaming  or ProtoMethodType.DuplexStreaming ? "stream " : "";
+            string resStream = rpc.MethodType is ProtoMethodType.ServerStreaming or ProtoMethodType.DuplexStreaming ? "stream " : "";
 
             if (rpc.IsDeprecated)
             {

@@ -25,7 +25,7 @@ public sealed class ProtobufDecodeException : Exception
     public ProtobufDecodeException(string message, int offset = -1, Type? targetType = null, Exception? inner = null)
         : base(message, inner)
     {
-        Offset     = offset;
+        Offset = offset;
         TargetType = targetType;
     }
 }

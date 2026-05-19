@@ -167,16 +167,16 @@ static void PrintSchemaFor<T>(string label)
 namespace ProtobuffEncoder.Demo.Setup.Advanced.Rest
 {
     // ─────────────────────────────────────────────────────────────
-//  MODELS — plain classes, no [ProtoContract] attributes.
-//  The resolver assigns field numbers based on the strategy.
-// ─────────────────────────────────────────────────────────────
+    //  MODELS — plain classes, no [ProtoContract] attributes.
+    //  The resolver assigns field numbers based on the strategy.
+    // ─────────────────────────────────────────────────────────────
 
-// Expected schema output (Alphabetical numbering):
-//   message Customer {
-//     string Email = 1;      ← E comes first
-//     bool   IsActive = 2;
-//     string Name = 3;       ← N comes after I
-//   }
+    // Expected schema output (Alphabetical numbering):
+    //   message Customer {
+    //     string Email = 1;      ← E comes first
+    //     bool   IsActive = 2;
+    //     string Name = 3;       ← N comes after I
+    //   }
     public class Customer
     {
         public string Name { get; set; } = "";
@@ -184,13 +184,13 @@ namespace ProtobuffEncoder.Demo.Setup.Advanced.Rest
         public bool IsActive { get; set; } = true;
     }
 
-// Expected schema output (DeclarationOrder numbering):
-//   message Invoice {
-//     string       Number = 1;     ← declared first
-//     string       CustomerName = 2;
-//     repeated ... LineItems = 3;
-//     double       Total = 4;      ← declared last
-//   }
+    // Expected schema output (DeclarationOrder numbering):
+    //   message Invoice {
+    //     string       Number = 1;     ← declared first
+    //     string       CustomerName = 2;
+    //     repeated ... LineItems = 3;
+    //     double       Total = 4;      ← declared last
+    //   }
     public class Invoice
     {
         public string Number { get; set; } = "";
@@ -199,13 +199,13 @@ namespace ProtobuffEncoder.Demo.Setup.Advanced.Rest
         public double Total { get; set; }
     }
 
-// Expected schema output (TypeThenAlphabetical — scalars, then collections):
-//   message Product {
-//     string       Category = 1;    ← scalar, C
-//     string       Name = 2;        ← scalar, N
-//     double       Price = 3;       ← scalar, P
-//     repeated ... Tags = 4;        ← collection comes last
-//   }
+    // Expected schema output (TypeThenAlphabetical — scalars, then collections):
+    //   message Product {
+    //     string       Category = 1;    ← scalar, C
+    //     string       Name = 2;        ← scalar, N
+    //     double       Price = 3;       ← scalar, P
+    //     repeated ... Tags = 4;        ← collection comes last
+    //   }
     public class Product
     {
         public string Name { get; set; } = "";
@@ -214,18 +214,18 @@ namespace ProtobuffEncoder.Demo.Setup.Advanced.Rest
         public List<string> Tags { get; set; } = [];
     }
 
-// ─────────────────────────────────────────────────────────────
-//  POLYMORPHISM — [ProtoInclude] maps derived types to field numbers.
-// ─────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────
+    //  POLYMORPHISM — [ProtoInclude] maps derived types to field numbers.
+    // ─────────────────────────────────────────────────────────────
 
-// Expected schema output:
-//   message Shape {
-//     string Name = 1;
-//     Circle circle = 10;
-//     Rectangle rectangle = 11;
-//   }
-//   message Circle { double Radius = 1; }
-//   message Rectangle { double Width = 1; double Height = 2; }
+    // Expected schema output:
+    //   message Shape {
+    //     string Name = 1;
+    //     Circle circle = 10;
+    //     Rectangle rectangle = 11;
+    //   }
+    //   message Circle { double Radius = 1; }
+    //   message Rectangle { double Width = 1; double Height = 2; }
 
     [ProtoContract]
     [ProtoInclude(10, typeof(Circle))]

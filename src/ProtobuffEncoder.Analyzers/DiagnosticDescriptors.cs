@@ -16,7 +16,7 @@ internal static class DiagnosticDescriptors
     public static readonly DiagnosticDescriptor ProtoContractWithoutFields = new(
         id: "PROTO001",
         title: "ProtoContract has no serializable fields",
-        messageFormat: "Type '{0}' is marked with [ProtoContract] but has no public properties with getters and setters — nothing will be serialised",
+        messageFormat: "Type '{0}' is marked with [ProtoContract] but has no public properties with getters and setters. Add at least one public property with a getter and setter, or remove the [ProtoContract] attribute.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
@@ -28,7 +28,7 @@ internal static class DiagnosticDescriptors
     public static readonly DiagnosticDescriptor DuplicateFieldNumber = new(
         id: "PROTO002",
         title: "Duplicate protobuf field number",
-        messageFormat: "Field number {0} is used by both '{1}' and '{2}' on type '{3}' — each field must have a unique number",
+        messageFormat: "Field number {0} is used by both '{1}' and '{2}' on type '{3}'. Change one of the [ProtoField] numbers so they are unique.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -40,7 +40,7 @@ internal static class DiagnosticDescriptors
     public static readonly DiagnosticDescriptor MissingParameterlessConstructor = new(
         id: "PROTO003",
         title: "ProtoContract type has no parameterless constructor",
-        messageFormat: "Type '{0}' is marked with [ProtoContract] but has no accessible parameterless constructor — deserialisation will fail at runtime",
+        messageFormat: "Type '{0}' is marked with [ProtoContract] but has no accessible parameterless constructor. Add a public or internal parameterless constructor to allow deserialization.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,

@@ -18,11 +18,11 @@ public class OrderProcessingDemo(IOrderProcessingService client) : IDemoStrategy
         Console.ForegroundColor = ConsoleColor.Cyan;
         Console.WriteLine($"\n  Received Order {order.Id} (Created {order.CreatedAt.LocalDateTime})");
         Console.ResetColor();
-        
+
         Console.WriteLine($"  Customer: {order.Customer.FirstName} {order.Customer.LastName}");
         Console.WriteLine($"  Shipping: {order.Customer.Address.Street}, {order.Customer.Address.City} [{order.Customer.Address.Country}]");
         Console.WriteLine($"  Status:   {order.Status}");
-        
+
         Console.WriteLine($"  Items ({order.Items.Count}):");
         foreach (var item in order.Items)
         {
@@ -30,10 +30,10 @@ public class OrderProcessingDemo(IOrderProcessingService client) : IDemoStrategy
         }
 
         Console.WriteLine("\n  --- Duplex Order Processing Stream ---");
-        
+
         // Setup stream pipeline
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10)); // Timeout safety
-        
+
         async IAsyncEnumerable<Order> GenerateOrders()
         {
             yield return new Order { Id = Guid.NewGuid(), Status = OrderStatus.PendingValidation };

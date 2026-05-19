@@ -1,6 +1,6 @@
 # CLI Tool
 
-`ProtobuffEncoder.Tool` is a .NET global tool that scans compiled assemblies for types decorated
+`ProtobuffEncoder.SourceGenerator` is a .NET global tool that scans compiled assemblies for types decorated
 with `[ProtoContract]` and `[ProtoService]`, generates `.proto` schema files with configurable
 output routing, and optionally patches `.csproj` files to include the generated output.
 
@@ -9,25 +9,25 @@ output routing, and optionally patches `.csproj` files to include the generated 
 Install as a global tool from NuGet:
 
 ```bash
-dotnet tool install --global ProtobuffEncoder.Tool
+dotnet tool install --global ProtobuffEncoder.SourceGenerator
 ```
 
 Or as a local (project-scoped) tool:
 
 ```bash
-dotnet tool install ProtobuffEncoder.Tool
+dotnet tool install ProtobuffEncoder.SourceGenerator
 ```
 
 Or run directly from source:
 
 ```bash
-dotnet run --project tools/ProtobuffEncoder.Tool -- <assembly-path> [output-dir] [csproj-path]
+dotnet build -- <assembly-path> [output-dir] [csproj-path]
 ```
 
 ## Usage
 
 ```
-proto-gen [assembly-path] [output-dir] [csproj-path] [options]
+Source Generator [assembly-path] [output-dir] [csproj-path] [options]
 ```
 
 | Argument | Required | Description |
@@ -51,19 +51,19 @@ proto-gen [assembly-path] [output-dir] [csproj-path] [options]
 
 ```bash
 # Guided — prompts for assembly selection and whether to update the project file
-proto-gen --auto
+Source Generator --auto
 
 # Minimal — uses [ProtoToolOptions] from the assembly (or defaults to Contracts/Proto/)
-proto-gen ./bin/Release/net10.0/MyApp.Contracts.dll
+Source Generator ./bin/Release/net10.0/MyApp.Contracts.dll
 
 # Override output directory
-proto-gen ./bin/Release/net10.0/MyApp.Contracts.dll ./gen/protos
+Source Generator ./bin/Release/net10.0/MyApp.Contracts.dll ./gen/protos
 
 # Generate and patch the csproj
-proto-gen ./bin/Release/net10.0/MyApp.Contracts.dll ./gen/protos ./MyApp.Server.csproj
+Source Generator ./bin/Release/net10.0/MyApp.Contracts.dll ./gen/protos ./MyApp.Server.csproj
 
 # Preview what would be written without touching files
-proto-gen ./bin/Release/net10.0/MyApp.Contracts.dll --dry-run --verbose
+Source Generator ./bin/Release/net10.0/MyApp.Contracts.dll --dry-run --verbose
 ```
 
 Sample output:
@@ -356,7 +356,7 @@ public interface IOrderService
 Command:
 
 ```bash
-proto-gen ./bin/Release/net10.0/MyApp.dll ./ignored MyApp.csproj --verbose
+Source Generator ./bin/Release/net10.0/MyApp.dll ./ignored MyApp.csproj --verbose
 ```
 
 Output:
@@ -382,7 +382,7 @@ When no assembly path is supplied, `--auto` walks you through generation interac
 4. Prompts whether to update the discovered `.csproj` with `<Content>` entries
 
 ```bash
-proto-gen --auto
+Source Generator --auto
 
 Select the assembly to scan:
   [1] bin/Release/net10.0/MyApp.Contracts.dll
@@ -403,4 +403,4 @@ package. `dotnet tool install` picks the best match for the installed runtime.
 
 ## Test Coverage
 
-The `ProjectModifier` and routing logic are covered by tests in `ProtobuffEncoder.Tool.Tests`.
+The `ProjectModifier` and routing logic are covered by tests in `ProtobuffEncoder.SourceGenerator.Tests`.

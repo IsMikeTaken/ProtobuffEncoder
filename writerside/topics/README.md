@@ -35,7 +35,7 @@ flowchart TD
 | `ProtobuffEncoder.Grpc` | Code-first gRPC marshaller, client proxy, service discovery | .NET 8 / 9 / 10 |
 | `ProtobuffEncoder.WebSockets` | Managed WebSocket client and server, connection manager, retry policies | .NET 8 / 9 / 10 |
 | `ProtobuffEncoder.Contracts` | Example contracts and service interfaces | .NET 8 / 9 / 10 |
-| `ProtobuffEncoder.Tool` | CLI tool for `.proto` generation and `.csproj` patching | .NET 8 / 9 / 10 |
+| `ProtobuffEncoder.SourceGenerator` | Source Generator for `.proto` generation and `.csproj` patching | .NET 8 / 9 / 10 |
 | `ProtobuffEncoder.Analyzers` | Roslyn analyser with 10 compile-time diagnostics (PROTO001–PROTO010) | netstandard2.0 |
 
 ## Quick Start
@@ -112,7 +112,7 @@ pie title "Test Suite (430+ tests)"
 | ProtobuffEncoder.AspNetCore.Tests | 41 | Formatters, HttpClient, setup, DI integration |
 | ProtobuffEncoder.Grpc.Tests | 34 | Marshaller, service discovery, client proxy, extensions |
 | ProtobuffEncoder.WebSockets.Tests | 117 | Client, server, connection manager, retry, stream |
-| ProtobuffEncoder.Tool.Tests | 12 | Project modifier, `.csproj` patching |
+| ProtobuffEncoder.SourceGenerator.Tests | 12 | Project modifier, `.csproj` patching |
 
 ## Documentation Map
 

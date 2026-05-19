@@ -68,7 +68,7 @@ public sealed class GrpcStrategy : IProtobufTransportStrategy
     public GrpcStrategy AddServiceAssembly(System.Reflection.Assembly assembly, bool autoMap = true)
     {
         var types = assembly.GetTypes()
-            .Where(t => t.IsClass && !t.IsAbstract && 
+            .Where(t => t.IsClass && !t.IsAbstract &&
                         (t.GetCustomAttributes(typeof(Attributes.ProtoServiceAttribute), true).Length > 0 ||
                          t.GetInterfaces().Any(i => i.GetCustomAttributes(typeof(Attributes.ProtoServiceAttribute), true).Length > 0)))
             .ToList();
@@ -121,7 +121,7 @@ public sealed class GrpcStrategy : IProtobufTransportStrategy
             {
                 if (_httpPort.HasValue)
                     kestrel.ListenLocalhost(_httpPort.Value, o => o.Protocols = HttpProtocols.Http1);
-                
+
                 if (_grpcPort.HasValue)
                     kestrel.ListenLocalhost(_grpcPort.Value, o => o.Protocols = HttpProtocols.Http2);
 

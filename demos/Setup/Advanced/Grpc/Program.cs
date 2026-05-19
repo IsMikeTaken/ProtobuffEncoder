@@ -133,16 +133,16 @@ static void PrintSchema<T>(string label)
 namespace ProtobuffEncoder.Demo.Setup.Advanced.Grpc
 {
     // ─────────────────────────────────────────────────────────────
-//  AUTO-DISCOVERED MODELS — no attributes needed.
-// ─────────────────────────────────────────────────────────────
+    //  AUTO-DISCOVERED MODELS — no attributes needed.
+    // ─────────────────────────────────────────────────────────────
 
-// Expected resolver output (DeclarationOrder):
-//   message InventoryItem {
-//     string Sku = 1;         ← declared first
-//     string Name = 2;
-//     int32  Quantity = 3;
-//     double UnitPrice = 4;   ← declared last
-//   }
+    // Expected resolver output (DeclarationOrder):
+    //   message InventoryItem {
+    //     string Sku = 1;         ← declared first
+    //     string Name = 2;
+    //     int32  Quantity = 3;
+    //     double UnitPrice = 4;   ← declared last
+    //   }
     public class InventoryItem
     {
         public string Sku { get; set; } = "";
@@ -151,13 +151,13 @@ namespace ProtobuffEncoder.Demo.Setup.Advanced.Grpc
         public double UnitPrice { get; set; }
     }
 
-// Expected resolver output (Alphabetical, auto-discovered):
-//   message StockLevel {
-//     bool   InStock = 1;     ← I
-//     int32  Quantity = 2;    ← Q
-//     string Sku = 3;         ← S
-//     string Warehouse = 4;   ← W
-//   }
+    // Expected resolver output (Alphabetical, auto-discovered):
+    //   message StockLevel {
+    //     bool   InStock = 1;     ← I
+    //     int32  Quantity = 2;    ← Q
+    //     string Sku = 3;         ← S
+    //     string Warehouse = 4;   ← W
+    //   }
     public class StockLevel
     {
         public string Sku { get; set; } = "";
@@ -166,9 +166,9 @@ namespace ProtobuffEncoder.Demo.Setup.Advanced.Grpc
         public bool InStock { get; set; }
     }
 
-// ─────────────────────────────────────────────────────────────
-//  gRPC SERVICE — uses auto-discovered types.
-// ─────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────
+    //  gRPC SERVICE — uses auto-discovered types.
+    // ─────────────────────────────────────────────────────────────
 
     [ProtoService("InventoryService")]
     public interface IInventoryGrpcService
@@ -192,7 +192,7 @@ namespace ProtobuffEncoder.Demo.Setup.Advanced.Grpc
         }
     }
 
-// Re-use the shared IDemoGrpcService contract.
+    // Re-use the shared IDemoGrpcService contract.
     public class DemoGrpcServiceImpl : IDemoGrpcService
     {
         public Task<DemoResponse> Echo(DemoRequest request) =>

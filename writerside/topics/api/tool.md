@@ -1,11 +1,11 @@
 # CLI Tool
 
-`ProtobuffEncoder.Tool` is a CLI that scans compiled .NET assemblies for `[ProtoContract]` types and generates `.proto` schema files.
+`ProtobuffEncoder.SourceGenerator` is a CLI that scans compiled .NET assemblies for `[ProtoContract]` types and generates `.proto` schema files.
 
 ## Usage
 
 ```bash
-dotnet run --project tools/ProtobuffEncoder.Tool -- <assembly-path> <proto-output-dir> [csproj-path]
+dotnet build -- <assembly-path> <proto-output-dir> [csproj-path]
 ```
 
 | Argument | Required | Description |
@@ -17,7 +17,7 @@ dotnet run --project tools/ProtobuffEncoder.Tool -- <assembly-path> <proto-outpu
 ### Example
 
 ```bash
-dotnet run --project tools/ProtobuffEncoder.Tool -- \
+dotnet build -- \
   "src/ProtobuffEncoder.Contracts/bin/Debug/net10.0/ProtobuffEncoder.Contracts.dll" \
   "src/ProtobuffEncoder.Contracts/protos" \
   "src/ProtobuffEncoder.Contracts/ProtobuffEncoder.Contracts.csproj"

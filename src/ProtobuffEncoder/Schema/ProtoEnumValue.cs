@@ -10,8 +10,8 @@ namespace ProtobuffEncoder.Schema;
 /// </param>
 public sealed record ProtoEnumValue(
     string Name,
-    int    Number,
-    bool   IsDeprecated = false)
+    int Number,
+    bool IsDeprecated = false)
 {
     // Parameterless constructor for object-initializer syntax compatibility.
     public ProtoEnumValue() : this("", 0) { }

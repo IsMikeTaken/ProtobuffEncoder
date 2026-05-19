@@ -24,7 +24,7 @@ List<string> paths = ProtoSchemaGenerator.GenerateToDirectory(assembly, "protos/
 ### CLI Tool
 
 ```bash
-dotnet run --project tools/ProtobuffEncoder.Tool -- \
+dotnet build -- \
   "src/ProtobuffEncoder.Contracts/bin/Debug/net10.0/ProtobuffEncoder.Contracts.dll" \
   "src/ProtobuffEncoder.Contracts/protos" \
   "src/ProtobuffEncoder.Contracts/ProtobuffEncoder.Contracts.csproj"

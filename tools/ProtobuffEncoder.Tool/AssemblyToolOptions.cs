@@ -21,7 +21,7 @@ internal sealed class AssemblyToolOptions
     private AssemblyToolOptions(string protoPath, ProtoRouteAttribute[] routes)
     {
         ProtoPath = protoPath;
-        _routes   = routes;
+        _routes = routes;
     }
 
     /// <summary>
@@ -87,7 +87,7 @@ internal sealed class AssemblyToolOptions
     /// </example>
     public string ResolveOutputPath(string protoFileName, string primaryTypeName)
     {
-        var dir  = Path.GetDirectoryName(protoFileName) ?? "";
+        var dir = Path.GetDirectoryName(protoFileName) ?? "";
         var file = Path.GetFileName(protoFileName);
 
         var capacity = 2 + (string.IsNullOrEmpty(dir) ? 0 : 1) + 1;

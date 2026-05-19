@@ -61,7 +61,7 @@ public static class OrderAggregateShowcase
         System.Console.WriteLine($"    Decoded Item 1: {decodedOrder.Items[0].ProductName} (x{decodedOrder.Items[0].Quantity})");
 
         // Verify values
-        if (decodedOrder.Id == order.Id && 
+        if (decodedOrder.Id == order.Id &&
             decodedOrder.Customer.FirstName == order.Customer.FirstName &&
             decodedOrder.Items.Count == order.Items.Count)
         {
